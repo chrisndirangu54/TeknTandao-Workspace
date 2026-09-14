@@ -1,11 +1,14 @@
 import './index.js';
-import {randomUUID} from 'node:crypto';
+import {createHash, randomUUID} from 'node:crypto';
 import {FieldValue, Timestamp, getFirestore} from 'firebase-admin/firestore';
 import {HttpsError, onCall} from 'firebase-functions/v2/https';
 import {catalog, canAccess, identifier, money} from './domain.js';
 import {graphNodeId, monthKey} from './sota_domain.js';
+import {websiteDigest} from './website_builder_domain.js';
+import {productRecordDigest} from './website_business_ai_domain.js';
 import {
   processTemplates,
+  safeAgentExecutionActions,
   summarizeAiUsage,
   validateAgentExecution,
   validateAiUsage,
@@ -74,6 +77,29 @@ function cleanDoc(data) {
     if (value?.toMillis instanceof Function) result[key] = value.toMillis();
   }
   return result;
+}
+
+function assertWebsiteSized(document) {
+  if (Buffer.byteLength(JSON.stringify(document), 'utf8') > 750000) throw new Error('Website JSON is too large');
+}
+
+function executionDigest(payload) {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+async function writeAgentEvent(org, permit, user, type, payload) {
+  const ref = org.collection('eventBus').doc(`agent_evt_${permit.permitId}`.slice(0, 180));
+  await ref.set({
+    type,
+    sourceApp: permit.appId,
+    payload,
+    depth: 0,
+    state: 'pending',
+    actorUid: user,
+    agentId: permit.agentId,
+    agentPermitId: permit.permitId,
+    createdAt: stamp()
+  }, {merge: true});
 }
 
 export const getProcessMarketplace = callable(async request => {
@@ -147,6 +173,10 @@ export const executeAgentAction = callable(async request => {
 
   const execution = validateAgentExecution({action: request.data.action, payload: request.data.payload}, permit.appId);
   if (execution.action !== permit.action) throw new Error('Permit action does not match execution');
+  const approvedPayloadDigest = audit.websiteAiContext?.payloadDigest;
+  if (approvedPayloadDigest && executionDigest(execution.payload) !== approvedPayloadDigest) {
+    throw new Error('Agent permit payload does not match the approved Website AI action');
+  }
   const executionRef = org.collection('agentExecutions').doc(permitId);
   if (permit.state === 'consumed') {
     const existing = (await executionRef.get()).data();
@@ -182,16 +212,41 @@ export const executeAgentAction = callable(async request => {
   try {
     const deterministicId = `agent_${permitId}`.slice(0, 180);
     if (execution.action === 'record.create') {
-      const ref = recordCollection(org, permit.appId).doc(deterministicId);
+      const ref = recordCollection(org, permit.appId).doc(execution.payload.recordId || deterministicId);
+      const existing = await ref.get();
+      if (existing.exists && existing.data().agentPermitId !== permitId) throw new Error('Target record already exists');
+      if (!existing.exists) {
+        await ref.create({
+          ...execution.payload.record,
+          agentId: permit.agentId,
+          agentPermitId: permitId,
+          createdBy: user,
+          createdAt: stamp(),
+          updatedBy: user,
+          updatedAt: stamp()
+        });
+      }
+      result = {recordId: ref.id, appId: permit.appId};
+      await writeAgentEvent(org, {...permit, permitId}, user, `${permit.appId}.record_created`, {recordId: ref.id});
+    } else if (execution.action === 'record.update') {
+      const ref = recordCollection(org, permit.appId).doc(execution.payload.recordId);
+      const existing = await ref.get();
+      if (!existing.exists) throw new Error('Target record not found');
+      if (execution.payload.expectedRecordDigest && permit.appId === 'inventory') {
+        const currentDigest = productRecordDigest(ref.id, existing.data());
+        if (currentDigest !== execution.payload.expectedRecordDigest) {
+          throw new Error('Product changed since the AI plan was generated; regenerate the plan before editing');
+        }
+      }
       await ref.set({
         ...execution.payload.record,
         agentId: permit.agentId,
         agentPermitId: permitId,
-        createdBy: user,
-        createdAt: stamp(),
+        updatedBy: user,
         updatedAt: stamp()
       }, {merge: true});
-      result = {recordId: ref.id, appId: permit.appId};
+      result = {recordId: ref.id, appId: permit.appId, updated: true};
+      await writeAgentEvent(org, {...permit, permitId}, user, `${permit.appId}.record_updated`, {recordId: ref.id});
     } else if (execution.action === 'task.create') {
       if (permit.appId !== 'crm') throw new Error('task.create requires a CRM-scoped permit');
       const ref = org.collection('tasks').doc(deterministicId);
@@ -214,6 +269,89 @@ export const executeAgentAction = callable(async request => {
         createdAt: stamp()
       }, {merge: true});
       result = {eventId: ref.id};
+    } else if (execution.action === 'website.document.apply') {
+      const {projectId, expectedRevision, document, planId} = execution.payload;
+      assertWebsiteSized(document);
+      const projectRef = org.collection('websiteProjects').doc(projectId);
+      const collaborationRef = org.collection('websiteCollaboration').doc(projectId);
+      const nextRevision = await db.runTransaction(async tx => {
+        const [projectSnapshot, collaborationSnapshot] = await Promise.all([tx.get(projectRef), tx.get(collaborationRef)]);
+        if (!projectSnapshot.exists) throw new Error('Website project not found');
+        const project = projectSnapshot.data();
+        if (project.revision !== expectedRevision) throw new Error(`Website changed since AI planning; server revision is ${project.revision}`);
+        const revision = expectedRevision + 1;
+        tx.update(projectRef, {
+          draft: document,
+          title: document.title,
+          revision,
+          status: project.publishedVersion ? 'modified' : 'draft',
+          aiPlanId: planId,
+          updatedBy: user,
+          updatedAt: stamp()
+        });
+        tx.set(org.collection('websiteProjectEvents').doc(`${projectId}_${revision}`), {
+          projectId,
+          revision,
+          kind: 'agent_replace_document',
+          planId,
+          agentId: permit.agentId,
+          agentPermitId: permitId,
+          digest: websiteDigest(document),
+          actorUid: user,
+          createdAt: stamp()
+        });
+        const epoch = Number(collaborationSnapshot.data()?.epoch || 1) + 1;
+        tx.set(collaborationRef, {
+          projectId,
+          epoch,
+          base: document,
+          materializedOpCount: 0,
+          materializedOpSetHash: '',
+          checkpointedBy: user,
+          checkpointedAt: stamp()
+        }, {merge: true});
+        if (planId) tx.set(org.collection('websiteAiPlans').doc(planId), {state: 'draft_applied', appliedRevision: revision, appliedAt: stamp()}, {merge: true});
+        return revision;
+      });
+      result = {projectId, revision: nextRevision, digest: websiteDigest(document)};
+      await writeAgentEvent(org, {...permit, permitId}, user, 'website.ai_document_applied', {projectId, revision: nextRevision});
+    } else if (execution.action === 'website.publish') {
+      const {projectId, planId} = execution.payload;
+      const projectRef = org.collection('websiteProjects').doc(projectId);
+      result = await db.runTransaction(async tx => {
+        const projectSnapshot = await tx.get(projectRef);
+        if (!projectSnapshot.exists) throw new Error('Website project not found');
+        const project = projectSnapshot.data();
+        assertWebsiteSized(project.draft);
+        const ownerRef = db.doc(`websitePublicSiteOwners/${identifier(project.publicId)}`);
+        const ownerSnapshot = await tx.get(ownerRef);
+        if (!ownerSnapshot.exists || ownerSnapshot.data().orgId !== org.id || ownerSnapshot.data().projectId !== projectId) throw new Error('Public site ownership mismatch');
+        const version = (Number.isInteger(project.publishedVersion) ? project.publishedVersion : 0) + 1;
+        const digest = websiteDigest(project.draft);
+        tx.set(org.collection('websiteVersions').doc(`${projectId}_${version}`), {
+          projectId,
+          version,
+          revision: project.revision,
+          document: project.draft,
+          digest,
+          publishedBy: user,
+          agentId: permit.agentId,
+          agentPermitId: permitId,
+          publishedAt: stamp()
+        });
+        tx.set(db.doc(`publishedWebsiteSites/${identifier(project.publicId)}`), {
+          publicId: project.publicId,
+          version,
+          revision: project.revision,
+          digest,
+          document: project.draft,
+          publishedAt: stamp()
+        });
+        tx.update(projectRef, {publishedVersion: version, publishedDigest: digest, status: 'published', publishedBy: user, publishedAt: stamp(), updatedAt: stamp()});
+        if (planId) tx.set(org.collection('websiteAiPlans').doc(planId), {state: 'published', publishedVersion: version, publishedAt: stamp()}, {merge: true});
+        return {projectId, publicId: project.publicId, version, revision: project.revision, digest};
+      });
+      await writeAgentEvent(org, {...permit, permitId}, user, 'website.published', {projectId, version: result.version});
     } else {
       const node = execution.payload.node;
       const nodeId = graphNodeId(node);
@@ -338,7 +476,7 @@ export const getControlPlaneOverview = callable(async request => {
     counts: result,
     pendingApprovals: pendingApprovals.data().count,
     openSyncConflicts: conflicts.data().count,
-    safeAgentActions: ['record.create', 'task.create', 'event.publish', 'graph.upsert'],
+    safeAgentActions: safeAgentExecutionActions,
     generatedAt: Date.now()
   };
 });

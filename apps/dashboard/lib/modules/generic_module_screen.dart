@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../app_blueprints.dart';
 import '../suite.dart';
 import 'platform_control_center.dart';
-import 'website_platform_studio.dart';
+import 'website_business_agent_screen.dart';
 
 class GenericEnterpriseModuleScreen extends StatefulWidget {
   final SuiteModule module;
@@ -199,7 +199,7 @@ class _GenericEnterpriseModuleScreenState
   @override
   Widget build(BuildContext context) {
     if (module.id == 'mc14_website_builder') {
-      return WebsitePlatformStudioScreen(store: store);
+      return WebsiteBusinessStudioScreen(store: store);
     }
     if (PlatformControlCenterScreen.supports(module.id)) {
       return PlatformControlCenterScreen(module: module, store: store);
