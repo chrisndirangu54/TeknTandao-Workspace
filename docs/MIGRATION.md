@@ -1,20 +1,45 @@
 # Upstream migration work
 
-All clones are pinned in `inventory/sources-lock.json`. The audit generator reads source manifests without running upstream code. Run `python scripts/audit-repositories.py` to regenerate the inventory.
+TeknTandao uses a **reuse-first feature-donor strategy**. Existing repositories should be migrated before equivalent functionality is rebuilt, provided their license, security posture and architecture are acceptable. All approved donors are pinned in `inventory/module-source-map.json` and `inventory/sources-lock.json`.
 
-| Area | Sources | Findings and next integration work |
+The audit tooling never executes upstream repository code. Use `python scripts/sync-module-sources.py` to obtain only licensed/pinned donors, and `python scripts/audit-repositories.py` to refresh the broader inventory.
+
+| Area | Sources | Reuse decision and next integration work |
 |---|---|---|
-| CRM | ClientFlow, FlareLine-CRM | ClientFlow uses MySQL/SQLite with Firebase messaging; FlareLine is a dashboard. Replace repositories and auth with suite contracts, migrate customer IDs, check root/dependency licenses. |
-| Inventory | Flutter-Firebase-Inventory-Management-App | Uses Auth/Firestore, but independent paths and identity flow. Map products to tenant products, route stock mutations through backend transactions, resolve redistribution licensing. |
-| POS | The-POS-Flutter, firebase-pos | Existing fork targets Dart 2 and uses HTTP/Hive. New MIT candidate uses Flutter/Auth/Firestore plus local storage. Adapt catalog/customer repositories and server-authoritative checkout; preserve offline replay IDs. |
-| HR | flutter_hr_management_design, EWork | HR fork is a Dart 2 UI; EWork is a different stack. Build real employee, leave, attendance and payroll domain workflows before integrating screens. |
-| Hospital | Hospital-Management-System-Mobile-App | Dart 2 HTTP client, no Firebase database dependency. Clinical records, scheduling, pharmacy and billing need separate domain schemas and granular clinical roles. No migration of patient data has been attempted. |
-| School | SchoolMate-App | Firebase dependencies but Dart 2 constraints. Port roles, pupils, classes and fee workflows with tenant boundaries. |
-| Books | TallyAssist, account-financial-tools, agora-invoicing-community | TallyAssist is a legacy Flutter/Firebase candidate; Odoo and PHP sources are reference systems, not Flutter modules. Current Books is draft invoices only, not double-entry accounting. |
-| Time | time-tracking | Modern Flutter/Firebase MIT candidate; uses per-user jobs/entries. Replace per-user ownership with organization/job/member contracts and shared auth. |
-| Attendance | employee-attendance | README advertises Firebase but checked pubspec has no Firebase packages; treat as an unverified candidate, not a ready integration. |
-| Property CRM | sfdx-dreamhouse | Salesforce/Apex source; reference only for a future Flutter implementation. |
+| CRM | FlareLine-CRM, ClientFlow, sfdx-dreamhouse | **Prefer FlareLine-CRM** for Flutter CRM UI/pipeline patterns. Replace its data/auth assumptions with `SuiteStore`, canonical contacts and TeknTandao RBAC. ClientFlow requires license review; Dreamhouse is workflow reference only. |
+| Inventory | Flutter-Firebase-Inventory-Management-App | Strong Firebase/Flutter donor for inventory flows, but root licensing must be resolved before substantial code copying. Once cleared, map its stock/catalog UX to canonical `products` and server-authoritative stock mutations. |
+| POS | elrizwiraswara/flutter_pos, The-POS-Flutter, TallyAssist | **Prefer MIT `flutter_pos`** for product/cart/checkout/receipt UI and Firebase patterns. Keep TeknTandao's server-authoritative sale transaction, idempotent request IDs, M-Pesa/Paystack adapters and shared product/contact data. |
+| HR | flutter_hr_management_design, EWork | Reuse the existing HR dashboard/UI after dependency modernization. EWork remains a domain/workflow reference where its stack does not fit Flutter directly. |
+| Attendance | employee-attendance | Reuse attendance workflows/UI after modernization, but verify its actual persistence architecture before porting. Do not introduce a second auth or attendance database. |
+| Hospital | Hospital-Management-System-Mobile-App | Use as clinical navigation/workflow reference until licensing is resolved. Patient/clinical data remains under dedicated protected TeknTandao collections and granular roles. |
+| School | SchoolMate-App | Reuse student/guardian/class UX and Firebase patterns after licensing and Flutter upgrade work. Map all records to tenant-scoped canonical paths. |
+| Accounting | account-financial-tools, TallyAssist, agora-invoicing-community | Reuse financial calculations, ledger/reporting concepts, Flutter UI from TallyAssist and invoice lifecycle behavior from Agora. TeknTandao still owns the canonical accounting ledger and payment/tax adapters. |
+| Time Tracking | bizz84/starter_architecture_flutter_firebase | **Preferred donor** for Firebase architecture, time-entry flows and tests. Replace per-user ownership with organization/member/project contracts. |
+| Property | wallfly, airbnb-clone, cocorico and related property repositories | Audit these candidates before building more property screens. Reuse listing/booking/tenant interaction patterns where licensing and stack allow. |
+| eCommerce | Amazon-Clone, ebay-clone, Grocery-Flutter-Design, Multi-Vendor-E-commerce, spree, marketplacekit, vendd | Audit and reuse catalog/cart/merchant UX before writing a new storefront from zero. Shared TeknTandao products, payments and inventory remain authoritative. |
+| Transport | Bus-Ticket-app, redbus, GPS4 | Reuse booking, route, fleet or tracking workflows where compatible; integrate them with shared Fleet/Payments rather than shipping separate systems. |
+| Collaboration | mini-google-docs-clone, community-edition, instiki, discourse | Audit before implementing WorkDrive/wiki/community functionality from scratch. Prefer reusable collaboration UX and document workflows where licensing permits. |
+| Identity/KYC | Identity_Verification, smart-kyc, KYB, KYC-chain, oss-kyc and related repos | Security-sensitive: audit code and licenses carefully. Reuse only isolated, reviewed components; do not inherit authentication or secret-handling blindly. |
 
-Priority: integrate the modern Firebase POS and time-tracking data layers, complete CRM/inventory editing and import tooling, then HR/school/hospital domain workflows. Preserve upstream copyright notices for reused code; missing root licenses and commercial dependencies need review before shipping their code.
+## Migration rules
 
-The initial suite demonstrates the integration contract with new code. It does not claim these cloned applications are already migrated, compiled or production ready.
+1. **Existing code first:** search the audited portfolio before creating a new equivalent module.
+2. **License before copy:** missing or unclear license means audit/reference only.
+3. **Port features, not silos:** donor repositories do not keep separate authentication, organization databases, billing or provider credentials.
+4. **Canonical data wins:** contacts, products, employees, sales, invoices, payments and shared entities map into TeknTandao's data fabric.
+5. **Server-authoritative writes:** sensitive mutations remain behind validated Functions, even if the donor originally wrote directly to Firestore.
+6. **Modernize while porting:** remove stale Flutter APIs, dependencies and obsolete SDK constraints rather than freezing the workspace to an old donor version.
+7. **Preserve provenance:** retain required copyright/license notices and source commit provenance.
+8. **Test the integration:** every migrated feature needs tenant isolation, RBAC, replay/idempotency and cross-module workflow tests as applicable.
+
+## First implementation wave
+
+1. POS from `elrizwiraswara/flutter_pos`.
+2. CRM from `chrisndirangu54/FlareLine-CRM`.
+3. Time tracking from `bizz84/starter_architecture_flutter_firebase`.
+4. HR + Attendance from the existing HR/attendance donors.
+5. Accounting/invoicing from TallyAssist, account-financial-tools and Agora.
+6. Inventory once redistribution licensing is resolved.
+7. School/Hospital once licensing and domain/security requirements are cleared.
+
+The target is not to preserve the donor applications as independent products. The target is to extract proven functionality and make it feel like one simple TeknTandao workspace with one identity, one organization data fabric and consistent cross-app automation.
