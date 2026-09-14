@@ -141,7 +141,7 @@ export const installProcessTemplate = callable(async request => {
 export const uninstallProcessTemplate = callable(async request => {
   const {org} = await authorize(request, null, true);
   const templateId = identifier(request.data.templateId);
-  const ruleId = `market_${template.id}`;
+  const ruleId = `market_${templateId}`;
   const ref = org.collection('automationRules').doc(ruleId);
   const snapshot = await ref.get();
   if (!snapshot.exists || snapshot.data().templateId !== templateId) throw new Error('Installed process template not found');
