@@ -26,6 +26,10 @@ before(async () => {
     await setDoc(doc(db, 'organizations/a/payments/settlement'), {amount:120000,state:'paid'});
     await setDoc(doc(db, 'organizations/a/apps/mc25_mining_operations'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
     await setDoc(doc(db, 'organizations/a/mc25_mining_operations/shift-one'), {site:'Kendege',status:'ACTIVE'});
+    await setDoc(doc(db, 'organizations/a/businessGraphNodes/customer_one'), {type:'customer',label:'Customer One'});
+    await setDoc(doc(db, 'organizations/a/automationRules/rule_one'), {name:'Owner workflow',enabled:true});
+    await setDoc(doc(db, 'organizations/a/agents/finance_agent'), {displayName:'Finance Agent'});
+    await setDoc(doc(db, 'organizations/a/syncReceipts/crm_phone_1'), {status:'applied'});
   });
 });
 after(async () => { await env?.cleanup(); });
@@ -46,9 +50,26 @@ test('master app collections are entitlement-bound without weakening reserved co
   await assertFails(getDoc(doc(clerk, 'organizations/a/payments/settlement')));
   await assertSucceeds(getDoc(doc(env.authenticatedContext('a').firestore(), 'organizations/a/payments/settlement')));
 });
-test('clients cannot grant roles, renew subscriptions, forge payment or edit records', async () => {
+test('cross-app SOTA control plane is owner-only on direct Firestore reads', async () => {
+  const owner = env.authenticatedContext('a').firestore();
+  const clerk = env.authenticatedContext('clerk').firestore();
+  for (const path of [
+    'businessGraphNodes/customer_one',
+    'automationRules/rule_one',
+    'agents/finance_agent',
+    'syncReceipts/crm_phone_1'
+  ]) {
+    await assertSucceeds(getDoc(doc(owner, `organizations/a/${path}`)));
+    await assertFails(getDoc(doc(clerk, `organizations/a/${path}`)));
+  }
+});
+test('clients cannot grant roles, renew subscriptions, forge payment, edit records or mutate the control plane', async () => {
   const db = env.authenticatedContext('a').firestore();
-  for (const path of ['members/attacker','apps/crm','payments/forged','contacts/customer','taxOutbox/fake','mc25_mining_operations/forged']) {
+  for (const path of [
+    'members/attacker','apps/crm','payments/forged','contacts/customer','taxOutbox/fake','mc25_mining_operations/forged',
+    'businessGraphNodes/forged','businessGraphEdges/forged','eventBus/forged','automationRules/forged','agents/forged',
+    'agentApprovals/forged','agentPermits/forged','agentAudit/forged','agentUsage/forged','syncReceipts/forged'
+  ]) {
     await assertFails(setDoc(doc(db, `organizations/a/${path}`), {role:'owner',state:'paid'}));
   }
 });
