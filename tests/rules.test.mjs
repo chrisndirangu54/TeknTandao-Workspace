@@ -29,7 +29,10 @@ before(async () => {
     await setDoc(doc(db, 'organizations/a/businessGraphNodes/customer_one'), {type:'customer',label:'Customer One'});
     await setDoc(doc(db, 'organizations/a/automationRules/rule_one'), {name:'Owner workflow',enabled:true});
     await setDoc(doc(db, 'organizations/a/agents/finance_agent'), {displayName:'Finance Agent'});
+    await setDoc(doc(db, 'organizations/a/agentExecutions/permit_one'), {state:'completed'});
     await setDoc(doc(db, 'organizations/a/syncReceipts/crm_phone_1'), {status:'applied'});
+    await setDoc(doc(db, 'organizations/a/aiUsage/ai_req_1'), {provider:'openai',costMinor:25});
+    await setDoc(doc(db, 'organizations/a/aiFinOpsConfig/default'), {monthlyBudgetMinor:10000});
   });
 });
 after(async () => { await env?.cleanup(); });
@@ -57,7 +60,10 @@ test('cross-app SOTA control plane is owner-only on direct Firestore reads', asy
     'businessGraphNodes/customer_one',
     'automationRules/rule_one',
     'agents/finance_agent',
-    'syncReceipts/crm_phone_1'
+    'agentExecutions/permit_one',
+    'syncReceipts/crm_phone_1',
+    'aiUsage/ai_req_1',
+    'aiFinOpsConfig/default'
   ]) {
     await assertSucceeds(getDoc(doc(owner, `organizations/a/${path}`)));
     await assertFails(getDoc(doc(clerk, `organizations/a/${path}`)));
@@ -68,7 +74,8 @@ test('clients cannot grant roles, renew subscriptions, forge payment, edit recor
   for (const path of [
     'members/attacker','apps/crm','payments/forged','contacts/customer','taxOutbox/fake','mc25_mining_operations/forged',
     'businessGraphNodes/forged','businessGraphEdges/forged','eventBus/forged','automationRules/forged','agents/forged',
-    'agentApprovals/forged','agentPermits/forged','agentAudit/forged','agentUsage/forged','syncReceipts/forged'
+    'agentApprovals/forged','agentPermits/forged','agentExecutions/forged','agentAudit/forged','agentUsage/forged',
+    'syncReceipts/forged','aiUsage/forged','aiFinOpsConfig/forged'
   ]) {
     await assertFails(setDoc(doc(db, `organizations/a/${path}`), {role:'owner',state:'paid'}));
   }
