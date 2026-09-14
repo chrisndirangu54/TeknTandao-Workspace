@@ -4,7 +4,7 @@ import {FieldValue, getFirestore} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {onDocumentWritten} from 'firebase-functions/v2/firestore';
 import {defineSecret} from 'firebase-functions/params';
-import {canAccess, identifier, textValue} from './domain.js';
+import {canAccess, catalog, identifier, textValue} from './domain.js';
 import {validateAgentPolicy} from './sota_domain.js';
 import {validateCmsCollection, validateCmsEntry} from './website_builder_advanced_domain.js';
 import {websiteDigest} from './website_builder_domain.js';
@@ -12,6 +12,7 @@ import {
   businessContextDigest,
   businessProductCmsSchema,
   businessProductCollectionId,
+  productRecordDigest,
   publicProductValues,
   summarizeBusinessGraph,
   validateWebsiteBusinessPlan,
@@ -85,6 +86,7 @@ async function collectBusinessContext(org, projectId) {
   ]);
   if (!projectSnapshot.exists) throw new Error('Website project not found');
   const products = productsSnapshot.docs.map(doc => publicProduct(doc.id, doc.data()));
+  const productDigests = Object.fromEntries(productsSnapshot.docs.map(doc => [doc.id, productRecordDigest(doc.id, doc.data())]));
   const graph = summarizeBusinessGraph(nodesSnapshot.docs.map(doc => doc.data()), edgesSnapshot.docs.map(doc => doc.data()));
   const productPerformance = {};
   let salesRevenueMinor = 0;
@@ -127,6 +129,7 @@ async function collectBusinessContext(org, projectId) {
       document: current.draft,
     },
     products,
+    productDigests,
     productPerformance,
     graph,
     metrics: {
@@ -209,7 +212,7 @@ export const ensureWebsiteBusinessAgent = callable(async request => {
     allowedActions: ['website.document.apply', 'website.publish', 'record.create', 'record.update'],
     approvalRequiredActions: ['website.publish', 'record.create', 'record.update'],
     monthlyBudgetMinor: Number.isSafeInteger(request.data.monthlyBudgetMinor) ? request.data.monthlyBudgetMinor : 500000,
-  }, (await import('./domain.js')).catalog);
+  }, catalog);
   const agent = {
     agentId: websiteBusinessAgentId,
     displayName: 'Website Business Operator',
@@ -228,7 +231,8 @@ export const getWebsiteBusinessContext = callable(async request => {
   const {org} = await authorize(request);
   const projectId = identifier(request.data.projectId);
   const context = await collectBusinessContext(org, projectId);
-  return {...context, contextDigest: businessContextDigest(context)};
+  const {productDigests: _, ...publicContext} = context;
+  return {...publicContext, contextDigest: businessContextDigest(publicContext)};
 });
 
 export const refreshWebsiteBusinessCatalog = callable(async request => {
@@ -257,7 +261,14 @@ export const generateWebsiteBusinessPlan = callable(async request => {
   };
   const guide = `You are the governed Website Business Operator inside TeknTandao. Return JSON only with keys summary, rationale, document, productChanges, publishRecommended, optimizationGoal. document MUST be a complete valid TeknTandao website JSON document using schemaVersion 1 and only these node types: page,section,container,row,column,wrap,stack,heading,text,richText,image,button,icon,divider,spacer,card,grid,navbar,hero,features,pricing,testimonials,cta,footer,form. Every node needs id,type,props,style,responsive,action,children. Actions are none, navigate with path, or externalUrl with an http/https/mailto/tel URL. Never output scripts, HTML, CSS, Dart, secrets or Firebase paths. For live product grids, use props.dataCollection="${businessProductCollectionId}" and child bindings such as {{name}}, {{description}}, {{price}}, {{stock}}, {{imageUrl}}. Product changes must be an array of {mutationId,operation,productId,product,reason}; operation is create or update. Product price is ALWAYS integer KES minor units: KES 250 = 25000. Stock and reorderLevel are non-negative integers. For create, product.name is required. For update, productId must match an existing product and product contains only changed fields. Do not invent product changes unless the user's goal asks for them. Preserve the current website when the goal only concerns products. Use aggregate Business Graph context and product/sales/website analytics to make evidence-based design, merchandising and optimization decisions.`;
   const raw = await callGemini(`${guide}\n\nUser goal:\n${goal}\n\nCurrent website:\n${JSON.stringify(context.project.document)}\n\nBusiness context (no customer PII):\n${JSON.stringify(safeContext)}`, geminiKey.value());
-  const plan = validateWebsiteBusinessPlan(raw);
+  const validated = validateWebsiteBusinessPlan(raw);
+  const productChanges = validated.productChanges.map(mutation => {
+    if (mutation.operation !== 'update') return mutation;
+    const baseProductDigest = context.productDigests[mutation.productId];
+    if (!baseProductDigest) throw new Error(`AI tried to update unknown product ${mutation.productId}`);
+    return {...mutation, baseProductDigest};
+  });
+  const plan = {...validated, productChanges};
   const planId = identifier(request.data.planId || `web_ai_${randomUUID()}`);
   const contextDigest = businessContextDigest(safeContext);
   await org.collection('websiteAiPlans').doc(planId).set({
