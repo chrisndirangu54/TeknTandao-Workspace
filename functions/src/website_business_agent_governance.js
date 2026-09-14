@@ -71,10 +71,16 @@ function actionFromPlan(plan, input) {
     const action = mutation.operation === 'create' ? 'record.create' : 'record.update';
     const payload = mutation.operation === 'create'
       ? {recordId: mutation.productId || mutation.mutationId, record: mutation.product}
-      : {recordId: mutation.productId, record: mutation.product};
+      : {recordId: mutation.productId, record: mutation.product, expectedRecordDigest: mutation.baseProductDigest};
     return {appId: 'inventory', action, mutationId, payload};
   }
   throw new Error('Unknown Website AI action kind');
+}
+
+function validatedAction(plan, input) {
+  const execution = actionFromPlan(plan, input);
+  const validated = validateAgentExecution({action: execution.action, payload: execution.payload}, execution.appId);
+  return {...execution, payload: validated.payload};
 }
 
 async function loadPlan(org, planId) {
@@ -91,7 +97,7 @@ async function assertAppAccess(org, member, appId) {
 export const requestWebsiteBusinessAction = callable(async request => {
   const {org, user, member} = await authorize(request);
   const plan = await loadPlan(org, request.data.planId);
-  const execution = actionFromPlan(plan, request.data);
+  const execution = validatedAction(plan, request.data);
   await assertAppAccess(org, member, execution.appId);
   const agent = (await org.collection('agents').doc(websiteBusinessAgentId).get()).data();
   if (!agent?.policy) throw new Error('Create the Website Business Operator agent first');
@@ -160,10 +166,12 @@ export const resolveWebsiteBusinessAction = callable(async request => {
   const mapping = (await org.collection('websiteAiActionRequests').doc(requestId).get()).data();
   if (!mapping) throw new Error('Website AI action request not found');
   const plan = await loadPlan(org, mapping.planId);
-  const execution = actionFromPlan(plan, {kind: mapping.kind, mutationId: mapping.mutationId});
+  const execution = validatedAction(plan, {kind: mapping.kind, mutationId: mapping.mutationId});
   if (digest(execution.payload) !== mapping.payloadDigest) throw new Error('Website AI action payload changed after approval request');
   const audit = (await org.collection('agentAudit').doc(requestId).get()).data();
-  if (!audit || audit.action !== execution.action || audit.appId !== execution.appId) throw new Error('Agent audit does not match the Website AI action');
+  if (!audit || audit.action !== execution.action || audit.appId !== execution.appId || audit.websiteAiContext?.payloadDigest !== mapping.payloadDigest) {
+    throw new Error('Agent audit does not match the Website AI action');
+  }
   let permitId = mapping.permitId || null;
   if (!permitId) {
     const approval = (await org.collection('agentApprovals').doc(requestId).get()).data();
