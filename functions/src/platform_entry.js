@@ -24,6 +24,9 @@ export {
 export {patchWebsiteProject} from './website_builder_crdt_patch.js';
 export {exportAdvancedWebsiteFlutterScaffold as exportWebsiteFlutterScaffold} from './website_builder_scaffold.js';
 export * from './website_builder_advanced.js';
+export {
+  resolveCostAwarePublishedWebsiteExperience as resolvePublishedWebsiteExperience
+} from './website_runtime_cost_guard.js';
 export * from './website_builder_payout_webhook.js';
 export * from './website_business_ai.js';
 export * from './website_business_agent_governance.js';
