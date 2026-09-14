@@ -23,3 +23,4 @@ export {
 } from './website_builder.js';
 export {patchWebsiteProject} from './website_builder_crdt_patch.js';
 export * from './website_builder_advanced.js';
+export * from './website_builder_payout_webhook.js';
