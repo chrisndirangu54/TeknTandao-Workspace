@@ -22,14 +22,19 @@ test('bundle quote uses distinct apps, minor units, and correct tiers', () => {
 
 test('master catalogue is available to install and price', () => {
   assert.equal(masterCatalogueCategoryCount, 30);
-  assert.equal(masterCatalogueSourceAppCount, 638);
-  assert.ok(Object.keys(catalog).length > 650);
+  assert.equal(masterCatalogueSourceAppCount, 653);
+  assert.ok(Object.keys(catalog).length > 665);
   assert.equal(catalog.mc25_mining_operations.name, 'Mining Operations');
   assert.equal(catalog.mc30_ai_finance_analyst.name, 'AI Finance Analyst');
   assert.equal(catalog.mc22_airtel_money.category, 'Africa-First Payments & Compliance');
+  assert.equal(catalog.mc30_agent_control_center.name, 'Agent Control Center');
+  assert.equal(catalog.mc11_business_graph.name, 'Business Graph');
+  assert.equal(catalog.mc19_cross_border_trade_os.name, 'Cross-Border Trade OS');
+  assert.equal(catalog.mc13_iot_and_device_cloud.name, 'IoT & Device Cloud');
+  assert.equal(catalog.mc25_geo_and_mining_intelligence.name, 'Geo & Mining Intelligence');
   assert.equal(quote(['mc25_mining_operations']).subtotal, catalog.mc25_mining_operations.price);
   assert.equal(
-    quote(['mc25_mining_operations', 'mc30_ai_finance_analyst', 'mc22_airtel_money']).discountPercent,
+    quote(['mc30_agent_control_center', 'mc11_business_graph', 'mc19_cross_border_trade_os']).discountPercent,
     10
   );
 });
