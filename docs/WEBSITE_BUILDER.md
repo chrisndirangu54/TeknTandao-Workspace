@@ -1,142 +1,188 @@
-# TeknTandao JSON-First Website Studio
+# TeknTandao JSON-First Website Platform
 
-The Website Studio turns the existing `Website Builder` catalogue app (`mc14_website_builder`) into a visual, runtime-rendered website platform rather than a conventional compile-time page generator.
+The Website Studio turns `mc14_website_builder` into a visual, runtime-rendered website platform. Validated JSON is the source of truth; Flutter is the controlled renderer. Supported content, layout, CMS, experiment and plugin-fragment changes can therefore publish without rebuilding the installed Flutter runtime.
 
-## Core model
+## Runtime architecture
 
-The validated website JSON document is the source of truth. A project stores a draft document, an optimistic `revision`, a stable public site id and version metadata. Visual edits are submitted as bounded node patches instead of arbitrary source code.
+A website project stores a validated draft, public id, publication versions and a content digest. The runtime accepts a bounded vocabulary of page/section/container, row/column/wrap/stack, typography, image, button, card, grid, navbar, hero, features, pricing, testimonials, CTA, footer and form components.
 
-Supported patch operations are:
+The server rejects arbitrary inline JavaScript, HTML, CSS, Dart, unsafe URL schemes, duplicate node ids and unbounded trees. Third-party extensibility is provided through capability-scoped remote plugins rather than executing untrusted native code inside a customer app.
 
-- update a node's props/style/responsive values/action,
-- insert a validated component,
-- remove a component,
-- move a component,
-- update a page,
-- replace theme tokens.
+Publishing writes an immutable organization version and the public runtime snapshot at `publishedWebsiteSites/{publicId}`. Tenant ownership stays in server-only `websitePublicSiteOwners/{publicId}`.
 
-Every edit requires the current revision. A stale editor receives a revision conflict instead of silently overwriting a newer change. Edit events are retained for audit/history.
+## CRDT collaboration
 
-## Live publishing without rebuilding Flutter
+Normal visual-editor patches are now routed through the collaboration engine rather than stale-revision rejection.
 
-Publishing validates the whole document, stores an immutable organization version and atomically updates:
+The collaboration model is an operation-set CRDT:
 
-`publishedWebsiteSites/{publicId}`
+- edits are immutable semantic patch operations,
+- every operation has an actor, monotonically increasing actor clock, operation id and epoch,
+- replicas merge by set union,
+- materialization uses deterministic Lamport/actor ordering,
+- dependency-sensitive operations are replayed until no additional operation can apply,
+- presence records expose active collaborators and selected nodes,
+- epoch checkpoints compact the collaboration base and create an explicit garbage-collection boundary.
 
-That public document contains only runtime publication data (public id, version/revision, digest, document and publication timestamp). Internal organization ownership is held separately in server-only `websitePublicSiteOwners`, so the public runtime document does not disclose the internal tenant id.
+`submitWebsiteCrdtOperation` is available to offline/new clients that maintain their own Lamport clocks. The compatibility `patchWebsiteProject` API allocates a server-side per-actor clock, so the existing visual editor benefits from the same CRDT operation stream without a breaking client migration.
 
-Generated Flutter projects listen to the published Firestore document. The generated app also contains a bundled JSON fallback. Content and supported layout changes therefore become visible after a JSON publish without recompiling or redeploying the Flutter client.
+## Custom domains, DNS and SSL
 
-A rebuild is still required when the runtime itself changes—for example when adding a brand-new executable widget type or native capability that the installed runtime does not understand.
+`provisionWebsiteCustomDomain` provisions a Firebase Hosting custom-domain resource. Firebase Hosting remains the certificate authority/orchestrator and automatically manages the TLS certificate after domain ownership and required DNS records validate.
 
-## Closed component schema
+DNS modes:
 
-Templates and AI output cannot inject arbitrary JavaScript, HTML, CSS, Dart, Firebase paths or executable plugins. The runtime uses a bounded component vocabulary including page/section/container layout, rows/columns/wrap/stack, typography, images, buttons, cards, grids, navbar, hero, features, pricing, testimonials, CTA, footer and forms.
+- `cloudflare`: TeknTandao reads Firebase Hosting's required DNS updates and automatically reconciles A, AAAA, CNAME, TXT and CAA records through the Cloudflare DNS API.
+- `manual`: TeknTandao returns the exact required DNS records for registrars/providers without an installed automation adapter; `syncWebsiteCustomDomain` re-checks Hosting ownership/certificate state afterwards.
 
-The server validates:
+A domain is marked active only when Hosting reports active host ownership and an active/expiring-soon certificate. `syncWebsiteDomains` reconciles configured domains every 30 minutes. The production runtime resolves the incoming host through the private domain mapping and serves the corresponding published JSON website.
 
-- unique stable node ids,
-- maximum pages, nodes and tree depth,
-- supported node types,
-- scalar props,
-- colors and numeric style limits,
-- mobile/tablet/desktop/wide responsive overrides,
-- safe navigation/external URL actions,
-- document size before Firestore writes.
+Required/optional configuration:
 
-Only `http`, `https`, `mailto` and `tel` external URL schemes are accepted.
+- `CLOUDFLARE_API_TOKEN` for Cloudflare-managed zones,
+- `WEBSITE_FIREBASE_HOSTING_SITE_ID` when the Hosting site id differs from the Firebase project id,
+- `WEBSITE_CERT_PREFERENCE` to override the default dedicated certificate preference.
 
-## Visual Studio
+The Firebase service identity used by Functions must have permission to manage Hosting custom domains.
 
-The Flutter editor provides:
+## Asset CDN uploads
 
-- mobile, tablet and desktop preview widths,
-- draggable component palette,
-- click-to-select canvas nodes,
-- in-place property/style inspector,
-- theme editing,
-- multi-page projects,
-- JSON inspection/copy,
-- AI website generation when Gemini is configured,
-- Flutter/Firebase scaffold export,
-- live publishing,
-- direct `Sell as template` creator action,
-- marketplace and creator dashboards.
+Website assets use a signed-upload/finalize flow:
 
-The production project collection is streamed through Firestore, so collaborators see current project documents while server-side revision checks protect concurrent edits.
+1. `createWebsiteAssetUpload` validates the requested file and returns a short-lived V4 signed Cloud Storage PUT URL.
+2. The editor uploads directly to the staging object.
+3. `finalizeWebsiteAssetUpload` checks the stored content type and size, moves the object to an immutable final path and assigns a download token.
+4. Final media is served with `Cache-Control: public,max-age=31536000,immutable`.
 
-## AI generation
+Allowed assets are passive image/video/PDF/WOFF2 types; active SVG/HTML/script uploads are rejected. Direct Firebase Storage client reads/writes are denied by `storage.rules`; public media uses per-object download-token URLs.
 
-`generateWebsiteFromPrompt` asks the configured Gemini model for schema-constrained JSON and then validates the result using the same server validator as manually created sites. Model output is never trusted as executable code.
+Configuration:
 
-Required production configuration:
+- `WEBSITE_ASSET_BUCKET`, or the Firebase app's configured Storage bucket.
 
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`
+## Headless CMS and data bindings
 
-If they are absent, AI generation fails closed rather than pretending to work.
+The builder now includes typed CMS collections with field types:
 
-## Flutter + Firebase scaffold export
+- text / long text,
+- number / boolean,
+- date / datetime,
+- URL / image,
+- reference,
+- bounded JSON object.
 
-`exportWebsiteFlutterScaffold` returns a deterministic project scaffold containing:
+Collections can mark individual fields public/private and can enable public runtime reads. Only published CMS entries are returned publicly, and private fields are stripped server-side.
 
-- `pubspec.yaml`,
-- `lib/main.dart`,
-- `assets/site.json`,
-- `firebase.json`,
-- `README.md`.
+Any component can become a CMS repeater using a scalar `dataCollection` prop and optional `dataLimit`. Child component strings support `{{field}}` and dotted-path interpolation. This preserves the closed JSON schema while allowing real content/data-driven sites.
 
-The scaffold initializes Firebase, listens to the live publication document and falls back to the bundled document if no remote snapshot is available. It can therefore be used as an independently deployable Flutter/Firebase starting point while preserving TeknTandao's runtime JSON model.
+## Third-party plugins
 
-## Template Marketplace
+Plugins are open to arbitrary third-party publishers but execute out-of-process at publisher-controlled HTTPS endpoints. This is the security boundary that permits extensibility without giving templates arbitrary code execution inside the customer's Flutter process.
 
-Owners can publish a project as a versioned template with:
+Plugin manifests declare explicit capabilities such as:
 
-- creator identity/display name,
-- description/category/tags,
-- content digest and version,
-- KES price in minor units,
-- `free`, `single_use`, `commercial` or `extended` licensing metadata,
-- sales and install counters.
+- `site.fragment` / `site.data`,
+- `cms.read` / `cms.write`,
+- `forms.receive`,
+- `automation.emit`,
+- `analytics.write`,
+- `asset.read`.
 
-Installing a paid template requires an organization entitlement. A buyer cannot bypass the server and install a paid template by editing Firestore directly.
+Installation grants are stored per organization. Invocations carry an HMAC-derived installation credential from `WEBSITE_PLUGIN_SIGNING_SECRET`. A plugin may return bounded JSON data or a visual fragment; fragments must pass the same TeknTandao website-node validator before rendering. Public-site invocation additionally requires `publicRuntime: true`.
 
-### Verified checkout
+## Public forms and spam protection
 
-Paid template checkout supports the platform's existing verified payment providers:
+Published form submissions are server-authoritative through `submitPublishedWebsiteForm`.
 
-- Paystack initialization + signed webhook + independent transaction verification,
-- M-Pesa STK initiation + Daraja transaction query verification.
+The production pipeline includes:
 
-Only a verified successful transaction grants the buyer entitlement. Purchase references and settlement are replay-safe/idempotent at the entitlement layer.
+- verification that the submitted form exists in the published document,
+- bounded field validation,
+- HMAC-hashed requester identity rather than storing raw visitor IPs,
+- a per-site/per-requester rolling rate limit,
+- honeypot detection,
+- minimum-submit-time heuristics,
+- link/repetition/known-spam scoring,
+- optional Cloudflare Turnstile verification,
+- separation of accepted submissions and spam quarantine,
+- aggregate daily form/spam counters,
+- conversion attribution when an experiment exposure token is present.
 
-### Creator earnings
+`TURNSTILE_SECRET_KEY` enables Turnstile verification. Forms do not require CAPTCHA by default; sites can enable `requireCaptcha` when the public client supplies a Turnstile token.
 
-A verified sale creates a seller earning record with gross amount, configurable platform fee, seller net and payout state. `WEBSITE_MARKETPLACE_FEE_BPS` controls the marketplace fee and defaults to zero when not configured.
+## Runtime A/B experiments and conversion analytics
 
-Automated creator payouts are **not** claimed. Earnings remain `pending_payout` until a real compliant payout rail and payout/reconciliation process is configured.
+Experiments point to immutable published website versions. Each experiment supports:
 
-## Security boundaries
+- 2-8 variants,
+- exact basis-point weights totalling 10,000,
+- partial traffic allocation,
+- URL-path targeting,
+- start/end scheduling,
+- named conversion goals.
 
-- Website project writes are callable/server-authoritative.
-- Entitled Website Builder collaborators can read project JSON.
-- Project edit history, publication versions and creator earnings are owner-only for direct reads.
-- Published site JSON supports public single-document reads but cannot be listed through Firestore rules.
-- Public site ownership/reservation metadata is not public.
-- All client writes remain denied by the global Firestore write rule.
-- Marketplace payment state and entitlements are created server-side after provider verification.
+`resolvePublishedWebsiteExperience` creates a deterministic sticky assignment from an HMAC visitor hash, returns the selected published document and a signed 24-hour exposure token. Raw visitor identifiers are not persisted.
 
-## Current production boundaries
+`recordWebsiteConversion` accepts only signed exposure tokens and configured events. Daily site views, experiment exposures, conversions and form outcomes are stored as aggregates for the owner dashboard.
 
-The implemented platform is intentionally honest about what remains outside this tranche:
+Configuration:
 
-- custom-domain DNS/SSL provisioning and automated Firebase Hosting deployment,
-- automated creator payouts,
-- public form-submission backend/spam protection (the form component is currently a visual/runtime primitive),
-- uploaded asset/CDN management,
-- arbitrary third-party plugin execution,
-- true CRDT-style simultaneous editing; current collaboration is live-document + optimistic revision conflict handling,
-- advanced CMS/data bindings and reusable cross-project design-system packages,
-- runtime A/B experimentation and conversion analytics.
+- `WEBSITE_ANALYTICS_SIGNING_KEY`.
 
-These can be layered onto the JSON runtime without changing the core principle: website state remains validated data, while the Flutter runtime remains a controlled renderer/executor.
+## Template marketplace and creator payouts
+
+Templates remain versioned JSON products with KES pricing, content digests, licensing metadata, verified Paystack/M-Pesa purchase entitlement, install counters and creator earnings.
+
+Creator payout automation is implemented through Paystack Transfers:
+
+1. the creator configures a supported KES transfer recipient,
+2. pending earnings are transactionally claimed into one payout job,
+3. the platform initiates the Paystack transfer,
+4. direct signed transfer webhooks and a scheduled 15-minute reconciliation job independently verify the transfer through Paystack,
+5. earnings become `paid_out` only after provider verification reports success,
+6. failed/reversed payouts return their earnings to the pending state.
+
+Supported payout profile types are `mobile_money`, `mobile_money_business` and `kepss`, subject to the connected Paystack account's live-country/provider availability and recipient codes.
+
+Configuration:
+
+- `PAYSTACK_SECRET_KEY`,
+- `WEBSITE_MARKETPLACE_FEE_BPS` for marketplace commission.
+
+## AI generation and scaffold export
+
+`generateWebsiteFromPrompt` asks the configured Gemini model for schema-constrained JSON and validates that output through the same server validator before it can become a project.
+
+Configuration:
+
+- `GEMINI_API_KEY`,
+- `GEMINI_MODEL`.
+
+`exportWebsiteFlutterScaffold` continues to provide an independently deployable Flutter/Firebase starting point with bundled JSON fallback. TeknTandao's hosted runtime uses the richer experience resolver for custom-domain routing, CMS, plugins, forms and experiments.
+
+## Security model
+
+- Website project and infrastructure mutations are callable/server-authoritative.
+- All direct Firestore client writes remain denied.
+- Published runtime JSON is public by opaque id but cannot be listed.
+- Tenant/domain ownership mappings are server-only.
+- Collaborators can read authoring/CMS/asset/collaboration data only with Website Builder entitlement.
+- Release history, domains, analytics, submissions, spam quarantine and payout records are owner-only.
+- Storage writes use short-lived signed URLs and immutable finalized paths.
+- Plugin code never executes directly inside the customer Flutter process.
+- Marketplace purchase entitlements and creator payout state close only after provider verification.
+
+## Deployment checklist
+
+To turn every provider-backed path on in production, configure the relevant credentials and provider accounts rather than substituting demo responses:
+
+- Firebase Hosting site + service-account permission for custom domains,
+- Cloudflare API token and per-domain Zone ID for automatic DNS,
+- Firebase Storage bucket/signing capability,
+- `WEBSITE_PLUGIN_SIGNING_SECRET`,
+- `WEBSITE_ANALYTICS_SIGNING_KEY`,
+- optional `TURNSTILE_SECRET_KEY`,
+- Paystack live transfer capability/recipient codes,
+- Gemini configuration for AI generation.
+
+These are deployment credentials and external-provider approvals, not missing application logic. Provider-specific restrictions still apply—for example, an organization cannot automate DNS for a registrar/zone it has not authorized, and a Paystack account cannot send a payout rail that Paystack has not enabled for that account.
