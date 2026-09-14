@@ -70,7 +70,7 @@ service cloud.firestore {
 
       // Website Builder: collaborators can read the live authoring model, CMS,
       // assets and collaboration presence. Infrastructure, submissions,
-      // analytics, payouts and immutable release history are owner-only.
+      // analytics, AI plans and immutable release history are owner-only.
       match /websiteProjects/{id} { allow read: if access(org, 'mc14_website_builder'); }
       match /websiteTemplateEntitlements/{id} { allow read: if access(org, 'mc14_website_builder'); }
       match /websiteAssets/{id} { allow read: if access(org, 'mc14_website_builder'); }
@@ -97,6 +97,8 @@ service cloud.firestore {
       match /websiteFormStats/{id} { allow read: if owner(org); }
       match /websiteCreatorPayoutProfiles/{id} { allow read: if owner(org); }
       match /websiteCreatorPayouts/{id} { allow read: if owner(org); }
+      match /websiteAiPlans/{id} { allow read: if owner(org); }
+      match /websiteAiActionRequests/{id} { allow read: if owner(org); }
 
       // Cross-app graph, automation, agent, AI-cost and sync metadata can expose
       // data from multiple installed apps. Direct client reads therefore remain
