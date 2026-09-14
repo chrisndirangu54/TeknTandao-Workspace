@@ -1,10 +1,11 @@
 import './index.js';
-import {randomUUID} from 'node:crypto';
+import {createHash, randomUUID} from 'node:crypto';
 import {FieldValue, Timestamp, getFirestore} from 'firebase-admin/firestore';
 import {HttpsError, onCall} from 'firebase-functions/v2/https';
 import {catalog, canAccess, identifier, money} from './domain.js';
 import {graphNodeId, monthKey} from './sota_domain.js';
 import {websiteDigest} from './website_builder_domain.js';
+import {productRecordDigest} from './website_business_ai_domain.js';
 import {
   processTemplates,
   safeAgentExecutionActions,
@@ -82,6 +83,10 @@ function assertWebsiteSized(document) {
   if (Buffer.byteLength(JSON.stringify(document), 'utf8') > 750000) throw new Error('Website JSON is too large');
 }
 
+function executionDigest(payload) {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
 async function writeAgentEvent(org, permit, user, type, payload) {
   const ref = org.collection('eventBus').doc(`agent_evt_${permit.permitId}`.slice(0, 180));
   await ref.set({
@@ -136,7 +141,7 @@ export const installProcessTemplate = callable(async request => {
 export const uninstallProcessTemplate = callable(async request => {
   const {org} = await authorize(request, null, true);
   const templateId = identifier(request.data.templateId);
-  const ruleId = `market_${templateId}`;
+  const ruleId = `market_${template.id}`;
   const ref = org.collection('automationRules').doc(ruleId);
   const snapshot = await ref.get();
   if (!snapshot.exists || snapshot.data().templateId !== templateId) throw new Error('Installed process template not found');
@@ -168,6 +173,10 @@ export const executeAgentAction = callable(async request => {
 
   const execution = validateAgentExecution({action: request.data.action, payload: request.data.payload}, permit.appId);
   if (execution.action !== permit.action) throw new Error('Permit action does not match execution');
+  const approvedPayloadDigest = audit.websiteAiContext?.payloadDigest;
+  if (approvedPayloadDigest && executionDigest(execution.payload) !== approvedPayloadDigest) {
+    throw new Error('Agent permit payload does not match the approved Website AI action');
+  }
   const executionRef = org.collection('agentExecutions').doc(permitId);
   if (permit.state === 'consumed') {
     const existing = (await executionRef.get()).data();
@@ -223,6 +232,12 @@ export const executeAgentAction = callable(async request => {
       const ref = recordCollection(org, permit.appId).doc(execution.payload.recordId);
       const existing = await ref.get();
       if (!existing.exists) throw new Error('Target record not found');
+      if (execution.payload.expectedRecordDigest && permit.appId === 'inventory') {
+        const currentDigest = productRecordDigest(ref.id, existing.data());
+        if (currentDigest !== execution.payload.expectedRecordDigest) {
+          throw new Error('Product changed since the AI plan was generated; regenerate the plan before editing');
+        }
+      }
       await ref.set({
         ...execution.payload.record,
         agentId: permit.agentId,
