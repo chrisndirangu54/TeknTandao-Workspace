@@ -1,0 +1,12 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Website assets are uploaded through short-lived signed PUT URLs and
+    // finalized by Functions. Public media is served through per-object
+    // download tokens. No browser/mobile client receives generic bucket write
+    // permission, so a compromised site editor cannot overwrite another asset.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
