@@ -15,30 +15,38 @@ class _PaymentsModuleScreenState extends State<PaymentsModuleScreen> {
   final TextEditingController _amountController = TextEditingController(text: '5000');
   bool _testingStk = false;
 
-  void _triggerStkPush() async {
-    if (_testingStk) return;
-    setState(() => _testingStk = true);
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
 
+  Future<void> _triggerStkPush() async {
+    if (_testingStk || !widget.store.demo) return;
+    setState(() => _testingStk = true);
     try {
       final amountKes = (double.tryParse(_amountController.text) ?? 100) * 100;
       final res = await widget.store.call('triggerMpesaStk', {
         'phone': _phoneController.text.trim(),
         'amount': amountKes.round(),
       });
-
       if (mounted) {
-        setState(() => _testingStk = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('📱 M-Pesa STK Push Sent: ${res['message']}'), backgroundColor: const Color(0xFF16A34A)),
+          SnackBar(
+            content: Text('Demo STK simulation: ${res['message']}'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _testingStk = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
+    } finally {
+      if (mounted) setState(() => _testingStk = false);
     }
   }
 
@@ -59,48 +67,74 @@ class _PaymentsModuleScreenState extends State<PaymentsModuleScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // STK Simulator Trigger Card
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('M-PESA DARAJA 2.0 STK PUSH TEST TERMINAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF16A34A))),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _phoneController,
-                            decoration: const InputDecoration(labelText: 'Customer M-Pesa Phone (e.g. 254712345678)'),
+                child: widget.store.demo
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'M-PESA STK DEMO SIMULATOR',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF16A34A)),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: _amountController,
-                            decoration: const InputDecoration(labelText: 'Amount (KES)'),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Preview-only simulator. It does not contact Safaricom or collect real merchant payments.',
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: _testingStk ? null : _triggerStkPush,
-                          icon: const Icon(Icons.send_to_mobile_rounded),
-                          label: Text(_testingStk ? 'Sending Prompt...' : 'Send STK Push'),
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _phoneController,
+                                  decoration: const InputDecoration(labelText: 'Demo phone (e.g. 254712345678)'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _amountController,
+                                  decoration: const InputDecoration(labelText: 'Demo amount (KES)'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                onPressed: _testingStk ? null : _triggerStkPush,
+                                icon: const Icon(Icons.send_to_mobile_rounded),
+                                label: Text(_testingStk ? 'Simulating...' : 'Simulate STK'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF16A34A),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'MERCHANT CHECKOUT NOT YET ENABLED',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Production M-Pesa currently supports verified Tandao subscription billing. '
+                            'Merchant POS checkout remains disabled until reconciliation, refunds and dispute handling are implemented.',
+                          ),
+                        ],
+                      ),
               ),
             ),
-
             const SizedBox(height: 24),
-            const Text('PAYMENT RECONCILIATION LOG', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+            const Text(
+              'PAYMENT RECONCILIATION LOG',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+            ),
             const SizedBox(height: 12),
-
             StreamBuilder<List<Map<String, dynamic>>>(
               stream: widget.store.watch('payments'),
               builder: (context, snapshot) {
@@ -114,19 +148,25 @@ class _PaymentsModuleScreenState extends State<PaymentsModuleScreen> {
                     separatorBuilder: (context, index) => const Divider(height: 1),
                     itemBuilder: (context, idx) {
                       final p = payments[idx];
+                      final provider = p['provider']?.toString() ?? 'Payment';
+                      final receipt = p['receipt']?.toString() ?? p['reference']?.toString() ?? 'Pending';
+                      final type = p['type']?.toString() ?? 'Subscription';
+                      final phone = p['phone']?.toString() ?? '—';
+                      final state = p['state']?.toString() ?? 'pending';
+                      final total = p['total'] is num ? p['total'] as num : 0;
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: const Color(0xFF16A34A).withValues(alpha: 0.1),
                           child: const Icon(Icons.receipt_rounded, color: Color(0xFF16A34A)),
                         ),
-                        title: Text('${p['provider']} · Receipt: ${p['receipt']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Type: ${p['type']} · Phone: ${p['phone']}'),
+                        title: Text('$provider · Receipt: $receipt', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Type: $type · Phone: $phone'),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(kes(p['total']), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(kes(total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             const SizedBox(width: 12),
-                            Chip(label: Text(p['state']), backgroundColor: const Color(0xFFD1FAE5)),
+                            Chip(label: Text(state)),
                           ],
                         ),
                       );
