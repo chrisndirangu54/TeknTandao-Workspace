@@ -24,6 +24,19 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Published runtime snapshots are public single-document reads only. Domain
+    // ownership, tenant mappings, analytics identities and provider metadata are
+    // intentionally not public Firestore surfaces.
+    match /publishedWebsiteSites/{siteId} {
+      allow get: if true;
+      allow list: if false;
+    }
+    match /publishedWebsiteDomains/{domain} { allow read: if false; }
+    match /websitePublicSiteOwners/{siteId} { allow read: if false; }
+    match /websitePlugins/{pluginId} { allow read: if false; }
+    match /websiteFormRateLimits/{id} { allow read: if false; }
+
     match /organizations/{org} {
       allow read: if member(org);
       match /members/{uid} { allow read: if member(org) && request.auth.uid == uid; }
@@ -54,6 +67,36 @@ service cloud.firestore {
       match /restaurant_orders/{id} { allow read: if access(org, 'restaurant'); }
       match /grants/{id} { allow read: if access(org, 'ngo'); }
       match /documents/{id} { allow read: if access(org, 'documents'); }
+
+      // Website Builder: collaborators can read the live authoring model, CMS,
+      // assets and collaboration presence. Infrastructure, submissions,
+      // analytics, payouts and immutable release history are owner-only.
+      match /websiteProjects/{id} { allow read: if access(org, 'mc14_website_builder'); }
+      match /websiteTemplateEntitlements/{id} { allow read: if access(org, 'mc14_website_builder'); }
+      match /websiteAssets/{id} { allow read: if access(org, 'mc14_website_builder'); }
+      match /websiteCmsCollections/{id} {
+        allow read: if access(org, 'mc14_website_builder');
+        match /entries/{entryId} { allow read: if access(org, 'mc14_website_builder'); }
+      }
+      match /websitePluginInstalls/{id} { allow read: if access(org, 'mc14_website_builder'); }
+      match /websiteCollaboration/{projectId} {
+        allow read: if access(org, 'mc14_website_builder');
+        match /ops/{opId} { allow read: if access(org, 'mc14_website_builder'); }
+        match /presence/{actorId} { allow read: if access(org, 'mc14_website_builder'); }
+      }
+      match /websiteProjectEvents/{id} { allow read: if owner(org); }
+      match /websiteVersions/{id} { allow read: if owner(org); }
+      match /websiteTemplateEarnings/{id} { allow read: if owner(org); }
+      match /websiteDomains/{id} { allow read: if owner(org); }
+      match /websiteAssetUploads/{id} { allow read: if owner(org); }
+      match /websiteExperiments/{id} { allow read: if owner(org); }
+      match /websiteExperimentStats/{id} { allow read: if owner(org); }
+      match /websiteAnalyticsDaily/{id} { allow read: if owner(org); }
+      match /websiteFormSubmissions/{id} { allow read: if owner(org); }
+      match /websiteFormSpam/{id} { allow read: if owner(org); }
+      match /websiteFormStats/{id} { allow read: if owner(org); }
+      match /websiteCreatorPayoutProfiles/{id} { allow read: if owner(org); }
+      match /websiteCreatorPayouts/{id} { allow read: if owner(org); }
 
       // Cross-app graph, automation, agent, AI-cost and sync metadata can expose
       // data from multiple installed apps. Direct client reads therefore remain

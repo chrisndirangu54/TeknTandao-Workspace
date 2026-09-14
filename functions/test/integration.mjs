@@ -101,6 +101,39 @@ test('shared workflow enforces auth, dependencies, tenant scope, stock transacti
   assert.equal(overview.counts.agents, 1);
   assert.equal(overview.counts.aiUsage, 1);
 
+  // JSON-first Website Builder runs through the same production Functions
+  // entrypoint. Editing a single node increments a revision; publishing writes
+  // a versioned public JSON snapshot consumed by generated Flutter clients.
+  await api.installApp.run(request({appId:'mc14_website_builder'}));
+  const publicId = `integration_site_${Date.now()}`;
+  const site = await api.createWebsiteProject.run(request({projectId:'website-one',title:'Integration Website',publicId}));
+  assert.equal(site.revision, 1);
+  const patch = await api.patchWebsiteProject.run(request({
+    projectId:'website-one',
+    expectedRevision:1,
+    patch:{op:'updateNode',nodeId:'hero_section',props:{title:'Edited without rebuild'}}
+  }));
+  assert.equal(patch.revision, 2);
+  const published = await api.publishWebsiteProject.run(request({projectId:'website-one'}));
+  assert.equal(published.version, 1);
+  const publicSnapshot = await db.doc(`publishedWebsiteSites/${publicId}`).get();
+  assert.equal(publicSnapshot.data().document.pages[0].root.children[0].props.title, 'Edited without rebuild');
+  const scaffold = await api.exportWebsiteFlutterScaffold.run(request({projectId:'website-one'}));
+  assert.match(scaffold.files['lib/main.dart'], /resolvePublishedWebsiteExperience/);
+  assert.match(scaffold.files['lib/main.dart'], new RegExp(`const publicId = '${publicId}'`));
+
+  const template = await api.publishWebsiteTemplate.run(request({
+    projectId:'website-one',
+    templateId:'integration-free-template',
+    metadata:{name:'Integration Free Template',description:'Validated marketplace template',creatorName:'Integration Creator',category:'Testing',priceMinor:0,license:'free',tags:['test']}
+  }));
+  assert.equal(template.version, 1);
+  const templateMarket = await api.getWebsiteTemplateMarketplace.run(request({}));
+  assert.ok(templateMarket.templates.some(item => item.templateId === 'integration-free-template'));
+  const installedTemplate = await api.installWebsiteTemplate.run(request({templateId:'integration-free-template',projectId:'website-from-template',publicId:`${publicId}_copy`}));
+  assert.equal(installedTemplate.templateId, 'integration-free-template');
+  assert.equal((await db.doc(`organizations/${owner}/websiteProjects/website-from-template`).get()).data().sourceTemplateId, 'integration-free-template');
+
   await api.uninstallApp.run(request({appId:'pos'}));
   await api.uninstallApp.run(request({appId:'inventory'}));
   assert.equal((await db.doc(`organizations/${owner}/apps/inventory`).get()).exists, false);

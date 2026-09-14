@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../app_blueprints.dart';
 import '../suite.dart';
 import 'platform_control_center.dart';
+import 'website_platform_studio.dart';
 
 class GenericEnterpriseModuleScreen extends StatefulWidget {
   final SuiteModule module;
@@ -27,9 +28,6 @@ class _GenericEnterpriseModuleScreenState
   SuiteStore get store => widget.store;
   AppBlueprint get blueprint => blueprintFor(module);
 
-  /// Production generic apps use their entitlement-bound top-level collection,
-  /// matching Functions saveRecord and the generic Firestore read rule. Demo
-  /// data remains under the in-memory modules/{app}/records namespace.
   String get _path => store.demo ? 'modules/${module.id}/records' : module.id;
 
   Future<void> _saveRecord(Map<String, dynamic> record, {String? id}) async {
@@ -200,6 +198,9 @@ class _GenericEnterpriseModuleScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (module.id == 'mc14_website_builder') {
+      return WebsitePlatformStudioScreen(store: store);
+    }
     if (PlatformControlCenterScreen.supports(module.id)) {
       return PlatformControlCenterScreen(module: module, store: store);
     }
