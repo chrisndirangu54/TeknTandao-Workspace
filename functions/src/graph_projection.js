@@ -16,6 +16,18 @@ function edgeId(edge) {
     .slice(0, 40);
 }
 
+function projectionFingerprint(collectionId, docId, raw) {
+  const projected = projectGraphNode(collectionId, docId, raw);
+  if (!projected) return null;
+  const node = validateGraphNode(projected);
+  const edges = projectedGraphEdges(collectionId, docId, raw)
+    .map(validateGraphEdge)
+    .sort((a, b) => `${a.from}|${a.relation}|${a.to}`.localeCompare(`${b.from}|${b.relation}|${b.to}`));
+  return createHash('sha256')
+    .update(JSON.stringify({node, edges}))
+    .digest('hex');
+}
+
 export const projectBusinessGraph = onDocumentWritten({
   document: 'organizations/{orgId}/{collectionId}/{docId}',
   region,
@@ -24,8 +36,21 @@ export const projectBusinessGraph = onDocumentWritten({
   const after = event.data?.after;
   if (!after?.exists) return;
   const raw = after.data();
-  const projected = projectGraphNode(event.params.collectionId, event.params.docId, raw);
+  const collectionId = event.params.collectionId;
+  const docId = event.params.docId;
+  const projected = projectGraphNode(collectionId, docId, raw);
   if (!projected) return;
+
+  // Operational writes often update metadata such as updatedAt, agent ids or
+  // sync receipts without changing the graph-visible business entity. Skip the
+  // projection completely when the graph node + edges are identical. This
+  // removes a large class of duplicate Firestore writes and trigger fan-out.
+  const before = event.data?.before;
+  if (before?.exists) {
+    const beforeFingerprint = projectionFingerprint(collectionId, docId, before.data());
+    const afterFingerprint = projectionFingerprint(collectionId, docId, raw);
+    if (beforeFingerprint && beforeFingerprint === afterFingerprint) return;
+  }
 
   const node = validateGraphNode(projected);
   const org = db.doc(`organizations/${event.params.orgId}`);
@@ -34,18 +59,18 @@ export const projectBusinessGraph = onDocumentWritten({
   batch.set(org.collection('businessGraphNodes').doc(nodeId), {
     ...node,
     nodeId,
-    projectionSource: `${event.params.collectionId}/${event.params.docId}`,
+    projectionSource: `${collectionId}/${docId}`,
     projected: true,
     updatedAt: stamp(),
   }, {merge: true});
 
-  for (const rawEdge of projectedGraphEdges(event.params.collectionId, event.params.docId, raw)) {
+  for (const rawEdge of projectedGraphEdges(collectionId, docId, raw)) {
     const edge = validateGraphEdge(rawEdge);
     const id = edgeId(edge);
     batch.set(org.collection('businessGraphEdges').doc(id), {
       ...edge,
       edgeId: id,
-      projectionSource: `${event.params.collectionId}/${event.params.docId}`,
+      projectionSource: `${collectionId}/${docId}`,
       projected: true,
       updatedAt: stamp(),
     }, {merge: true});
