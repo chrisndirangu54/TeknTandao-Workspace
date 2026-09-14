@@ -17,7 +17,9 @@ Every installable app inherits the shared platform runtime:
 - live record counters,
 - shared AI/reporting and future event-bus integration points.
 
-The 30 catalogue families have tailored blueprints. Examples include Mining site/material/location records, Healthcare patient/provider/service records, Finance counterparty/ledger/amount records, Transport vehicle/origin/destination records, NGO programme/donor/beneficiary records and AI-agent goal/data-scope/guardrail records.
+The 30 catalogue families now contain 653 source entries and have tailored blueprints. Examples include Mining site/material/location records, Healthcare patient/provider/service records, Finance counterparty/ledger/amount records, Transport vehicle/origin/destination records, NGO programme/donor/beneficiary records and AI-agent goal/data-scope/guardrail records.
+
+A strategic platform layer extends the catalogue beyond conventional ERP/CRM products with Agent Control Center, AI FinOps & Model Cost Manager, African Business Identity & Trust Network, Cross-Border Trade OS, African Supplier Network & B2B Marketplace, Autonomous Collections & Receivables, SME Cybersecurity Center / Virtual SOC, IoT & Device Cloud, Digital Twin & Physical Operations, Insurance & Risk Hub, Food & Retail Intelligence, Geo & Mining Intelligence, Business Process Marketplace, Autonomous Operations Center and Business Graph.
 
 ## Layer 2 — Deep specialist implementations
 
