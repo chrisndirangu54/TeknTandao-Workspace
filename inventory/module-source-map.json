@@ -1,0 +1,69 @@
+{
+  "policy": {
+    "mode": "reuse-first",
+    "rule": "Prefer audited existing repositories as feature donors when license and compatibility permit. Keep TeknTandao tenancy, RBAC, billing, event bus and canonical Firestore contracts authoritative.",
+    "licenseGate": "Do not copy or redistribute substantial code from a repository with missing or unclear license terms. Such repositories may be inspected for product ideas only until licensing is resolved."
+  },
+  "modules": {
+    "crm": {
+      "primary": {"repository": "chrisndirangu54/FlareLine-CRM", "commit": "ab28957f304fb3cfab8f1a679ba8b0ebcffe66ef", "license": "MIT", "reuse": ["pipeline UI", "lead/contact screens", "CRM interaction patterns"], "status": "approved_feature_donor"},
+      "alternates": [
+        {"repository": "chrisndirangu54/ClientFlow", "commit": "320d4dba894ea8e3231146e76620a21b33dc206b", "license": "review_required", "status": "audit_only"},
+        {"repository": "chrisndirangu54/sfdx-dreamhouse", "license": "present", "status": "reference_only_non_flutter"}
+      ]
+    },
+    "pos": {
+      "primary": {"repository": "elrizwiraswara/flutter_pos", "commit": "3b61e52815cd5c9150c97cb71ab135896216ee40", "license": "MIT", "reuse": ["POS interaction flow", "product/cart components", "receipt and checkout UI patterns", "Firebase-aware architecture"], "status": "approved_feature_donor"},
+      "alternates": [
+        {"repository": "chrisndirangu54/The-POS-Flutter", "commit": "c3aa373f353b3ef7538d3d85a0bca5cffd854106", "license": "review_required", "status": "audit_only"},
+        {"repository": "TallyAssist/TallyAssist", "commit": "a0dc517e37b27923016f5ff2b2451f0f424dea33", "license": "present", "status": "secondary_feature_donor"}
+      ]
+    },
+    "inventory": {
+      "primary": {"repository": "chrisndirangu54/Flutter-Firebase-Inventory-Management-App", "commit": "01de16c3e12add612ac217dabd4b6e9b6e3f827d", "license": "review_required", "reuse": ["inventory workflows", "stock screens", "Firebase data patterns"], "status": "audit_only_until_license_resolved"}
+    },
+    "hr": {
+      "primary": {"repository": "chrisndirangu54/flutter_hr_management_design", "commit": "4d59b8b5d8007ebcdca8be6be048c730bc5e38e9", "license": "present", "reuse": ["HR dashboard", "employee UI", "workforce navigation"], "status": "feature_donor_after_dependency_upgrade"},
+      "alternates": [
+        {"repository": "chrisndirangu54/EWork", "commit": "0b4474bb67ecc2341e2833cc58f854fea13ffd5d", "license": "present", "status": "reference_only_non_flutter"},
+        {"repository": "zwayth/Employee-Attendance-Management-App", "commit": "6e7c47e38ee7c2cffa6be2f09320b053a905fad1", "license": "present", "status": "attendance_feature_donor_after_upgrade"}
+      ]
+    },
+    "time": {
+      "primary": {"repository": "bizz84/starter_architecture_flutter_firebase", "commit": "c5b1940cbd6b2647a39394a9f4e516ad2c332131", "license": "MIT", "reuse": ["time tracking architecture", "Firestore stream patterns", "Flutter/Firebase test patterns"], "status": "approved_feature_donor"}
+    },
+    "hospital": {
+      "primary": {"repository": "chrisndirangu54/Hospital-Management-System-Mobile-App", "commit": "ccf52142c9fab65f92d7d662268d0458ff446e51", "license": "review_required", "reuse": ["clinical navigation", "patient workflow ideas"], "status": "audit_only_until_license_resolved"}
+    },
+    "school": {
+      "primary": {"repository": "chrisndirangu54/SchoolMate-App", "commit": "8af789cf380c5206e61970d43a1f80df9a548946", "license": "review_required", "reuse": ["student/guardian flows", "school UI", "Firebase patterns"], "status": "audit_only_until_license_resolved"}
+    },
+    "accounting": {
+      "primary": {"repository": "chrisndirangu54/account-financial-tools", "commit": "b576b2c9956dc76cd98c966d04f36d92197b9690", "license": "present", "reuse": ["financial calculations", "reporting concepts"], "status": "feature_donor_non_flutter"},
+      "alternates": [
+        {"repository": "chrisndirangu54/agora-invoicing-community", "commit": "75e2f677c738bc1cc8b600d5210434b9ff72a808", "license": "present", "status": "invoice_workflow_reference_non_flutter"},
+        {"repository": "TallyAssist/TallyAssist", "commit": "a0dc517e37b27923016f5ff2b2451f0f424dea33", "license": "present", "status": "flutter_feature_donor"}
+      ]
+    },
+    "property": {
+      "candidates": ["chrisndirangu54/wallfly", "chrisndirangu54/airbnb-clone", "chrisndirangu54/cocorico", "chrisndirangu54/fullstack-graphql-airbnb-clone", "chrisndirangu54/react-native-airbnb-clone"],
+      "status": "adjacent_repositories_require_stack_and_license_audit"
+    },
+    "ecommerce": {
+      "candidates": ["chrisndirangu54/Amazon-Clone", "chrisndirangu54/ebay-clone", "chrisndirangu54/Grocery-Flutter-Design", "chrisndirangu54/Multi-Vendor-E-commerce", "chrisndirangu54/spree", "chrisndirangu54/marketplacekit", "chrisndirangu54/vendd"],
+      "status": "adjacent_repositories_require_stack_and_license_audit"
+    },
+    "transport": {
+      "candidates": ["chrisndirangu54/Bus-Ticket-app", "chrisndirangu54/redbus", "chrisndirangu54/GPS4"],
+      "status": "adjacent_repositories_require_stack_and_license_audit"
+    },
+    "documents_collaboration": {
+      "candidates": ["chrisndirangu54/mini-google-docs-clone", "chrisndirangu54/community-edition", "chrisndirangu54/instiki", "chrisndirangu54/discourse"],
+      "status": "adjacent_repositories_require_stack_and_license_audit"
+    },
+    "identity": {
+      "candidates": ["chrisndirangu54/Identity_Verification", "chrisndirangu54/smart-kyc", "chrisndirangu54/KYB", "chrisndirangu54/KYC-chain", "chrisndirangu54/oss-kyc"],
+      "status": "adjacent_repositories_require_security_and_license_audit"
+    }
+  }
+}
