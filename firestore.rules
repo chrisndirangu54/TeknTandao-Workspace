@@ -9,7 +9,9 @@ service cloud.firestore {
       let a = get(/databases/$(database)/documents/organizations/$(org)/apps/$(app)).data;
       return member(org) && (m.role == 'owner' || app in m.apps) && a.expiresAt > request.time;
     }
-    match /users/{uid} { allow read: if request.auth != null && request.auth.uid == uid; }
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+    }
     match /organizations/{org} {
       allow read: if member(org);
       match /members/{uid} { allow read: if member(org) && request.auth.uid == uid; }
@@ -20,8 +22,20 @@ service cloud.firestore {
       match /sales/{id} { allow read: if access(org, 'pos') || access(org, 'accounting'); }
       match /invoices/{id} { allow read: if access(org, 'accounting'); }
       match /tasks/{id} { allow read: if access(org, 'crm'); }
-      match /reports/{id} { allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner'; }
-      match /payments/{id} { allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner'; }
+      match /employees/{id} { allow read: if access(org, 'hr'); }
+      match /projects/{id} { allow read: if access(org, 'projects'); }
+      match /tickets/{id} { allow read: if access(org, 'helpdesk'); }
+      match /patients/{id} { allow read: if access(org, 'hospital'); }
+      match /students/{id} { allow read: if access(org, 'school'); }
+      match /properties/{id} { allow read: if access(org, 'property'); }
+      match /sacco_members/{id} { allow read: if access(org, 'sacco'); }
+      match /etims_logs/{id} { allow read: if access(org, 'etims') || access(org, 'accounting'); }
+      match /reports/{id} {
+        allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
+      }
+      match /payments/{id} {
+        allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
+      }
     }
     // All mutations pass through validated callable functions. Unknown paths deny.
     match /{document=**} { allow write: if false; }
