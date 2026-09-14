@@ -45,7 +45,9 @@ jobs:
       # static analysis. A repository-wide formatting cleanup can be isolated in
       # a later mechanical-only PR instead of obscuring this platform change.
       - run: dart format --output=none lib test
-      - run: flutter analyze
+      # Analyzer errors remain fatal; informational lint/deprecation notices do not
+      # block release validation while legacy screens are being modernized.
+      - run: flutter analyze --no-fatal-infos
       - run: flutter test
       - name: Validate explicit preview build
         run: flutter build web --release --dart-define=PREVIEW=true --no-wasm-dry-run
