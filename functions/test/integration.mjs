@@ -30,6 +30,26 @@ test('shared workflow enforces auth, dependencies, tenant scope, stock transacti
   await api.saveRecord.run(request({appId:'marketing', id:'campaign', record:{name:'Campaign',segment:'SMEs',channel:'WhatsApp',status:'ACTIVE'}}));
   assert.equal((await db.doc(`organizations/${owner}/marketing_campaigns/campaign`).get()).data().segment, 'SMEs');
 
+  // Specialized screens are allowed to use their native primary fields rather
+  // than being forced to invent a generic `name` field.
+  await api.installApp.run(request({appId:'procurement'}));
+  await api.saveRecord.run(request({appId:'procurement', id:'po-one', record:{vendor:'Acme Supplies',item:'Cement',qty:40,status:'ORDERED'}}));
+  const purchase = (await db.doc(`organizations/${owner}/procurement_pos/po-one`).get()).data();
+  assert.equal(purchase.vendor, 'Acme Supplies');
+  assert.equal(purchase.name, 'Acme Supplies');
+
+  // Any master-catalogue app is a real entitlement and persists through the
+  // generic top-level app collection used by the shared operational runtime.
+  await api.installApp.run(request({appId:'mc25_mining_operations'}));
+  await api.saveRecord.run(request({
+    appId:'mc25_mining_operations',
+    id:'shift-one',
+    record:{title:'Kendege Shift',site:'Kendege',material:'Coltan',location:'Pit A',status:'ACTIVE'}
+  }));
+  const mining = (await db.doc(`organizations/${owner}/mc25_mining_operations/shift-one`).get()).data();
+  assert.equal(mining.site, 'Kendege');
+  assert.equal(mining.material, 'Coltan');
+
   const sale = {requestId:'sale-one',productId:'tea',contactId:'customer',quantity:2};
   await Promise.all([api.createSale.run(request(sale)), api.createSale.run(request(sale))]);
   assert.equal((await db.doc(`organizations/${owner}/products/tea`).get()).data().stock, 1);
