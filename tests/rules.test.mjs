@@ -14,11 +14,18 @@ before(async () => {
       await setDoc(doc(db, `organizations/${org}/apps/crm`), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
       await setDoc(doc(db, `organizations/${org}/contacts/customer`), {name: 'Customer'});
     }
-    await setDoc(doc(db, 'organizations/a/members/clerk'), {role:'member',apps:['crm']});
+    await setDoc(doc(db, 'organizations/a/members/clerk'), {
+      role:'member',
+      apps:['crm','payments','mc25_mining_operations']
+    });
     await setDoc(doc(db, 'organizations/a/apps/hospital'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
     await setDoc(doc(db, 'organizations/a/modules/hospital/records/patient'), {name:'Private'});
     await setDoc(doc(db, 'organizations/a/apps/hr'), {expiresAt: Timestamp.fromMillis(1)});
     await setDoc(doc(db, 'organizations/a/modules/hr/records/employee'), {name:'Employee'});
+    await setDoc(doc(db, 'organizations/a/apps/payments'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
+    await setDoc(doc(db, 'organizations/a/payments/settlement'), {amount:120000,state:'paid'});
+    await setDoc(doc(db, 'organizations/a/apps/mc25_mining_operations'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
+    await setDoc(doc(db, 'organizations/a/mc25_mining_operations/shift-one'), {site:'Kendege',status:'ACTIVE'});
   });
 });
 after(async () => { await env?.cleanup(); });
@@ -33,7 +40,15 @@ test('app permission and expiry protect sensitive records even from another app 
   await assertFails(getDoc(doc(clerk, 'organizations/a/modules/hospital/records/patient')));
   await assertFails(getDoc(doc(env.authenticatedContext('a').firestore(), 'organizations/a/modules/hr/records/employee')));
 });
+test('master app collections are entitlement-bound without weakening reserved collections', async () => {
+  const clerk = env.authenticatedContext('clerk').firestore();
+  await assertSucceeds(getDoc(doc(clerk, 'organizations/a/mc25_mining_operations/shift-one')));
+  await assertFails(getDoc(doc(clerk, 'organizations/a/payments/settlement')));
+  await assertSucceeds(getDoc(doc(env.authenticatedContext('a').firestore(), 'organizations/a/payments/settlement')));
+});
 test('clients cannot grant roles, renew subscriptions, forge payment or edit records', async () => {
   const db = env.authenticatedContext('a').firestore();
-  for (const path of ['members/attacker','apps/crm','payments/forged','contacts/customer','taxOutbox/fake']) await assertFails(setDoc(doc(db, `organizations/a/${path}`), {role:'owner',state:'paid'}));
+  for (const path of ['members/attacker','apps/crm','payments/forged','contacts/customer','taxOutbox/fake','mc25_mining_operations/forged']) {
+    await assertFails(setDoc(doc(db, `organizations/a/${path}`), {role:'owner',state:'paid'}));
+  }
 });
