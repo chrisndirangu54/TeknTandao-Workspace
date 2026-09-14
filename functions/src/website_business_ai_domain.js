@@ -65,12 +65,15 @@ export function validateProductMutation(input) {
   if (!['create', 'update'].includes(operation)) throw new Error('Invalid product operation');
   const productId = input.productId ? identifier(input.productId) : null;
   if (operation === 'update' && !productId) throw new Error('Product update requires productId');
+  const baseProductDigest = input.baseProductDigest == null ? null : String(input.baseProductDigest).toLowerCase();
+  if (baseProductDigest && !/^[a-f0-9]{64}$/.test(baseProductDigest)) throw new Error('Invalid base product digest');
   return {
     mutationId: identifier(input.mutationId || `product_${createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 20)}`),
     operation,
     productId,
     product: normalizeProductRecord(input.product || input.changes, {partial: operation === 'update'}),
     reason: optionalText(input.reason || '', 600),
+    ...(baseProductDigest ? {baseProductDigest} : {}),
   };
 }
 
@@ -92,6 +95,10 @@ export function publicProductValues(productId, raw = {}) {
     seoDescription: raw.seoDescription || '',
   });
   return {productId, ...clean};
+}
+
+export function productRecordDigest(productId, raw = {}) {
+  return createHash('sha256').update(JSON.stringify(publicProductValues(productId, raw))).digest('hex');
 }
 
 export const businessProductCmsSchema = Object.freeze({
