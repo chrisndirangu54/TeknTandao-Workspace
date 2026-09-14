@@ -36,8 +36,12 @@ service cloud.firestore {
       match /payments/{id} {
         allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
       }
+      // Generic module records use a top-level collection named by the module id.
+      // Access still requires a server-created, unexpired app entitlement.
+      match /{app}/{id} {
+        allow read: if access(org, app);
+      }
     }
-    // All mutations pass through validated callable functions. Unknown paths deny.
     match /{document=**} { allow write: if false; }
   }
 }
