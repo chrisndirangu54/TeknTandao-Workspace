@@ -51,6 +51,8 @@ before(async () => {
     await setDoc(doc(db, 'organizations/a/websiteFormStats/contact_today'), {submissions:3});
     await setDoc(doc(db, 'organizations/a/websiteCreatorPayoutProfiles/default'), {provider:'paystack'});
     await setDoc(doc(db, 'organizations/a/websiteCreatorPayouts/wp_one'), {state:'processing'});
+    await setDoc(doc(db, 'organizations/a/websiteAiPlans/plan_one'), {state:'proposed',summary:'Private AI plan'});
+    await setDoc(doc(db, 'organizations/a/websiteAiActionRequests/request_one'), {state:'pending_approval'});
 
     await setDoc(doc(db, 'publishedWebsiteSites/public_one'), {publicId:'public_one',version:1,document:{title:'Public'}});
     await setDoc(doc(db, 'publishedWebsiteDomains/www.example.com'), {publicId:'public_one',active:true});
@@ -104,7 +106,7 @@ test('website collaborators can read authoring, assets, CMS, plugin installs and
   ]) await assertSucceeds(getDoc(doc(clerk, `organizations/a/${path}`)));
 });
 
-test('website infrastructure, release, submissions, analytics and payouts remain owner-only', async () => {
+test('website infrastructure, release, AI governance, submissions, analytics and payouts remain owner-only', async () => {
   const owner = env.authenticatedContext('a').firestore();
   const clerk = env.authenticatedContext('clerk').firestore();
   for (const path of [
@@ -112,7 +114,8 @@ test('website infrastructure, release, submissions, analytics and payouts remain
     'websiteDomains/www_example_com','websiteAssetUploads/upload_one','websiteExperiments/hero_test',
     'websiteExperimentStats/hero_a_today','websiteAnalyticsDaily/public_today',
     'websiteFormSubmissions/form_one','websiteFormSpam/spam_one','websiteFormStats/contact_today',
-    'websiteCreatorPayoutProfiles/default','websiteCreatorPayouts/wp_one'
+    'websiteCreatorPayoutProfiles/default','websiteCreatorPayouts/wp_one',
+    'websiteAiPlans/plan_one','websiteAiActionRequests/request_one'
   ]) {
     await assertSucceeds(getDoc(doc(owner, `organizations/a/${path}`)));
     await assertFails(getDoc(doc(clerk, `organizations/a/${path}`)));
@@ -147,7 +150,7 @@ test('cross-app SOTA control plane is owner-only on direct Firestore reads', asy
   }
 });
 
-test('clients cannot mutate server-owned builder, platform, payment or control-plane state', async () => {
+test('clients cannot mutate server-owned builder, AI, platform, payment or control-plane state', async () => {
   const db = env.authenticatedContext('a').firestore();
   for (const path of [
     'members/attacker','apps/crm','payments/forged','contacts/customer','taxOutbox/fake','mc25_mining_operations/forged',
@@ -155,6 +158,7 @@ test('clients cannot mutate server-owned builder, platform, payment or control-p
     'websiteAssets/forged','websiteCmsCollections/forged','websitePluginInstalls/forged','websiteCollaboration/forged','websiteDomains/forged',
     'websiteAssetUploads/forged','websiteExperiments/forged','websiteExperimentStats/forged','websiteAnalyticsDaily/forged',
     'websiteFormSubmissions/forged','websiteFormSpam/forged','websiteFormStats/forged','websiteCreatorPayoutProfiles/forged','websiteCreatorPayouts/forged',
+    'websiteAiPlans/forged','websiteAiActionRequests/forged',
     'businessGraphNodes/forged','businessGraphEdges/forged','eventBus/forged','automationRules/forged','agents/forged',
     'agentApprovals/forged','agentPermits/forged','agentExecutions/forged','agentAudit/forged','agentUsage/forged',
     'syncReceipts/forged','aiUsage/forged','aiFinOpsConfig/forged'
