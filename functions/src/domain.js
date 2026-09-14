@@ -114,6 +114,10 @@ export function sanitizeRecord(input) {
     throw new Error(`Unsupported record field: ${safeKey}`);
   }
   if (!result.name && result.title) result.name = result.title;
-  if (!result.name) throw new Error('Record requires name or title');
+  if (!result.name) {
+    const displayKeys = ['client', 'vendor', 'item', 'site', 'rego', 'guest', 'table', 'customer', 'employee', 'student', 'patient', 'member', 'property', 'project'];
+    const displayKey = displayKeys.find(key => typeof result[key] === 'string' && result[key].trim());
+    if (displayKey) result.name = result[displayKey];
+  }
   return result;
 }
