@@ -11,19 +11,25 @@ A multi-tenant, modular business operating system for African SMEs, enterprises,
 - Production installation validates the server-side module catalog and automatically provisions required dependencies.
 - **Interactive Data Fabric Inspector**: Click connection badges to inspect intended cross-app data routing.
 
-### ⌨️ 2. Universal Command Palette (`Cmd/Ctrl + K`)
+### ♻️ 2. Reuse-first Module Engineering
+- Existing audited repositories are preferred as feature donors before equivalent screens/workflows are rebuilt from scratch.
+- TeknTandao keeps one authoritative tenancy, RBAC, billing, event-bus and Firestore data contract while donor repositories contribute compatible UI, workflows, calculations and tests.
+- Every donor must be pinned to a source commit and pass a license/security/compatibility gate before substantial code is migrated.
+- See `docs/REUSE_STRATEGY.md` and `inventory/module-source-map.json` for the current donor map.
+
+### ⌨️ 3. Universal Command Palette (`Cmd/Ctrl + K`)
 - Instant search and action dispatcher (`CommandPaletteDialog`).
 - Quick actions: Create Customer, Issue Tax Invoice, Register Product SKU, Record POS Sale, Query AI Copilot.
 
-### 🤖 3. AI Business Copilot (`AiCopilotDrawer`)
+### 🤖 4. AI Business Copilot (`AiCopilotDrawer`)
 - Global AI assistant with tenant RBAC boundaries.
 - Production AI reports use bounded aggregate business facts and do not send employee or patient notes to the model.
 
-### 🌍 4. Regional Configuration Layer (`CountryAdapter`)
+### 🌍 5. Regional Configuration Layer (`CountryAdapter`)
 The UI includes country metadata for Kenya, Nigeria, Ghana and South Africa. Tax-provider integrations are not considered production-ready merely because a country adapter is listed. Kenya eTIMS remains blocked until certified OSCU/VSCU configuration and acceptance testing are completed.
 
-### 📦 5. Modular Application Suite
-The workspace catalog includes sales, finance, HR, productivity, supply-chain and industry modules. The backend now recognizes the same module IDs as the workspace catalog, while individual modules can still be at different implementation depths.
+### 📦 6. Modular Application Suite
+The workspace catalog includes sales, finance, HR, productivity, supply-chain and industry modules. The backend recognizes the same module IDs as the workspace catalog, while individual modules can still be at different implementation depths.
 
 Core implemented workflows include:
 - **POS + Inventory**: transaction-safe stock deduction and replay-safe sale creation.
@@ -35,6 +41,24 @@ Core implemented workflows include:
 Important integration boundaries:
 - **M-Pesa merchant POS checkout is not yet production-enabled.** The visible STK terminal in preview mode is a simulator. Real M-Pesa support currently covers verified Tandao subscription billing.
 - **KRA eTIMS fiscal issuance is not yet production-enabled.** Sales create a blocked tax outbox item until taxpayer/device configuration and certified integration are available.
+
+---
+
+## ♻️ Source reuse workflow
+
+The repository inventory already contains pinned candidates for CRM, POS, Inventory, HR, Attendance, Hospital, School, Accounting/Invoicing and Time Tracking. To obtain only approved, pinned donors without executing upstream code:
+
+```powershell
+python scripts/sync-module-sources.py
+```
+
+Or sync selected modules:
+
+```powershell
+python scripts/sync-module-sources.py crm pos time
+```
+
+Repositories with missing or unclear license terms remain audit/reference-only until licensing is resolved.
 
 ---
 
