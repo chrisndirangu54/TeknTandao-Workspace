@@ -38,7 +38,7 @@ class _GenericEnterpriseModuleScreenState
       final index = rows.indexWhere((row) => row['id'] == id);
       if (index >= 0) {
         rows[index] = {...rows[index], ...record, 'id': id};
-        demo.notifyListeners();
+        if (mounted) setState(() {});
         return;
       }
     }
