@@ -1,0 +1,130 @@
+import 'package:flutter/material.dart';
+import 'suite.dart';
+
+/// Full 30-category master catalogue supplied for TeknTandao Workspace.
+/// Rich existing modules remain authoritative when an exact app name already exists.
+const String _rawMasterCatalogue = r'''1|Sales, CRM & Revenue|Enterprise CRM; Simple CRM/Bigin-style CRM; Lead Management; Contact & Account Management; Sales Pipeline; Sales Orders; Quotations; CPQ; Sales Forecasting; Territory Management; Sales Commissions; Appointment Booking; Field Sales; Sales Route Planning; Partner/Dealer CRM; Channel Management; Customer Success; Key Account Management; Customer Journey Orchestration; Sales Intelligence; Cloud Voice/Contact Center; Live Chat; Loyalty & Rewards; Referral Management; Business Card Scanner; Sales Training
+2|Marketing & Growth|Email Campaigns; Marketing Automation; SMS Marketing; WhatsApp Marketing; Social Media Management; Social Inbox; Forms; Surveys; Landing Page Builder; Conversion Optimization/A-B Testing; Event Management; Webinar Platform; Lead Capture; Lead Attribution; Lead Synchronization; Customer Segmentation; Customer Data Platform; Local Business Listings; Link-in-Bio; Affiliate Management; Influencer Management; Referral Campaigns; SEO Manager; Advertising Manager; Push Notifications; Community Marketing; Marketing Calendar; Brand Asset Management
+3|Customer Service & Experience|Help Desk; Omnichannel Support; Shared Support Inbox; Ticket Management; Knowledge Base; Customer Portal; SLA & Escalation Management; Customer Feedback/CSAT/NPS; Remote Desktop Support; Visual/AR Remote Assistance; Field Service Management; Service Contracts; Warranty Management; Returns/RMA; Call Center; Customer Community; Complaint Management; Customer Experience Analytics
+4|Retail & Commerce|Retail POS; Restaurant POS; eCommerce; B2B Commerce; Wholesale Portal; Marketplace Platform; Subscription Commerce; Rental Management; Checkout/Payment Pages; Order Management; Returns & Refunds; Gift Cards; Store Credit; Loyalty Commerce; Promotions & Coupons; Self-Service Kiosk; Omnichannel Retail; Click-and-Collect; Franchise Management; Store Management; Price Management; Retail Analytics
+5|Accounting & Finance|General Accounting; Invoicing; Recurring Billing; Accounts Receivable; Accounts Payable; Expense Management; Payroll; Payments; Banking; Bank Reconciliation; Budgeting; Cash Flow Management; Treasury Management; Fixed Assets; Tax Management; Financial Consolidation; Revenue Recognition; Collections/Credit Control; Multi-Currency; Intercompany Accounting; Financial Reporting; Audit & Controls; Employee Advances; Loans; Petty Cash; Subscription Revenue; Finance Dashboard; Autonomous Collections & Receivables
+6|Inventory, Procurement & Supply Chain|Inventory Management; Warehouse Management/WMS; Multi-Warehouse; Procurement; Purchasing; Vendor Management; Supplier Portal; RFQ Management; Tender Management; Purchase Requisitions; Demand Planning; Supply Planning; Distribution Management; Logistics Management; Delivery Management; Shipping; Barcode Operations; QR Operations; Batch/Lot Tracking; Serial Number Tracking; Cold Chain Tracking; Stock Counting; Stock Transfers; Asset Tracking; Repair Management; Maintenance Management; Quality Management; Product Lifecycle Management; Supplier Quality; Product Catalog; Replenishment Planning; African Supplier Network & B2B Marketplace
+7|Manufacturing & Industrial|Manufacturing/MRP; Bills of Materials; Production Planning; Shop-Floor Management; Work Orders; Manufacturing Costing; Subcontracting; Quality Control; PLM; Equipment Maintenance; Preventive Maintenance; Predictive Maintenance; Capacity Planning; Material Requirements Planning; Production Traceability; Factory IoT; OEE Monitoring; Scrap Management; Packaging Management; Engineering Change Orders; Digital Twin & Physical Operations
+8|Human Resources & Workforce|HRIS/Employees; Recruitment/ATS; Employee Onboarding; Attendance; Leave/Time Off; Timesheets; Shift Management; Workforce Scheduling; Workforce Planning; Performance Appraisals; Goals & OKRs; Employee Learning; Training LMS; Employee Referrals; Benefits Administration; Employee Self-Service; Payroll Portal; Employee Loans; Disciplinary Cases; Grievances; Occupational Health & Safety; Offboarding; Contractor Management; Casual Worker Management; Workforce Analytics; Employee Engagement; Recognition & Rewards
+9|Projects, Work & Collaboration|Project Management; Agile/Sprints; Task Management; Portfolio Management; Resource Planning; Timesheets; Approvals; Business Email; Team Chat; Video Meetings; Webinars; Calendar; Shared Inbox; Cloud Drive; Document Management; Word Processor; Spreadsheet; Presentation Builder; Notes; Whiteboard; Knowledge/Wiki; Internal Social Network; Team LMS; Digital Signatures; Password Vault; Meeting Notes; Action Tracker; Company Intranet; Team Announcements
+10|Automation, Low-Code & Integration|Low-Code App Builder; No-Code Studio; Workflow Automation; Business Process Management; Integration Builder/iPaaS; RPA; Approval Flow Builder; Form Builder; Rules Engine; Event Bus; API Gateway; Webhook Manager; Developer Portal; Integration Marketplace; Workflow Marketplace; Custom Module Builder; Custom Object Builder; Scheduled Jobs; Business Rules; Process Mining; Digital Adoption Platform; Business Process Marketplace
+11|Data, Analytics & AI|Business Intelligence; Analytics Dashboards; Data Preparation; ETL/ELT; Data Warehouse Connector; Master Data Management; Data Catalog; Custom Reports; Custom Dashboards; Enterprise Search; AI Business Copilot; AI Agents; AI Report Writer; AI Data Analyst; AI Forecasting; AI Anomaly Detection; Document AI/OCR; Natural-Language Database Query; Natural-Language Workflow Builder; Predictive Analytics; Recommendations Engine; Customer Intelligence; Revenue Intelligence; Decision Intelligence; AI Knowledge Search; AI FinOps & Model Cost Manager; Business Graph
+12|Legal, Compliance & Governance|Contract Lifecycle Management; Legal Matter Management; Case Management; eSignature; Policy Management; Compliance/GRC; Risk Register; Incident Management; Whistleblowing; Vendor Risk; Privacy Management; Consent Management; Data Retention; Regulatory Calendar; Board Management; Corporate Secretary; Internal Audit; Evidence Repository; Compliance Training; Insurance & Risk Hub
+13|IT, Security & Administration|Identity & Access Management; SSO; MFA; Password Management; Device Management/MDM; IT Asset Management; IT Service Management; IT Helpdesk; Software License Management; Hardware Management; Network Inventory; SIEM/Log Management; Security Incident Response; Backup & Recovery; Disaster Recovery; Business Continuity; User Provisioning; Application Provisioning; Audit Trail Explorer; Secret Management; Access Reviews; Privileged Access Management; African Business Identity & Trust Network; SME Cybersecurity Center / Virtual SOC; IoT & Device Cloud
+14|Web & Digital Experience|Website Builder; CMS; Domain Management; Blog; Forum/Q&A; Community Platform; eLearning Website; Customer Portal Builder; Partner Portal; Media Library; SEO Suite; Cookie/Consent Manager; Microsite Builder; Link Manager; Knowledge Website; Membership Website; Website Analytics; Website Live Chat
+15|Healthcare|Hospital Management System; Clinic Management; Electronic Medical Records/EHR; Patient Management; Appointment & Queue Management; Pharmacy Management; Laboratory/LIMS; Radiology Workflow; Dental Practice; Optical Practice; Telemedicine; Ward & Bed Management; Theatre/Procedures; Medical Billing; Insurance Claims; Ambulance Dispatch; Blood Bank; Medical Inventory; Doctor Portal; Nurse Portal; Patient Portal; Home Healthcare; Physiotherapy; Maternity; Vaccination Management
+16|Education|School Management; University/College ERP; Student Information System; Admissions; Fees & Billing; Student Attendance; Timetables; Exams; Grading; Report Cards; LMS/eLearning; Library Management; School Transport; Hostel/Dormitory Management; Parent Portal; Student Portal; Teacher Portal; Alumni Management; Research Administration; Scholarship Management; School Inventory; Cafeteria Management
+17|Hotels, Restaurants & Hospitality|Hotel/PMS; Reservations; Housekeeping; Guest CRM; Restaurant Management; Restaurant POS; Kitchen Display System; Table Reservations; Bar/Pub Management; Fast Food/QSR; Catering; Food Costing; Recipe Management; Guest House Management; Event Venue Management; Spa Management; Conference Management; Hotel Inventory; Channel Manager
+18|Real Estate, Property & Construction|Real Estate CRM; Property Management; Lease/Tenancy Management; Rent Collection; Tenant Portal; Landlord Portal; Property Maintenance; HOA/Association Management; Real Estate Sales; Facility Management; Construction Management; BOQ/Quantity Surveying; Project Costing; Contractor Management; Subcontractor Management; Site Management; Architecture Practice Management; Building Inspection; Property Valuation; Property Listings; Utilities Billing; Service Charges
+19|Transport, Mobility & Logistics|Fleet Management; Vehicle Maintenance; Fuel Management; Driver Management; 3PL Management; Courier Management; Last-Mile Delivery; Freight Forwarding; Dispatch Management; Route Optimization; Bus/Shuttle Ticketing; Ride-Hailing Operations; Taxi Fleet Management; School Transport; Cold-Chain Fleet; Proof of Delivery; Vehicle Rental; Transport Booking; Parcel Tracking; Delivery Driver App; Cross-Border Trade OS
+20|Professional & Local Services|Accounting Firm Management; Legal Practice Management; Consulting Firm Management; Marketing Agency Management; IT/MSP Management; Staffing Agency; Freelancer Workspace; Cleaning Company Management; Security Company Management; Salon/Barbershop Management; Gym/Fitness Center; Repair Shop; Auto Workshop; Laundry/Dry Cleaning; Photography Studio; Creative Agency; Co-working Space; Event Planner; Funeral Home Management; Pest Control; Home Services
+21|Retail Industry Editions|Grocery Store; Pharmacy Retail; Clothing/Fashion Store; Electronics Store; Hardware Store; Furniture Store; Book Store; Toy Store; Automobile Spare Parts; Beauty/Cosmetics Store; Wholesale Distributor; Beverage Distributor; Agricultural Inputs Store; Building Materials Store; Petrol Station; Convenience Store; Food & Retail Intelligence
+22|Africa-First Payments & Compliance|M-Pesa; M-Pesa STK Push; M-Pesa Till/PayBill Reconciliation; Paystack; Airtel Money; Flutterwave; Pesapal; Mobile Money Hub; Bank Transfer Gateway; KRA eTIMS; VAT Assistant; PAYE/Statutory Payroll; Withholding Tax; EFD/Fiscal Device Adapter; Multi-country African Tax Engine; Mobile Money Reconciliation; SMS Gateway; USSD Business Portal; WhatsApp Commerce; WhatsApp CRM; Offline Payment Reconciliation
+23|SACCO, FinTech & Cooperative|SACCO Management; Chama/Group Savings; Microfinance Management; Member Management; Savings Accounts; Loan Origination; Loan Servicing; Credit Scoring; Guarantor Management; Dividend Management; Collections; Agency Banking; Mobile Money Agency; Remittances; Cooperative Management; Investment Club Management; Digital Wallet; Member Portal
+24|Agriculture & Agribusiness|Farm Management; Crop Planning; Livestock Management; Dairy Management; Poultry Management; Farm Inputs; Produce Aggregation; Contract Farming; Cooperative Management; Agricultural Traceability; Farmer CRM; Agricultural Marketplace; Warehouse Receipt System; Irrigation Management; Extension Officer App; Farm Equipment; Harvest Management; Commodity Trading
+25|Mining, Energy & Natural Resources|Mining Operations; Exploration Project Management; Geology Field Data; Mine Inventory; Sample Management; Laboratory Assays; Heavy Equipment Management; Mine Maintenance; Production Tracking; Ore/Grade Tracking; Environmental Monitoring; Health & Safety; Contractor Management; Mineral Traceability; Solar/Energy Operations; Utility Management; Water Operations; Meter Management; Energy Billing; Geo & Mining Intelligence
+26|NGO, Nonprofit & Development|NGO Management; Grant Management; Donor CRM; Fundraising; Volunteer Management; Beneficiary Management; Case Management; Program Management; Monitoring & Evaluation; Impact Reporting; Theory-of-Change Tracker; Field Survey/Data Collection; Aid Distribution; Membership Management; Association Management; Faith Organization Management
+27|Public Sector & Institutional|Citizen CRM; Public Service Case Management; Permit/Licensing System; County Revenue Collection; Procurement Transparency; Asset Registry; Public Complaints; Inspection Management; Government Fleet; Grants; Constituency/County Projects; Records Management; Board/Committee Management; Public Appointments; Municipal Service Requests
+28|ESG & Sustainability|ESG Reporting; Carbon Accounting; Carbon Footprint Tracking; Energy Management; Waste Management; Water Management; Sustainability Goals; Supplier ESG; Environmental Compliance; Climate Risk; Sustainability Reporting
+29|Executive & Corporate Management|Executive Dashboard; Strategy Management; OKR Management; Business Planning; Scenario Planning; Board Management; Investor Relations; Virtual Data Room; Corporate Performance Management; Multi-Company Holding Management; Franchise Headquarters; Branch Performance; Business Benchmarking; Enterprise Risk; M&A/Data Room
+30|AI-native applications beyond Zoho/Odoo|AI CEO/Executive Analyst; AI Finance Analyst; AI Sales Agent; AI SDR; AI Customer Support Agent; AI HR Analyst; AI Recruiter; AI Procurement Agent; AI Inventory Planner; AI Operations Analyst; AI Marketing Agent; AI Data Analyst; AI Meeting Agent; AI Voice Receptionist; AI Document Processor; AI Collections Agent; AI Compliance Assistant; AI Legal Contract Reviewer; AI Forecasting Agent; AI Workflow Builder; AI Knowledge Agent; AI Fraud Detection; AI Churn Prediction; AI Dynamic Pricing; AI Demand Forecasting; AI Cash-Flow Forecasting; AI Business Health Monitor; Agent Control Center; Autonomous Operations Center''';
+
+const List<int> _categoryPricesKesMinor = [99000, 89000, 99000, 119000, 129000, 119000, 149000, 99000, 89000, 99000, 119000, 109000, 99000, 79000, 149000, 129000, 129000, 129000, 119000, 99000, 99000, 99000, 129000, 119000, 149000, 109000, 129000, 109000, 129000, 129000];
+
+const List<IconData> _categoryIcons = [
+  Icons.trending_up_rounded,
+  Icons.campaign_rounded,
+  Icons.support_agent_rounded,
+  Icons.storefront_rounded,
+  Icons.account_balance_wallet_rounded,
+  Icons.inventory_2_rounded,
+  Icons.precision_manufacturing_rounded,
+  Icons.badge_rounded,
+  Icons.workspaces_rounded,
+  Icons.account_tree_rounded,
+  Icons.analytics_rounded,
+  Icons.gavel_rounded,
+  Icons.security_rounded,
+  Icons.language_rounded,
+  Icons.local_hospital_rounded,
+  Icons.school_rounded,
+  Icons.hotel_rounded,
+  Icons.apartment_rounded,
+  Icons.local_shipping_rounded,
+  Icons.business_center_rounded,
+  Icons.store_rounded,
+  Icons.payments_rounded,
+  Icons.account_balance_rounded,
+  Icons.agriculture_rounded,
+  Icons.terrain_rounded,
+  Icons.volunteer_activism_rounded,
+  Icons.account_balance_rounded,
+  Icons.eco_rounded,
+  Icons.dashboard_customize_rounded,
+  Icons.auto_awesome_rounded
+];
+
+const List<Color> _palette = [
+  Color(0xFF2563EB),
+  Color(0xFF7C3AED),
+  Color(0xFF0891B2),
+  Color(0xFF059669),
+  Color(0xFFD97706),
+  Color(0xFFDC2626),
+  Color(0xFF475569),
+  Color(0xFFDB2777),
+];
+
+String _masterSlug(String value) => value
+    .toLowerCase()
+    .replaceAll('&', ' and ')
+    .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+    .replaceAll(RegExp(r'^_+|_+$'), '');
+
+String normalizeModuleName(String value) =>
+    value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+
+final List<SuiteModule> masterCatalogueModules = _buildMasterCatalogue();
+
+List<SuiteModule> _buildMasterCatalogue() {
+  final result = <SuiteModule>[];
+  for (final line in _rawMasterCatalogue.trim().split('\n')) {
+    final parts = line.split('|');
+    if (parts.length != 3) {
+      throw StateError('Invalid master catalogue row: $line');
+    }
+    final categoryNumber = int.parse(parts[0]);
+    final category = parts[1].trim();
+    final price = _categoryPricesKesMinor[categoryNumber - 1];
+    final icon = _categoryIcons[categoryNumber - 1];
+    final color = _palette[(categoryNumber - 1) % _palette.length];
+
+    for (final rawName in parts[2].split(';')) {
+      final name = rawName.trim();
+      if (name.isEmpty) continue;
+      result.add(
+        SuiteModule(
+          id: 'mc${categoryNumber.toString().padLeft(2, '0')}_${_masterSlug(name)}',
+          name: name,
+          description:
+              '$name — operational $category app in the TeknTandao master catalogue. '
+              'Uses the shared tenant, RBAC, billing and workflow runtime with domain-specific '
+              'fields and status pipelines; approved donor repositories provide deeper workflows where available.',
+          icon: icon,
+          color: color,
+          category: category,
+          monthlyPriceKes: price,
+        ),
+      );
+    }
+  }
+  return List<SuiteModule>.unmodifiable(result);
+}
+
+const int masterCatalogueCategoryCount = 30;
+int get masterCatalogueSourceAppCount => masterCatalogueModules.length;

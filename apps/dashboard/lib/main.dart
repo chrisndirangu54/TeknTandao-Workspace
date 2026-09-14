@@ -6,43 +6,36 @@ import 'package:flutter/material.dart';
 import 'suite.dart';
 import 'dashboard.dart';
 
-const useEmulators = bool.fromEnvironment('USE_EMULATORS', defaultValue: true);
-const preview = bool.fromEnvironment('PREVIEW', defaultValue: true);
+const useEmulators = bool.fromEnvironment('USE_EMULATORS', defaultValue: false);
+const preview = bool.fromEnvironment('PREVIEW', defaultValue: false);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!preview) {
-    const project = String.fromEnvironment(
-      'FIREBASE_PROJECT_ID',
-      defaultValue: 'demo-tandao',
-    );
+    const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
+    const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
+    const appId = String.fromEnvironment('FIREBASE_APP_ID');
+    const senderId = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+    if (project.isEmpty || apiKey.isEmpty || appId.isEmpty || senderId.isEmpty) {
+      throw StateError(
+        'Missing Firebase configuration. Use --dart-define-from-file for a real environment, '
+        'or explicitly pass --dart-define=PREVIEW=true for the demo workspace.',
+      );
+    }
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: String.fromEnvironment(
-          'FIREBASE_API_KEY',
-          defaultValue: 'demo-key',
-        ),
-        appId: String.fromEnvironment(
-          'FIREBASE_APP_ID',
-          defaultValue: '1:123:web:demo',
-        ),
-        messagingSenderId: String.fromEnvironment(
-          'FIREBASE_MESSAGING_SENDER_ID',
-          defaultValue: '123',
-        ),
+        apiKey: apiKey,
+        appId: appId,
+        messagingSenderId: senderId,
         projectId: project,
         authDomain: '$project.firebaseapp.com',
       ),
     );
     if (useEmulators) {
-      const host = String.fromEnvironment(
-        'EMULATOR_HOST',
-        defaultValue: 'localhost',
-      );
+      const host = String.fromEnvironment('EMULATOR_HOST', defaultValue: 'localhost');
       await FirebaseAuth.instance.useAuthEmulator(host, 9099);
       FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-      FirebaseFunctions.instanceFor(
-        region: 'europe-west1',
-      ).useFunctionsEmulator(host, 5001);
+      FirebaseFunctions.instanceFor(region: 'europe-west1').useFunctionsEmulator(host, 5001);
     }
   }
   runApp(const SuiteApp());
@@ -58,9 +51,7 @@ class SuiteApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff176b59)),
       scaffoldBackgroundColor: const Color(0xfff5f6f3),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-      ),
+      inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
     ),
     home: preview ? Dashboard(store: DemoSuiteStore()) : const SignIn(),
   );
@@ -79,6 +70,7 @@ class _SignInState extends State<SignIn> {
       workspaceId = TextEditingController();
   bool busy = false, register = false;
   String? error;
+
   @override
   void dispose() {
     email.dispose();
@@ -107,20 +99,13 @@ class _SignInState extends State<SignIn> {
       }
       final functions = FirebaseFunctions.instanceFor(region: 'europe-west1');
       final result = workspaceId.text.trim().isNotEmpty
-          ? await functions.httpsCallable('getWorkspaceContext').call({
-              'orgId': workspaceId.text.trim(),
-            })
+          ? await functions.httpsCallable('getWorkspaceContext').call({'orgId': workspaceId.text.trim()})
           : await functions.httpsCallable('createOrganization').call({
-              'name': organization.text.trim().isEmpty
-                  ? 'My organization'
-                  : organization.text.trim(),
+              'name': organization.text.trim().isEmpty ? 'My organization' : organization.text.trim(),
             });
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) =>
-                Dashboard(store: FirebaseSuiteStore(result.data['orgId'])),
-          ),
+          MaterialPageRoute(builder: (_) => Dashboard(store: FirebaseSuiteStore(result.data['orgId']))),
         );
       }
     } catch (e) {
@@ -143,15 +128,9 @@ class _SignInState extends State<SignIn> {
               children: [
                 const Icon(Icons.hub_outlined, size: 48),
                 const SizedBox(height: 16),
-                Text(
-                  'Welcome to Tandao',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                Text('Welcome to Tandao', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 24),
-                TextField(
-                  controller: email,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                ),
+                TextField(controller: email, decoration: const InputDecoration(labelText: 'Email')),
                 const SizedBox(height: 16),
                 TextField(
                   controller: password,
@@ -162,9 +141,7 @@ class _SignInState extends State<SignIn> {
                 if (register)
                   TextField(
                     controller: organization,
-                    decoration: const InputDecoration(
-                      labelText: 'Organization name',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Organization name'),
                   ),
                 const SizedBox(height: 16),
                 TextField(
@@ -177,31 +154,16 @@ class _SignInState extends State<SignIn> {
                 if (error != null)
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Text(
-                      error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
+                    child: Text(error!, style: const TextStyle(color: Colors.red)),
                   ),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: busy ? null : submit,
-                  child: Text(
-                    busy
-                        ? 'Connecting…'
-                        : register
-                        ? 'Create workspace'
-                        : 'Sign in',
-                  ),
+                  child: Text(busy ? 'Connecting…' : register ? 'Create workspace' : 'Sign in'),
                 ),
                 TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => setState(() => register = !register),
-                  child: Text(
-                    register
-                        ? 'Already have an account? Sign in'
-                        : 'Create an account',
-                  ),
+                  onPressed: busy ? null : () => setState(() => register = !register),
+                  child: Text(register ? 'Already have an account? Sign in' : 'Create an account'),
                 ),
               ],
             ),
