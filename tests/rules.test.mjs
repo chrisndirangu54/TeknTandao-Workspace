@@ -16,7 +16,7 @@ before(async () => {
     }
     await setDoc(doc(db, 'organizations/a/members/clerk'), {
       role:'member',
-      apps:['crm','payments','mc25_mining_operations']
+      apps:['crm','payments','mc25_mining_operations','mc14_website_builder']
     });
     await setDoc(doc(db, 'organizations/a/apps/hospital'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
     await setDoc(doc(db, 'organizations/a/modules/hospital/records/patient'), {name:'Private'});
@@ -26,6 +26,13 @@ before(async () => {
     await setDoc(doc(db, 'organizations/a/payments/settlement'), {amount:120000,state:'paid'});
     await setDoc(doc(db, 'organizations/a/apps/mc25_mining_operations'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
     await setDoc(doc(db, 'organizations/a/mc25_mining_operations/shift-one'), {site:'Kendege',status:'ACTIVE'});
+    await setDoc(doc(db, 'organizations/a/apps/mc14_website_builder'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
+    await setDoc(doc(db, 'organizations/a/websiteProjects/site_one'), {title:'Live JSON Site',revision:3});
+    await setDoc(doc(db, 'organizations/a/websiteTemplateEntitlements/template_one'), {license:'commercial'});
+    await setDoc(doc(db, 'organizations/a/websiteProjectEvents/site_one_3'), {revision:3});
+    await setDoc(doc(db, 'organizations/a/websiteVersions/site_one_1'), {version:1});
+    await setDoc(doc(db, 'organizations/a/websiteTemplateEarnings/sale_one'), {sellerNetMinor:450000});
+    await setDoc(doc(db, 'publishedWebsiteSites/public_one'), {publicId:'public_one',version:1,document:{title:'Public'}});
     await setDoc(doc(db, 'organizations/a/businessGraphNodes/customer_one'), {type:'customer',label:'Customer One'});
     await setDoc(doc(db, 'organizations/a/automationRules/rule_one'), {name:'Owner workflow',enabled:true});
     await setDoc(doc(db, 'organizations/a/agents/finance_agent'), {displayName:'Finance Agent'});
@@ -53,6 +60,17 @@ test('master app collections are entitlement-bound without weakening reserved co
   await assertFails(getDoc(doc(clerk, 'organizations/a/payments/settlement')));
   await assertSucceeds(getDoc(doc(env.authenticatedContext('a').firestore(), 'organizations/a/payments/settlement')));
 });
+test('website collaborators can read project JSON but version and earnings history remain owner-only', async () => {
+  const owner = env.authenticatedContext('a').firestore();
+  const clerk = env.authenticatedContext('clerk').firestore();
+  await assertSucceeds(getDoc(doc(clerk, 'organizations/a/websiteProjects/site_one')));
+  await assertSucceeds(getDoc(doc(clerk, 'organizations/a/websiteTemplateEntitlements/template_one')));
+  for (const path of ['websiteProjectEvents/site_one_3','websiteVersions/site_one_1','websiteTemplateEarnings/sale_one']) {
+    await assertSucceeds(getDoc(doc(owner, `organizations/a/${path}`)));
+    await assertFails(getDoc(doc(clerk, `organizations/a/${path}`)));
+  }
+  await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), 'publishedWebsiteSites/public_one')));
+});
 test('cross-app SOTA control plane is owner-only on direct Firestore reads', async () => {
   const owner = env.authenticatedContext('a').firestore();
   const clerk = env.authenticatedContext('clerk').firestore();
@@ -69,14 +87,16 @@ test('cross-app SOTA control plane is owner-only on direct Firestore reads', asy
     await assertFails(getDoc(doc(clerk, `organizations/a/${path}`)));
   }
 });
-test('clients cannot grant roles, renew subscriptions, forge payment, edit records or mutate the control plane', async () => {
+test('clients cannot grant roles, renew subscriptions, forge payments, edit records or mutate server-owned builder/control-plane state', async () => {
   const db = env.authenticatedContext('a').firestore();
   for (const path of [
     'members/attacker','apps/crm','payments/forged','contacts/customer','taxOutbox/fake','mc25_mining_operations/forged',
+    'websiteProjects/forged','websiteTemplateEntitlements/forged','websiteProjectEvents/forged','websiteVersions/forged','websiteTemplateEarnings/forged',
     'businessGraphNodes/forged','businessGraphEdges/forged','eventBus/forged','automationRules/forged','agents/forged',
     'agentApprovals/forged','agentPermits/forged','agentExecutions/forged','agentAudit/forged','agentUsage/forged',
     'syncReceipts/forged','aiUsage/forged','aiFinOpsConfig/forged'
   ]) {
     await assertFails(setDoc(doc(db, `organizations/a/${path}`), {role:'owner',state:'paid'}));
   }
+  await assertFails(setDoc(doc(db, 'publishedWebsiteSites/forged'), {document:{title:'forged'}}));
 });
