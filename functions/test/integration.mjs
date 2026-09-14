@@ -119,7 +119,8 @@ test('shared workflow enforces auth, dependencies, tenant scope, stock transacti
   const publicSnapshot = await db.doc(`publishedWebsiteSites/${publicId}`).get();
   assert.equal(publicSnapshot.data().document.pages[0].root.children[0].props.title, 'Edited without rebuild');
   const scaffold = await api.exportWebsiteFlutterScaffold.run(request({projectId:'website-one'}));
-  assert.match(scaffold.files['lib/main.dart'], new RegExp(`publishedWebsiteSites/${publicId}`));
+  assert.match(scaffold.files['lib/main.dart'], /resolvePublishedWebsiteExperience/);
+  assert.match(scaffold.files['lib/main.dart'], new RegExp(`const publicId = '${publicId}'`));
 
   const template = await api.publishWebsiteTemplate.run(request({
     projectId:'website-one',
