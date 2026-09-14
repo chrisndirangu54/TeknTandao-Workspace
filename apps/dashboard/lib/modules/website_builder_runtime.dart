@@ -94,7 +94,8 @@ class JsonWebsiteRuntime extends StatelessWidget {
                 constraints: BoxConstraints(
                   maxWidth: ((theme['maxContentWidth'] as num?)?.toDouble() ??
                           1200)
-                      .clamp(320, 2400),
+                      .clamp(320, 2400)
+                      .toDouble(),
                 ),
                 child: _SiteNode(
                   node: siteMap(page['root']),
@@ -296,11 +297,12 @@ class _SiteNode extends StatelessWidget {
       case 'pricing':
       case 'testimonials':
         final requested = (props['columns'] as num?)?.toInt() ?? 3;
-        final columns = availableWidth < 600
-            ? 1
-            : availableWidth < 960
-                ? requested.clamp(1, 2)
-                : requested.clamp(1, 6);
+        final columns = (availableWidth < 600
+                ? 1
+                : availableWidth < 960
+                    ? requested.clamp(1, 2)
+                    : requested.clamp(1, 6))
+            .toInt();
         return GridView.count(
           crossAxisCount: columns,
           crossAxisSpacing: gap,
