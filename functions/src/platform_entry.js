@@ -8,7 +8,6 @@ export {
   publishWebsiteProject,
   rollbackWebsiteProject,
   getPublishedWebsite,
-  exportWebsiteFlutterScaffold,
   publishWebsiteTemplate,
   unpublishWebsiteTemplate,
   getWebsiteTemplateMarketplace,
@@ -22,5 +21,6 @@ export {
   getWebsiteBuilderOverview
 } from './website_builder.js';
 export {patchWebsiteProject} from './website_builder_crdt_patch.js';
+export {exportAdvancedWebsiteFlutterScaffold as exportWebsiteFlutterScaffold} from './website_builder_scaffold.js';
 export * from './website_builder_advanced.js';
 export * from './website_builder_payout_webhook.js';
