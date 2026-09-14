@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'cost_aware_store.dart';
 import 'dashboard.dart';
 import 'modules/website_builder_runtime.dart';
 import 'suite.dart';
@@ -35,6 +36,10 @@ Future<void> main() async {
         projectId: project,
         authDomain: '$project.firebaseapp.com',
       ),
+    );
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: 104857600,
     );
     if (useEmulators) {
       const host = String.fromEnvironment(
@@ -284,8 +289,9 @@ class _SignInState extends State<SignIn> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) =>
-                Dashboard(store: FirebaseSuiteStore(result.data['orgId'])),
+            builder: (_) => Dashboard(
+              store: CostAwareFirebaseSuiteStore(result.data['orgId']),
+            ),
           ),
         );
       }
