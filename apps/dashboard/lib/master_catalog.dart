@@ -112,9 +112,9 @@ List<SuiteModule> _buildMasterCatalogue() {
           id: 'mc${categoryNumber.toString().padLeft(2, '0')}_${_masterSlug(name)}',
           name: name,
           description:
-              '$name — standalone $category app in the TeknTandao master catalogue. '
-              'Uses the shared tenant, RBAC, billing and data-fabric platform; deeper '
-              'workflows are migrated from approved donor repositories where available.',
+              '$name — operational $category app in the TeknTandao master catalogue. '
+              'Uses the shared tenant, RBAC, billing and workflow runtime with domain-specific '
+              'fields and status pipelines; approved donor repositories provide deeper workflows where available.',
           icon: icon,
           color: color,
           category: category,
