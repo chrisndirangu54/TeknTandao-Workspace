@@ -55,7 +55,9 @@ class CostAwareFirebaseSuiteStore extends SuiteStore {
     if (name == 'getWorkspaceContext') return const Duration(minutes: 2);
     if (name == 'getFirebaseCostPolicy') return const Duration(minutes: 5);
     if (name.startsWith('get')) {
-      return Duration(seconds: _defaultReadCacheSeconds.clamp(0, 300));
+      return Duration(
+        seconds: _defaultReadCacheSeconds.clamp(0, 300).toInt(),
+      );
     }
     return null;
   }
@@ -131,7 +133,7 @@ class CostAwareFirebaseSuiteStore extends SuiteStore {
     if (path == 'websiteExperimentStats') return 200;
     if (path == 'businessGraphNodes' || path == 'businessGraphEdges') return 300;
     if (path.contains('/presence')) return 50;
-    return _defaultLiveLimit.clamp(25, 500);
+    return _defaultLiveLimit.clamp(25, 500).toInt();
   }
 
   @override
