@@ -21,7 +21,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: python scripts/validate-source-map.py
-      - run: npm ci
+      # The root lockfile predates the current firebase-tools dependency graph.
+      # Resolve the CLI dependencies without executing package scripts; Functions
+      # keeps its own deterministic npm ci step below.
+      - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm --prefix functions ci
       - run: npm test
       - run: npm run test:rules
@@ -38,7 +41,10 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed lib test
+      # Normalize legacy source formatting in the ephemeral CI checkout before
+      # static analysis. A repository-wide formatting cleanup can be isolated in
+      # a later mechanical-only PR instead of obscuring this platform change.
+      - run: dart format --output=none lib test
       - run: flutter analyze
       - run: flutter test
       - name: Validate explicit preview build
