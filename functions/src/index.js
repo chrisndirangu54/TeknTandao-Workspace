@@ -122,7 +122,18 @@ const topLevelCollectionByApp = Object.freeze({
   hospital: 'patients',
   school: 'students',
   property: 'properties',
-  sacco: 'sacco_members'
+  sacco: 'sacco_members',
+  marketing: 'marketing_campaigns',
+  bookings: 'appointments',
+  ecommerce: 'ecommerce_orders',
+  procurement: 'procurement_pos',
+  manufacturing: 'work_orders',
+  fieldservice: 'field_dispatches',
+  fleet: 'fleet_trips',
+  hotel: 'hotel_rooms',
+  restaurant: 'restaurant_orders',
+  ngo: 'grants',
+  documents: 'documents'
 });
 
 export const saveRecord = callable(async request => {
@@ -134,17 +145,13 @@ export const saveRecord = callable(async request => {
   if (['pos', 'accounting', 'payments', 'etims'].includes(app)) throw new Error('Use the dedicated workflow for this app');
 
   let data = sanitizeRecord(input);
-  let collection = org.collection('modules').doc(app).collection('records');
+  let collection = org.collection(topLevelCollectionByApp[app] || app);
   if (app === 'crm') {
-    collection = org.collection('contacts');
     data.email = input.email ? textValue(input.email, 254) : '';
   } else if (app === 'inventory') {
-    collection = org.collection('products');
     data.price = money(input.price);
     if (!Number.isSafeInteger(input.stock) || input.stock < 0 || input.stock > 10000000) throw new Error('Invalid stock');
     data.stock = input.stock;
-  } else if (topLevelCollectionByApp[app]) {
-    collection = org.collection(topLevelCollectionByApp[app]);
   }
   data = {...data, updatedAt: stamp(), updatedBy: user};
   await collection.doc(id).set(data, {merge: true});
