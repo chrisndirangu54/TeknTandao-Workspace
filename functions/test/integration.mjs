@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {getFirestore} from 'firebase-admin/firestore';
 import {getApps, deleteApp} from 'firebase-admin/app';
 if (!process.env.FIRESTORE_EMULATOR_HOST || process.env.GCLOUD_PROJECT !== 'demo-tandao') throw new Error('Integration tests require the demo-tandao Firestore emulator');
-const api = await import('../src/index.js');
+const api = await import('../src/platform_entry.js');
 const db = getFirestore();
 const owner = `test_${Date.now()}`;
 const request = (data, uid = owner) => ({data: {orgId: owner, ...data}, auth: {uid, token: {email: 'owner@example.test'}}});
@@ -69,6 +69,37 @@ test('shared workflow enforces auth, dependencies, tenant scope, stock transacti
   await api.grantMember.run(request({uid:'clerk',apps:['pos']}));
   await assert.rejects(api.saveRecord.run(request({appId:'hospital',record:{name:'Forbidden'}},'clerk')));
   await assert.rejects(api.installApp.run(request({appId:'hr'},'clerk')));
+
+  // The production entrypoint now includes the interconnected SOTA control plane.
+  const marketplace = await api.getProcessMarketplace.run(request({}));
+  assert.equal(marketplace.templates.length, 5);
+  await api.installProcessTemplate.run(request({templateId:'retail_low_stock_replenishment'}));
+  assert.equal((await db.doc(`organizations/${owner}/automationRules/market_retail_low_stock_replenishment`).get()).exists, true);
+
+  await api.saveAgentPolicy.run(request({
+    agentId:'crm_agent',
+    displayName:'CRM Agent',
+    policy:{active:true,allowedApps:['crm'],allowedActions:['event.publish'],approvalRequiredActions:[],monthlyBudgetMinor:1000}
+  }));
+  const agentRequest = await api.requestAgentAction.run(request({agentId:'crm_agent',appId:'crm',action:'event.publish',estimatedCostMinor:10}));
+  assert.equal(agentRequest.state, 'allowed');
+  const execution = await api.executeAgentAction.run(request({
+    permitId:agentRequest.permitId,
+    action:'event.publish',
+    payload:{type:'crm.agent_tested',payload:{contactId:'customer'}}
+  }));
+  assert.equal(execution.state, 'completed');
+  assert.equal((await db.doc(`organizations/${owner}/agentPermits/${agentRequest.permitId}`).get()).data().state, 'consumed');
+
+  await api.saveAiFinOpsBudget.run(request({monthlyBudgetMinor:5000,warnPercent:80}));
+  await api.recordAiUsage.run(request({usage:{requestId:'provider_req_1',provider:'openai',model:'test-model',appId:'analytics',inputTokens:100,outputTokens:20,cachedTokens:0,costMinor:25}}));
+  const finops = await api.getAiFinOpsSummary.run(request({}));
+  assert.equal(finops.summary.requests, 1);
+  assert.equal(finops.summary.costMinor, 25);
+
+  const overview = await api.getControlPlaneOverview.run(request({}));
+  assert.equal(overview.counts.agents, 1);
+  assert.equal(overview.counts.aiUsage, 1);
 
   await api.uninstallApp.run(request({appId:'pos'}));
   await api.uninstallApp.run(request({appId:'inventory'}));
