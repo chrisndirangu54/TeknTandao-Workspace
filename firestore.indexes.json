@@ -1,1 +1,17 @@
-{"indexes": [], "fieldOverrides": []}
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "websiteFormRateLimits",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "presence",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    }
+  ]
+}
