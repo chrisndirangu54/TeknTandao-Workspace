@@ -1,0 +1,1568 @@
+[
+  {
+    "repository": "chrisndirangu54/3D-CNN",
+    "url": "https://github.com/chrisndirangu54/3D-CNN",
+    "fork": false,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/about",
+    "url": "https://github.com/chrisndirangu54/about",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/academicresearchassistant",
+    "url": "https://github.com/chrisndirangu54/academicresearchassistant",
+    "fork": true,
+    "language": "HTML",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/account-financial-tools",
+    "url": "https://github.com/chrisndirangu54/account-financial-tools",
+    "fork": true,
+    "language": "Python",
+    "category": "accounting",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/agora-invoicing-community",
+    "url": "https://github.com/chrisndirangu54/agora-invoicing-community",
+    "fork": true,
+    "language": "PHP",
+    "category": "accounting",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/airbnb-clone",
+    "url": "https://github.com/chrisndirangu54/airbnb-clone",
+    "fork": true,
+    "language": null,
+    "category": "property",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Amazon-Clone",
+    "url": "https://github.com/chrisndirangu54/Amazon-Clone",
+    "fork": true,
+    "language": null,
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/androidGpsTracker",
+    "url": "https://github.com/chrisndirangu54/androidGpsTracker",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/art-DCGAN",
+    "url": "https://github.com/chrisndirangu54/art-DCGAN",
+    "fork": true,
+    "language": "Lua",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/artificial-intelligence",
+    "url": "https://github.com/chrisndirangu54/artificial-intelligence",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/awesome-startup",
+    "url": "https://github.com/chrisndirangu54/awesome-startup",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/bigchaindb",
+    "url": "https://github.com/chrisndirangu54/bigchaindb",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/bitcoin",
+    "url": "https://github.com/chrisndirangu54/bitcoin",
+    "fork": true,
+    "language": "C++",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/bitnami-docker-php-fpm",
+    "url": "https://github.com/chrisndirangu54/bitnami-docker-php-fpm",
+    "fork": true,
+    "language": "Dockerfile",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/blockchain-demo",
+    "url": "https://github.com/chrisndirangu54/blockchain-demo",
+    "fork": true,
+    "language": "HTML",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/blockey",
+    "url": "https://github.com/chrisndirangu54/blockey",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Booktype",
+    "url": "https://github.com/chrisndirangu54/Booktype",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Bus-Ticket-app",
+    "url": "https://github.com/chrisndirangu54/Bus-Ticket-app",
+    "fork": true,
+    "language": "Java",
+    "category": "transport",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ChatBooks",
+    "url": "https://github.com/chrisndirangu54/ChatBooks",
+    "fork": false,
+    "language": "TypeScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Chatbot",
+    "url": "https://github.com/chrisndirangu54/Chatbot",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ChatterBot",
+    "url": "https://github.com/chrisndirangu54/ChatterBot",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ClientFlow",
+    "url": "https://github.com/chrisndirangu54/ClientFlow",
+    "fork": true,
+    "language": null,
+    "category": "crm",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/Clone-Google-Search-Engine",
+    "url": "https://github.com/chrisndirangu54/Clone-Google-Search-Engine",
+    "fork": true,
+    "language": "PHP",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/cocorico",
+    "url": "https://github.com/chrisndirangu54/cocorico",
+    "fork": true,
+    "language": null,
+    "category": "property",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/coda",
+    "url": "https://github.com/chrisndirangu54/coda",
+    "fork": true,
+    "language": "OCaml",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Combined-GAN-VAE-and-Diffussion",
+    "url": "https://github.com/chrisndirangu54/Combined-GAN-VAE-and-Diffussion",
+    "fork": false,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/community-edition",
+    "url": "https://github.com/chrisndirangu54/community-edition",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "collaboration",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/corda",
+    "url": "https://github.com/chrisndirangu54/corda",
+    "fork": true,
+    "language": "Kotlin",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/cosmos-search",
+    "url": "https://github.com/chrisndirangu54/cosmos-search",
+    "fork": true,
+    "language": "HTML",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/CouldntShareLess",
+    "url": "https://github.com/chrisndirangu54/CouldntShareLess",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "collaboration",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/crown-marketplace",
+    "url": "https://github.com/chrisndirangu54/crown-marketplace",
+    "fork": true,
+    "language": "HTML",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/datasets",
+    "url": "https://github.com/chrisndirangu54/datasets",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/digital-marketplace",
+    "url": "https://github.com/chrisndirangu54/digital-marketplace",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/digital-marketplace-1",
+    "url": "https://github.com/chrisndirangu54/digital-marketplace-1",
+    "fork": true,
+    "language": "PHP",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/digitalmarketplace-apiclient",
+    "url": "https://github.com/chrisndirangu54/digitalmarketplace-apiclient",
+    "fork": true,
+    "language": "Python",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/discourse",
+    "url": "https://github.com/chrisndirangu54/discourse",
+    "fork": true,
+    "language": "Ruby",
+    "category": "collaboration",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/dto-digitalmarketplace-api",
+    "url": "https://github.com/chrisndirangu54/dto-digitalmarketplace-api",
+    "fork": true,
+    "language": "Python",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/dtube",
+    "url": "https://github.com/chrisndirangu54/dtube",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/EasyTrade",
+    "url": "https://github.com/chrisndirangu54/EasyTrade",
+    "fork": true,
+    "language": "Ruby",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ebay-clone",
+    "url": "https://github.com/chrisndirangu54/ebay-clone",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ebook-reader",
+    "url": "https://github.com/chrisndirangu54/ebook-reader",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Ecommerce-CodeIgniter-Bootstrap",
+    "url": "https://github.com/chrisndirangu54/Ecommerce-CodeIgniter-Bootstrap",
+    "fork": true,
+    "language": null,
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ESRGAN",
+    "url": "https://github.com/chrisndirangu54/ESRGAN",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/EWork",
+    "url": "https://github.com/chrisndirangu54/EWork",
+    "fork": true,
+    "language": "C#",
+    "category": "hr",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/expo-instagram-reels",
+    "url": "https://github.com/chrisndirangu54/expo-instagram-reels",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/facebook-clone",
+    "url": "https://github.com/chrisndirangu54/facebook-clone",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/facebook-clone-1",
+    "url": "https://github.com/chrisndirangu54/facebook-clone-1",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/FacebookMessengerBot",
+    "url": "https://github.com/chrisndirangu54/FacebookMessengerBot",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/fairseq",
+    "url": "https://github.com/chrisndirangu54/fairseq",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/fb-clone",
+    "url": "https://github.com/chrisndirangu54/fb-clone",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/fcc-stock-trading-app",
+    "url": "https://github.com/chrisndirangu54/fcc-stock-trading-app",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/FlareLine-CRM",
+    "url": "https://github.com/chrisndirangu54/FlareLine-CRM",
+    "fork": true,
+    "language": null,
+    "category": "crm",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/Flutter-Firebase-Inventory-Management-App",
+    "url": "https://github.com/chrisndirangu54/Flutter-Firebase-Inventory-Management-App",
+    "fork": true,
+    "language": null,
+    "category": "inventory",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/flutter-netflix-clone",
+    "url": "https://github.com/chrisndirangu54/flutter-netflix-clone",
+    "fork": true,
+    "language": "Dart",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/flutter_hr_management_design",
+    "url": "https://github.com/chrisndirangu54/flutter_hr_management_design",
+    "fork": true,
+    "language": null,
+    "category": "hr",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/flutter_netflix",
+    "url": "https://github.com/chrisndirangu54/flutter_netflix",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/FolioReader-Android",
+    "url": "https://github.com/chrisndirangu54/FolioReader-Android",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/forex-app",
+    "url": "https://github.com/chrisndirangu54/forex-app",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/freelance",
+    "url": "https://github.com/chrisndirangu54/freelance",
+    "fork": true,
+    "language": null,
+    "category": "services",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/freelancing-market",
+    "url": "https://github.com/chrisndirangu54/freelancing-market",
+    "fork": true,
+    "language": "HTML",
+    "category": "services",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/fullstack-graphql-airbnb-clone",
+    "url": "https://github.com/chrisndirangu54/fullstack-graphql-airbnb-clone",
+    "fork": true,
+    "language": null,
+    "category": "property",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/fx-trading-app",
+    "url": "https://github.com/chrisndirangu54/fx-trading-app",
+    "fork": true,
+    "language": "TypeScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ganlab",
+    "url": "https://github.com/chrisndirangu54/ganlab",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/google",
+    "url": "https://github.com/chrisndirangu54/google",
+    "fork": true,
+    "language": "HTML",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/google-api-ruby-client",
+    "url": "https://github.com/chrisndirangu54/google-api-ruby-client",
+    "fork": true,
+    "language": "Ruby",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/GooglePlayCloned",
+    "url": "https://github.com/chrisndirangu54/GooglePlayCloned",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/GP-GAN",
+    "url": "https://github.com/chrisndirangu54/GP-GAN",
+    "fork": true,
+    "language": "MATLAB",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/GPS-and-Activity-Tracker",
+    "url": "https://github.com/chrisndirangu54/GPS-and-Activity-Tracker",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/GPS4",
+    "url": "https://github.com/chrisndirangu54/GPS4",
+    "fork": true,
+    "language": null,
+    "category": "transport",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/GPSTracker",
+    "url": "https://github.com/chrisndirangu54/GPSTracker",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Grocery-Flutter-Design",
+    "url": "https://github.com/chrisndirangu54/Grocery-Flutter-Design",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/HackElite",
+    "url": "https://github.com/chrisndirangu54/HackElite",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/hashtag.io",
+    "url": "https://github.com/chrisndirangu54/hashtag.io",
+    "fork": true,
+    "language": "PHP",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Hospital-Management-System-Mobile-App",
+    "url": "https://github.com/chrisndirangu54/Hospital-Management-System-Mobile-App",
+    "fork": true,
+    "language": null,
+    "category": "hospital",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/HTML",
+    "url": "https://github.com/chrisndirangu54/HTML",
+    "fork": false,
+    "language": "HTML",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/HyperGAN",
+    "url": "https://github.com/chrisndirangu54/HyperGAN",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Identity_Verification",
+    "url": "https://github.com/chrisndirangu54/Identity_Verification",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Input-characterization-",
+    "url": "https://github.com/chrisndirangu54/Input-characterization-",
+    "fork": false,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Instagram-Clone",
+    "url": "https://github.com/chrisndirangu54/Instagram-Clone",
+    "fork": true,
+    "language": "Dart",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/instagram-clone-1",
+    "url": "https://github.com/chrisndirangu54/instagram-clone-1",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/instiki",
+    "url": "https://github.com/chrisndirangu54/instiki",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "collaboration",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/invenio-communities",
+    "url": "https://github.com/chrisndirangu54/invenio-communities",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ios-kindle-clone",
+    "url": "https://github.com/chrisndirangu54/ios-kindle-clone",
+    "fork": true,
+    "language": "Swift",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Italiano",
+    "url": "https://github.com/chrisndirangu54/Italiano",
+    "fork": false,
+    "language": "HTML",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/jiji2",
+    "url": "https://github.com/chrisndirangu54/jiji2",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/jkh-j",
+    "url": "https://github.com/chrisndirangu54/jkh-j",
+    "fork": false,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Keras-GAN",
+    "url": "https://github.com/chrisndirangu54/Keras-GAN",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/KYB",
+    "url": "https://github.com/chrisndirangu54/KYB",
+    "fork": true,
+    "language": "Java",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/KYC-chain",
+    "url": "https://github.com/chrisndirangu54/KYC-chain",
+    "fork": true,
+    "language": "CSS",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/kyc-in-vpc",
+    "url": "https://github.com/chrisndirangu54/kyc-in-vpc",
+    "fork": false,
+    "language": "JavaScript",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/kyc_beta",
+    "url": "https://github.com/chrisndirangu54/kyc_beta",
+    "fork": false,
+    "language": "JavaScript",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/L-Commerce",
+    "url": "https://github.com/chrisndirangu54/L-Commerce",
+    "fork": true,
+    "language": null,
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/LaraDev",
+    "url": "https://github.com/chrisndirangu54/LaraDev",
+    "fork": false,
+    "language": "PHP",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/leon",
+    "url": "https://github.com/chrisndirangu54/leon",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/LibreraReader",
+    "url": "https://github.com/chrisndirangu54/LibreraReader",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Lightning-Browser",
+    "url": "https://github.com/chrisndirangu54/Lightning-Browser",
+    "fork": true,
+    "language": "Kotlin",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/LinearAccel",
+    "url": "https://github.com/chrisndirangu54/LinearAccel",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/lynket-browser",
+    "url": "https://github.com/chrisndirangu54/lynket-browser",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/marketplacekit",
+    "url": "https://github.com/chrisndirangu54/marketplacekit",
+    "fork": true,
+    "language": null,
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/marketplacekit_integration",
+    "url": "https://github.com/chrisndirangu54/marketplacekit_integration",
+    "fork": true,
+    "language": null,
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/medium-clone-on-node",
+    "url": "https://github.com/chrisndirangu54/medium-clone-on-node",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/metasploit-payloads",
+    "url": "https://github.com/chrisndirangu54/metasploit-payloads",
+    "fork": true,
+    "language": "C",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/meTTa-Chatbot",
+    "url": "https://github.com/chrisndirangu54/meTTa-Chatbot",
+    "fork": false,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/meTTa-Chatbot-",
+    "url": "https://github.com/chrisndirangu54/meTTa-Chatbot-",
+    "fork": false,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/mini-google-docs-clone",
+    "url": "https://github.com/chrisndirangu54/mini-google-docs-clone",
+    "fork": true,
+    "language": "TypeScript",
+    "category": "collaboration",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/MNIST-GAN",
+    "url": "https://github.com/chrisndirangu54/MNIST-GAN",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/mousekyc",
+    "url": "https://github.com/chrisndirangu54/mousekyc",
+    "fork": true,
+    "language": null,
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Movement",
+    "url": "https://github.com/chrisndirangu54/Movement",
+    "fork": false,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/movementPathTrackerAndroid",
+    "url": "https://github.com/chrisndirangu54/movementPathTrackerAndroid",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/moveVis",
+    "url": "https://github.com/chrisndirangu54/moveVis",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Movie-Spider",
+    "url": "https://github.com/chrisndirangu54/Movie-Spider",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Multi-Vendor-E-commerce",
+    "url": "https://github.com/chrisndirangu54/Multi-Vendor-E-commerce",
+    "fork": true,
+    "language": null,
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Multivendor",
+    "url": "https://github.com/chrisndirangu54/Multivendor",
+    "fork": true,
+    "language": null,
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/mycloud",
+    "url": "https://github.com/chrisndirangu54/mycloud",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/netflix-clone-react-typescript",
+    "url": "https://github.com/chrisndirangu54/netflix-clone-react-typescript",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/nxtbn",
+    "url": "https://github.com/chrisndirangu54/nxtbn",
+    "fork": true,
+    "language": null,
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/oss-kyc",
+    "url": "https://github.com/chrisndirangu54/oss-kyc",
+    "fork": true,
+    "language": "JavaScript",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/pluralsight-clone",
+    "url": "https://github.com/chrisndirangu54/pluralsight-clone",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/predict-fraud-using-auto-ai",
+    "url": "https://github.com/chrisndirangu54/predict-fraud-using-auto-ai",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/predictive-model-on-watson-ml",
+    "url": "https://github.com/chrisndirangu54/predictive-model-on-watson-ml",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/presentation-ai",
+    "url": "https://github.com/chrisndirangu54/presentation-ai",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/proofofphone",
+    "url": "https://github.com/chrisndirangu54/proofofphone",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/quora-clone",
+    "url": "https://github.com/chrisndirangu54/quora-clone",
+    "fork": true,
+    "language": "Ruby",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/quora-clone-1",
+    "url": "https://github.com/chrisndirangu54/quora-clone-1",
+    "fork": true,
+    "language": "Ruby",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/RadioPlayer2",
+    "url": "https://github.com/chrisndirangu54/RadioPlayer2",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/React-Instagram-Clone-2.0",
+    "url": "https://github.com/chrisndirangu54/React-Instagram-Clone-2.0",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/react-native-airbnb-clone",
+    "url": "https://github.com/chrisndirangu54/react-native-airbnb-clone",
+    "fork": true,
+    "language": null,
+    "category": "property",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/react-native-paypal",
+    "url": "https://github.com/chrisndirangu54/react-native-paypal",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/realworld",
+    "url": "https://github.com/chrisndirangu54/realworld",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/redbus",
+    "url": "https://github.com/chrisndirangu54/redbus",
+    "fork": true,
+    "language": "Java",
+    "category": "transport",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/reddit-clone",
+    "url": "https://github.com/chrisndirangu54/reddit-clone",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/ReGen-Insights",
+    "url": "https://github.com/chrisndirangu54/ReGen-Insights",
+    "fork": false,
+    "language": "TypeScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/robinhood-ui",
+    "url": "https://github.com/chrisndirangu54/robinhood-ui",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/SchoolMate-App",
+    "url": "https://github.com/chrisndirangu54/SchoolMate-App",
+    "fork": true,
+    "language": null,
+    "category": "school",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/scoold",
+    "url": "https://github.com/chrisndirangu54/scoold",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/sdk-java-v1",
+    "url": "https://github.com/chrisndirangu54/sdk-java-v1",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/search-engine",
+    "url": "https://github.com/chrisndirangu54/search-engine",
+    "fork": true,
+    "language": "CSS",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/SecuringArt-using-Blockchain-DigitalCertificates",
+    "url": "https://github.com/chrisndirangu54/SecuringArt-using-Blockchain-DigitalCertificates",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/sfdx-dreamhouse",
+    "url": "https://github.com/chrisndirangu54/sfdx-dreamhouse",
+    "fork": true,
+    "language": "Apex",
+    "category": "crm",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/SkyTube",
+    "url": "https://github.com/chrisndirangu54/SkyTube",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/smart-kyc",
+    "url": "https://github.com/chrisndirangu54/smart-kyc",
+    "fork": true,
+    "language": "PHP",
+    "category": "identity",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/snipe",
+    "url": "https://github.com/chrisndirangu54/snipe",
+    "fork": true,
+    "language": "API Blueprint",
+    "category": "services",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/spotify-app",
+    "url": "https://github.com/chrisndirangu54/spotify-app",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Spotify-Clone",
+    "url": "https://github.com/chrisndirangu54/Spotify-Clone",
+    "fork": true,
+    "language": "Java",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/spotify-clone-1",
+    "url": "https://github.com/chrisndirangu54/spotify-clone-1",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/spotty-clone-app",
+    "url": "https://github.com/chrisndirangu54/spotty-clone-app",
+    "fork": true,
+    "language": "Kotlin",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/spree",
+    "url": "https://github.com/chrisndirangu54/spree",
+    "fork": true,
+    "language": "Ruby",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/standstill",
+    "url": "https://github.com/chrisndirangu54/standstill",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/startbootstrap",
+    "url": "https://github.com/chrisndirangu54/startbootstrap",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/stock-trader",
+    "url": "https://github.com/chrisndirangu54/stock-trader",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/stockfree",
+    "url": "https://github.com/chrisndirangu54/stockfree",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/stock_exchange_script",
+    "url": "https://github.com/chrisndirangu54/stock_exchange_script",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Style-transfer",
+    "url": "https://github.com/chrisndirangu54/Style-transfer",
+    "fork": false,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/TabNine",
+    "url": "https://github.com/chrisndirangu54/TabNine",
+    "fork": true,
+    "language": "Shell",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/tech-and-venture-capital-toolkit",
+    "url": "https://github.com/chrisndirangu54/tech-and-venture-capital-toolkit",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/technology_books",
+    "url": "https://github.com/chrisndirangu54/technology_books",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/TecoGAN",
+    "url": "https://github.com/chrisndirangu54/TecoGAN",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/The-POS-Flutter",
+    "url": "https://github.com/chrisndirangu54/The-POS-Flutter",
+    "fork": true,
+    "language": null,
+    "category": "pos",
+    "selection": "core",
+    "cloned": true
+  },
+  {
+    "repository": "chrisndirangu54/TourNest",
+    "url": "https://github.com/chrisndirangu54/TourNest",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/tradingAlgo",
+    "url": "https://github.com/chrisndirangu54/tradingAlgo",
+    "fork": false,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/traveler",
+    "url": "https://github.com/chrisndirangu54/traveler",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/UGATIT",
+    "url": "https://github.com/chrisndirangu54/UGATIT",
+    "fork": true,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/unsplash-clone",
+    "url": "https://github.com/chrisndirangu54/unsplash-clone",
+    "fork": true,
+    "language": "JavaScript",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/VCInvestmentTool",
+    "url": "https://github.com/chrisndirangu54/VCInvestmentTool",
+    "fork": true,
+    "language": null,
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/vendd",
+    "url": "https://github.com/chrisndirangu54/vendd",
+    "fork": true,
+    "language": "PHP",
+    "category": "commerce",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/vertical-community",
+    "url": "https://github.com/chrisndirangu54/vertical-community",
+    "fork": true,
+    "language": null,
+    "category": "collaboration",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/Video-AnimeGAN",
+    "url": "https://github.com/chrisndirangu54/Video-AnimeGAN",
+    "fork": false,
+    "language": "Python",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/wallfly",
+    "url": "https://github.com/chrisndirangu54/wallfly",
+    "fork": true,
+    "language": null,
+    "category": "property",
+    "selection": "adjacent",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/WhatsApp-Clone",
+    "url": "https://github.com/chrisndirangu54/WhatsApp-Clone",
+    "fork": true,
+    "language": "Dart",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/WhatsAppUIClone",
+    "url": "https://github.com/chrisndirangu54/WhatsAppUIClone",
+    "fork": true,
+    "language": "Dart",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/YouPHPTube",
+    "url": "https://github.com/chrisndirangu54/YouPHPTube",
+    "fork": true,
+    "language": "PHP",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/youphptube-docker",
+    "url": "https://github.com/chrisndirangu54/youphptube-docker",
+    "fork": true,
+    "language": "Dockerfile",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/youtube",
+    "url": "https://github.com/chrisndirangu54/youtube",
+    "fork": true,
+    "language": "CSS",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  },
+  {
+    "repository": "chrisndirangu54/YuzuBrowser",
+    "url": "https://github.com/chrisndirangu54/YuzuBrowser",
+    "fork": true,
+    "language": "Kotlin",
+    "category": null,
+    "selection": "out-of-scope",
+    "cloned": false
+  }
+]

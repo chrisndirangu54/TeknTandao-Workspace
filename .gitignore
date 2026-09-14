@@ -1,0 +1,10 @@
+sources/
+**/node_modules/
+**/.dart_tool/
+**/build/
+**/.env*
+!**/.env.example
+*-debug.log
+.firebase/
+firebase-config.json
+*.service-account.json

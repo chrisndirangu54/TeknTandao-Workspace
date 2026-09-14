@@ -1,0 +1,205 @@
+[
+  {
+    "directory": "account-financial-tools",
+    "url": "https://github.com/chrisndirangu54/account-financial-tools.git",
+    "commit": "b576b2c9956dc76cd98c966d04f36d92197b9690",
+    "flutter": false,
+    "sdk": null,
+    "firebasePackages": [],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "agora-invoicing-community",
+    "url": "https://github.com/chrisndirangu54/agora-invoicing-community.git",
+    "commit": "75e2f677c738bc1cc8b600d5210434b9ff72a808",
+    "flutter": false,
+    "sdk": null,
+    "firebasePackages": [],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "ClientFlow",
+    "url": "https://github.com/chrisndirangu54/ClientFlow.git",
+    "commit": "320d4dba894ea8e3231146e76620a21b33dc206b",
+    "flutter": true,
+    "sdk": ">=3.3.0 <4.0.0'",
+    "firebasePackages": [
+      "firebase_core",
+      "firebase_messaging"
+    ],
+    "licenseFiles": [],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "employee-attendance",
+    "url": "https://github.com/zwayth/Employee-Attendance-Management-App.git",
+    "commit": "6e7c47e38ee7c2cffa6be2f09320b053a905fad1",
+    "flutter": true,
+    "sdk": ">=2.19.6 <3.0.0'",
+    "firebasePackages": [],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "EWork",
+    "url": "https://github.com/chrisndirangu54/EWork.git",
+    "commit": "0b4474bb67ecc2341e2833cc58f854fea13ffd5d",
+    "flutter": false,
+    "sdk": null,
+    "firebasePackages": [],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "firebase-pos",
+    "url": "https://github.com/elrizwiraswara/flutter_pos.git",
+    "commit": "3b61e52815cd5c9150c97cb71ab135896216ee40",
+    "flutter": true,
+    "sdk": "^3.8.1",
+    "firebasePackages": [
+      "cloud_firestore",
+      "firebase_auth",
+      "firebase_core",
+      "firebase_core_platform_interface",
+      "firebase_crashlytics",
+      "firebase_storage",
+      "firebase_storage_mocks"
+    ],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "FlareLine-CRM",
+    "url": "https://github.com/chrisndirangu54/FlareLine-CRM.git",
+    "commit": "ab28957f304fb3cfab8f1a679ba8b0ebcffe66ef",
+    "flutter": true,
+    "sdk": ">=3.4.1 <4.0.0'",
+    "firebasePackages": [],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "Flutter-Firebase-Inventory-Management-App",
+    "url": "https://github.com/chrisndirangu54/Flutter-Firebase-Inventory-Management-App.git",
+    "commit": "01de16c3e12add612ac217dabd4b6e9b6e3f827d",
+    "flutter": true,
+    "sdk": ">=3.4.3 <4.0.0'",
+    "firebasePackages": [
+      "cloud_firestore",
+      "firebase_auth",
+      "firebase_core",
+      "firebase_storage"
+    ],
+    "licenseFiles": [],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "flutter_hr_management_design",
+    "url": "https://github.com/chrisndirangu54/flutter_hr_management_design.git",
+    "commit": "4d59b8b5d8007ebcdca8be6be048c730bc5e38e9",
+    "flutter": true,
+    "sdk": ">=2.12.0 <3.0.0\"",
+    "firebasePackages": [],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "Hospital-Management-System-Mobile-App",
+    "url": "https://github.com/chrisndirangu54/Hospital-Management-System-Mobile-App.git",
+    "commit": "ccf52142c9fab65f92d7d662268d0458ff446e51",
+    "flutter": true,
+    "sdk": ">=2.7.0 <3.0.0\"",
+    "firebasePackages": [],
+    "licenseFiles": [],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "SchoolMate-App",
+    "url": "https://github.com/chrisndirangu54/SchoolMate-App.git",
+    "commit": "8af789cf380c5206e61970d43a1f80df9a548946",
+    "flutter": true,
+    "sdk": ">=2.16.1 <3.0.0'",
+    "firebasePackages": [
+      "cloud_firestore",
+      "firebase_auth",
+      "firebase_messaging",
+      "firebase_storage"
+    ],
+    "licenseFiles": [],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "sfdx-dreamhouse",
+    "url": "https://github.com/chrisndirangu54/sfdx-dreamhouse.git",
+    "commit": "df9ee587d46e934913e6da31f8c1abd6f3eeb502",
+    "flutter": false,
+    "sdk": null,
+    "firebasePackages": [],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "TallyAssist",
+    "url": "https://github.com/TallyAssist/TallyAssist.git",
+    "commit": "a0dc517e37b27923016f5ff2b2451f0f424dea33",
+    "flutter": true,
+    "sdk": ">=2.2.2 <3.0.0\"",
+    "firebasePackages": [
+      "cloud_firestore",
+      "firebase_analytics",
+      "firebase_auth",
+      "firebase_messaging",
+      "firebase_storage"
+    ],
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "The-POS-Flutter",
+    "url": "https://github.com/chrisndirangu54/The-POS-Flutter.git",
+    "commit": "c3aa373f353b3ef7538d3d85a0bca5cffd854106",
+    "flutter": true,
+    "sdk": ">=2.12.0 <3.0.0'",
+    "firebasePackages": [],
+    "licenseFiles": [],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  },
+  {
+    "directory": "time-tracking",
+    "url": "https://github.com/bizz84/starter_architecture_flutter_firebase.git",
+    "commit": "c5b1940cbd6b2647a39394a9f4e516ad2c332131",
+    "flutter": true,
+    "sdk": ">=3.6.0 <4.0.0\"",
+    "firebasePackages": [
+      "cloud_firestore",
+      "firebase_auth",
+      "firebase_core",
+      "firebase_ui_auth",
+      "firebase_ui_firestore"
+    ],
+    "licenseFiles": [
+      "LICENSE.md"
+    ],
+    "integrationStatus": "cloned_for_audit_not_migrated"
+  }
+]
