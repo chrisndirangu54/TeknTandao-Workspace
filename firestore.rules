@@ -4,6 +4,9 @@ service cloud.firestore {
     function member(org) {
       return request.auth != null && exists(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid));
     }
+    function owner(org) {
+      return member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
+    }
     function access(org, app) {
       let m = get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data;
       let a = get(/databases/$(database)/documents/organizations/$(org)/apps/$(app)).data;
@@ -52,12 +55,23 @@ service cloud.firestore {
       match /grants/{id} { allow read: if access(org, 'ngo'); }
       match /documents/{id} { allow read: if access(org, 'documents'); }
 
-      match /reports/{id} {
-        allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
-      }
-      match /payments/{id} {
-        allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
-      }
+      // Cross-app graph, automation, agent and sync metadata can expose data from
+      // multiple installed apps. Direct client reads therefore remain owner-only;
+      // scoped member access is served through callable APIs after authorization.
+      match /businessGraphNodes/{id} { allow read: if owner(org); }
+      match /businessGraphEdges/{id} { allow read: if owner(org); }
+      match /eventBus/{id} { allow read: if owner(org); }
+      match /automationRules/{id} { allow read: if owner(org); }
+      match /automationRuns/{id} { allow read: if owner(org); }
+      match /agents/{id} { allow read: if owner(org); }
+      match /agentApprovals/{id} { allow read: if owner(org); }
+      match /agentPermits/{id} { allow read: if owner(org); }
+      match /agentAudit/{id} { allow read: if owner(org); }
+      match /agentUsage/{id} { allow read: if owner(org); }
+      match /syncReceipts/{id} { allow read: if owner(org); }
+
+      match /reports/{id} { allow read: if owner(org); }
+      match /payments/{id} { allow read: if owner(org); }
       match /{app}/{id} {
         allow read: if genericAppCollection(app) && access(org, app);
       }
