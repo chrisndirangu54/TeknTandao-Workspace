@@ -1,6 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+typedef WebsiteCmsResolver = Future<List<Map<String, dynamic>>> Function(
+  String collectionId,
+  int limit,
+);
+typedef WebsitePluginResolver = Future<Map<String, dynamic>> Function(
+  String pluginId,
+  String component,
+  Map<String, dynamic> input,
+);
+typedef WebsiteFormSubmitter = Future<Map<String, dynamic>> Function(
+  String formId,
+  Map<String, String> values,
+  int elapsedMs,
+);
+typedef WebsiteConversionRecorder = Future<void> Function(String event);
+
 Color siteColor(dynamic value, [Color fallback = const Color(0xFF0F172A)]) {
   final raw = value?.toString().replaceFirst('#', '') ?? '';
   if (raw.length != 6 && raw.length != 8) return fallback;
@@ -13,7 +29,10 @@ Map<String, dynamic> siteMap(dynamic value) =>
     value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
 
 List<Map<String, dynamic>> siteList(dynamic value) => value is List
-    ? value.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList()
+    ? value
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList()
     : <Map<String, dynamic>>[];
 
 String websiteBreakpoint(double width) {
@@ -52,6 +71,29 @@ Map<String, dynamic>? findWebsiteNode(
   return null;
 }
 
+String _bindString(String value, Map<String, dynamic> context) {
+  return value.replaceAllMapped(RegExp(r'\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}'), (
+    match,
+  ) {
+    dynamic current = context;
+    for (final part in match.group(1)!.split('.')) {
+      if (current is! Map || !current.containsKey(part)) return '';
+      current = current[part];
+    }
+    return current?.toString() ?? '';
+  });
+}
+
+Map<String, dynamic> _bindMap(
+  Map<String, dynamic> input,
+  Map<String, dynamic> context,
+) => {
+      for (final entry in input.entries)
+        entry.key: entry.value is String
+            ? _bindString(entry.value as String, context)
+            : entry.value,
+    };
+
 class JsonWebsiteRuntime extends StatelessWidget {
   final Map<String, dynamic> document;
   final String? pageId;
@@ -59,6 +101,11 @@ class JsonWebsiteRuntime extends StatelessWidget {
   final String? selectedNodeId;
   final ValueChanged<String>? onSelectNode;
   final void Function(String parentNodeId, String componentType)? onDropComponent;
+  final Map<String, dynamic> dataContext;
+  final WebsiteCmsResolver? cmsResolver;
+  final WebsitePluginResolver? pluginResolver;
+  final WebsiteFormSubmitter? formSubmitter;
+  final WebsiteConversionRecorder? conversionRecorder;
 
   const JsonWebsiteRuntime({
     super.key,
@@ -68,6 +115,11 @@ class JsonWebsiteRuntime extends StatelessWidget {
     this.selectedNodeId,
     this.onSelectNode,
     this.onDropComponent,
+    this.dataContext = const {},
+    this.cmsResolver,
+    this.pluginResolver,
+    this.formSubmitter,
+    this.conversionRecorder,
   });
 
   @override
@@ -92,9 +144,9 @@ class JsonWebsiteRuntime extends StatelessWidget {
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: ((theme['maxContentWidth'] as num?)?.toDouble() ??
-                          1200)
-                      .clamp(320, 2400)
+                  maxWidth: (((theme['maxContentWidth'] as num?)?.toDouble() ??
+                              1200)
+                          .clamp(320, 2400))
                       .toDouble(),
                 ),
                 child: _SiteNode(
@@ -105,6 +157,11 @@ class JsonWebsiteRuntime extends StatelessWidget {
                   selectedNodeId: selectedNodeId,
                   onSelectNode: onSelectNode,
                   onDropComponent: onDropComponent,
+                  dataContext: dataContext,
+                  cmsResolver: cmsResolver,
+                  pluginResolver: pluginResolver,
+                  formSubmitter: formSubmitter,
+                  conversionRecorder: conversionRecorder,
                 ),
               ),
             ),
@@ -123,6 +180,12 @@ class _SiteNode extends StatelessWidget {
   final String? selectedNodeId;
   final ValueChanged<String>? onSelectNode;
   final void Function(String parentNodeId, String componentType)? onDropComponent;
+  final Map<String, dynamic> dataContext;
+  final WebsiteCmsResolver? cmsResolver;
+  final WebsitePluginResolver? pluginResolver;
+  final WebsiteFormSubmitter? formSubmitter;
+  final WebsiteConversionRecorder? conversionRecorder;
+  final int pluginDepth;
 
   const _SiteNode({
     required this.node,
@@ -132,6 +195,12 @@ class _SiteNode extends StatelessWidget {
     required this.selectedNodeId,
     required this.onSelectNode,
     required this.onDropComponent,
+    required this.dataContext,
+    required this.cmsResolver,
+    required this.pluginResolver,
+    required this.formSubmitter,
+    required this.conversionRecorder,
+    this.pluginDepth = 0,
   });
 
   @override
@@ -149,7 +218,7 @@ class _SiteNode extends StatelessWidget {
         onWillAcceptWithDetails: (_) => _acceptsChildren(node['type']?.toString()),
         onAcceptWithDetails: (details) =>
             onDropComponent?.call(id, details.data),
-        builder: (context, candidates, rejects) => MouseRegion(
+        builder: (context, candidates, _) => MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
@@ -186,19 +255,26 @@ class _SiteNode extends StatelessWidget {
         'spacer',
       }.contains(type);
 
-  List<Widget> _children() => siteList(node['children'])
-      .map(
-        (child) => _SiteNode(
-          node: child,
-          document: document,
-          availableWidth: availableWidth,
-          editable: editable,
-          selectedNodeId: selectedNodeId,
-          onSelectNode: onSelectNode,
-          onDropComponent: onDropComponent,
-        ),
-      )
-      .toList(growable: false);
+  List<Widget> _children([Map<String, dynamic>? childContext]) =>
+      siteList(node['children'])
+          .map(
+            (child) => _SiteNode(
+              node: child,
+              document: document,
+              availableWidth: availableWidth,
+              editable: editable,
+              selectedNodeId: selectedNodeId,
+              onSelectNode: onSelectNode,
+              onDropComponent: onDropComponent,
+              dataContext: childContext ?? dataContext,
+              cmsResolver: cmsResolver,
+              pluginResolver: pluginResolver,
+              formSubmitter: formSubmitter,
+              conversionRecorder: conversionRecorder,
+              pluginDepth: pluginDepth,
+            ),
+          )
+          .toList(growable: false);
 
   Widget _buildContent(
     BuildContext context,
@@ -206,7 +282,48 @@ class _SiteNode extends StatelessWidget {
     Map<String, dynamic> theme,
   ) {
     final type = node['type']?.toString() ?? 'text';
-    final props = siteMap(node['props']);
+    final props = _bindMap(siteMap(node['props']), dataContext);
+    final dataCollection = props['dataCollection']?.toString();
+    if (dataCollection != null && dataCollection.isNotEmpty && cmsResolver != null) {
+      return _CmsCollection(
+        collectionId: dataCollection,
+        limit: ((props['dataLimit'] as num?)?.toInt() ?? 20).clamp(1, 100),
+        resolver: cmsResolver!,
+        builder: (item) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _children(item),
+        ),
+      );
+    }
+
+    final pluginId = props['pluginId']?.toString();
+    if (pluginId != null && pluginId.isNotEmpty && pluginResolver != null) {
+      if (pluginDepth >= 3) {
+        return const Text('Plugin nesting limit reached.');
+      }
+      return _PluginFragment(
+        pluginId: pluginId,
+        component: props['pluginComponent']?.toString() ?? 'default',
+        input: dataContext,
+        resolver: pluginResolver!,
+        renderer: (fragment) => _SiteNode(
+          node: fragment,
+          document: document,
+          availableWidth: availableWidth,
+          editable: false,
+          selectedNodeId: null,
+          onSelectNode: null,
+          onDropComponent: null,
+          dataContext: dataContext,
+          cmsResolver: cmsResolver,
+          pluginResolver: pluginResolver,
+          formSubmitter: formSubmitter,
+          conversionRecorder: conversionRecorder,
+          pluginDepth: pluginDepth + 1,
+        ),
+      );
+    }
+
     final children = _children();
     final foreground = siteColor(
       style['foregroundColor'],
@@ -245,13 +362,14 @@ class _SiteNode extends StatelessWidget {
             (style['radius'] as num?)?.toDouble() ?? 12,
           ),
           child: AspectRatio(
-            aspectRatio: (props['aspectRatio'] as num?)?.toDouble() ?? 16 / 9,
+            aspectRatio:
+                (props['aspectRatio'] as num?)?.toDouble() ?? 16 / 9,
             child: Image.network(
               imageUrl,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => ColoredBox(
-                color: const Color(0xFFE2E8F0),
-                child: const Center(child: Icon(Icons.broken_image_outlined)),
+              errorBuilder: (_, _, _) => const ColoredBox(
+                color: Color(0xFFE2E8F0),
+                child: Center(child: Icon(Icons.broken_image_outlined)),
               ),
             ),
           ),
@@ -260,7 +378,15 @@ class _SiteNode extends StatelessWidget {
         return Align(
           alignment: _alignment(style['alignment']),
           child: FilledButton(
-            onPressed: editable ? null : () => _runAction(context),
+            onPressed: editable
+                ? null
+                : () async {
+                    final event = props['conversionEvent']?.toString();
+                    if (event != null && event.isNotEmpty) {
+                      await conversionRecorder?.call(event);
+                    }
+                    if (context.mounted) await _runAction(context);
+                  },
             child: Text(props['text']?.toString() ?? 'Button'),
           ),
         );
@@ -271,7 +397,12 @@ class _SiteNode extends StatelessWidget {
           color: foreground,
         );
       case 'divider':
-        return Divider(color: siteColor(style['borderColor'], const Color(0xFFE2E8F0)));
+        return Divider(
+          color: siteColor(
+            style['borderColor'],
+            const Color(0xFFE2E8F0),
+          ),
+        );
       case 'spacer':
         return SizedBox(height: (props['height'] as num?)?.toDouble() ?? 32);
       case 'row':
@@ -297,19 +428,19 @@ class _SiteNode extends StatelessWidget {
       case 'pricing':
       case 'testimonials':
         final requested = (props['columns'] as num?)?.toInt() ?? 3;
-        final columns = (availableWidth < 600
-                ? 1
-                : availableWidth < 960
-                    ? requested.clamp(1, 2)
-                    : requested.clamp(1, 6))
-            .toInt();
+        final columns = availableWidth < 600
+            ? 1
+            : availableWidth < 960
+                ? requested.clamp(1, 2)
+                : requested.clamp(1, 6);
         return GridView.count(
           crossAxisCount: columns,
           crossAxisSpacing: gap,
           mainAxisSpacing: gap,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: (props['childAspectRatio'] as num?)?.toDouble() ?? 1.6,
+          childAspectRatio:
+              (props['childAspectRatio'] as num?)?.toDouble() ?? 1.6,
           children: children,
         );
       case 'card':
@@ -324,15 +455,20 @@ class _SiteNode extends StatelessWidget {
           ),
         );
       case 'navbar':
-        return _navbar(context, props, children, foreground);
+        return _navbar(props, children, foreground);
       case 'hero':
-        return _hero(context, props, children, foreground);
+        return _hero(props, children, foreground);
       case 'cta':
         return _cta(props, children, foreground);
       case 'footer':
         return _footer(props, children, foreground);
       case 'form':
-        return _form(props, children);
+        return _RuntimeForm(
+          formId: node['id']?.toString() ?? 'form',
+          props: props,
+          submitter: formSubmitter,
+          conversionRecorder: conversionRecorder,
+        );
       case 'page':
       case 'section':
       case 'container':
@@ -346,7 +482,6 @@ class _SiteNode extends StatelessWidget {
   }
 
   Widget _navbar(
-    BuildContext context,
     Map<String, dynamic> props,
     List<Widget> children,
     Color foreground,
@@ -355,7 +490,9 @@ class _SiteNode extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            props['brand']?.toString() ?? document['title']?.toString() ?? 'Brand',
+            props['brand']?.toString() ??
+                document['title']?.toString() ??
+                'Brand',
             style: TextStyle(
               color: foreground,
               fontSize: 20,
@@ -370,7 +507,6 @@ class _SiteNode extends StatelessWidget {
   }
 
   Widget _hero(
-    BuildContext context,
     Map<String, dynamic> props,
     List<Widget> children,
     Color foreground,
@@ -401,7 +537,11 @@ class _SiteNode extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             props['subtitle'].toString(),
-            style: TextStyle(color: foreground.withValues(alpha: 0.72), fontSize: 18, height: 1.5),
+            style: TextStyle(
+              color: foreground.withValues(alpha: 0.72),
+              fontSize: 18,
+              height: 1.5,
+            ),
           ),
         ],
         if (children.isNotEmpty) ...[
@@ -420,17 +560,25 @@ class _SiteNode extends StatelessWidget {
     Map<String, dynamic> props,
     List<Widget> children,
     Color foreground,
-  ) => Column(
+  ) =>
+      Column(
         children: [
           Text(
             props['title']?.toString() ?? 'Ready to get started?',
             textAlign: TextAlign.center,
-            style: TextStyle(color: foreground, fontSize: 32, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: foreground,
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           if ((props['subtitle']?.toString() ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 10),
-              child: Text(props['subtitle'].toString(), textAlign: TextAlign.center),
+              child: Text(
+                props['subtitle'].toString(),
+                textAlign: TextAlign.center,
+              ),
             ),
           if (children.isNotEmpty)
             Padding(
@@ -444,28 +592,18 @@ class _SiteNode extends StatelessWidget {
     Map<String, dynamic> props,
     List<Widget> children,
     Color foreground,
-  ) => Column(
+  ) =>
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ...children,
           if ((props['copyright']?.toString() ?? '').isNotEmpty) ...[
             const SizedBox(height: 20),
-            Text(props['copyright'].toString(), style: TextStyle(color: foreground.withValues(alpha: 0.65))),
+            Text(
+              props['copyright'].toString(),
+              style: TextStyle(color: foreground.withValues(alpha: 0.65)),
+            ),
           ],
-        ],
-      );
-
-  Widget _form(Map<String, dynamic> props, List<Widget> children) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if ((props['title']?.toString() ?? '').isNotEmpty)
-            Text(props['title'].toString(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          TextField(decoration: InputDecoration(labelText: props['field1']?.toString() ?? 'Name')),
-          const SizedBox(height: 12),
-          TextField(decoration: InputDecoration(labelText: props['field2']?.toString() ?? 'Email')),
-          const SizedBox(height: 12),
-          ...children,
         ],
       );
 
@@ -499,7 +637,12 @@ class _SiteNode extends StatelessWidget {
       ),
       child: child,
     );
-    if (style['width'] == 'content') current = Align(alignment: _alignment(style['alignment']), child: IntrinsicWidth(child: current));
+    if (style['width'] == 'content') {
+      current = Align(
+        alignment: _alignment(style['alignment']),
+        child: IntrinsicWidth(child: current),
+      );
+    }
     return current;
   }
 
@@ -508,7 +651,9 @@ class _SiteNode extends StatelessWidget {
     switch (action['type']) {
       case 'externalUrl':
         final uri = Uri.tryParse(action['url']?.toString() ?? '');
-        if (uri != null) await launchUrl(uri, mode: LaunchMode.platformDefault);
+        if (uri != null) {
+          await launchUrl(uri, mode: LaunchMode.platformDefault);
+        }
         break;
       case 'navigate':
         final target = action['path']?.toString();
@@ -521,10 +666,21 @@ class _SiteNode extends StatelessWidget {
     }
   }
 
-  List<Widget> _withGap(List<Widget> children, double gap, {bool vertical = false}) {
+  List<Widget> _withGap(
+    List<Widget> children,
+    double gap, {
+    bool vertical = false,
+  }) {
     final result = <Widget>[];
     for (var i = 0; i < children.length; i++) {
-      if (i > 0) result.add(SizedBox(width: vertical ? 0 : gap, height: vertical ? gap : 0));
+      if (i > 0) {
+        result.add(
+          SizedBox(
+            width: vertical ? 0 : gap,
+            height: vertical ? gap : 0,
+          ),
+        );
+      }
       result.add(children[i]);
     }
     return result;
@@ -560,4 +716,195 @@ class _SiteNode extends StatelessWidget {
         'location' => Icons.location_on_rounded,
         _ => Icons.auto_awesome_rounded,
       };
+}
+
+class _CmsCollection extends StatelessWidget {
+  final String collectionId;
+  final int limit;
+  final WebsiteCmsResolver resolver;
+  final Widget Function(Map<String, dynamic>) builder;
+
+  const _CmsCollection({
+    required this.collectionId,
+    required this.limit,
+    required this.resolver,
+    required this.builder,
+  });
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<Map<String, dynamic>>>(
+        future: resolver(collectionId, limit),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Text('Could not load content: ${snapshot.error}');
+          }
+          final rows = snapshot.data ?? const <Map<String, dynamic>>[];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: rows.map(builder).toList(growable: false),
+          );
+        },
+      );
+}
+
+class _PluginFragment extends StatelessWidget {
+  final String pluginId;
+  final String component;
+  final Map<String, dynamic> input;
+  final WebsitePluginResolver resolver;
+  final Widget Function(Map<String, dynamic>) renderer;
+
+  const _PluginFragment({
+    required this.pluginId,
+    required this.component,
+    required this.input,
+    required this.resolver,
+    required this.renderer,
+  });
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+        future: resolver(pluginId, component, input),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Text('Plugin unavailable: ${snapshot.error}');
+          }
+          final result = snapshot.data ?? const {};
+          final fragment = siteMap(result['fragment']);
+          if (fragment.isEmpty) {
+            final data = siteMap(result['data']);
+            return Text(data['text']?.toString() ?? 'Plugin returned data.');
+          }
+          return renderer(fragment);
+        },
+      );
+}
+
+class _RuntimeForm extends StatefulWidget {
+  final String formId;
+  final Map<String, dynamic> props;
+  final WebsiteFormSubmitter? submitter;
+  final WebsiteConversionRecorder? conversionRecorder;
+
+  const _RuntimeForm({
+    required this.formId,
+    required this.props,
+    required this.submitter,
+    required this.conversionRecorder,
+  });
+
+  @override
+  State<_RuntimeForm> createState() => _RuntimeFormState();
+}
+
+class _RuntimeFormState extends State<_RuntimeForm> {
+  late final DateTime _openedAt;
+  final Map<String, TextEditingController> _controllers = {};
+  bool _busy = false;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _openedAt = DateTime.now();
+    for (var i = 1; i <= 8; i++) {
+      final label = widget.props['field$i']?.toString();
+      if (label != null && label.trim().isNotEmpty) {
+        _controllers['field$i'] = TextEditingController();
+      }
+    }
+    if (_controllers.isEmpty) {
+      _controllers['field1'] = TextEditingController();
+      _controllers['field2'] = TextEditingController();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_busy || widget.submitter == null) return;
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      final result = await widget.submitter!(
+        widget.formId,
+        {for (final entry in _controllers.entries) entry.key: entry.value.text.trim()},
+        DateTime.now().difference(_openedAt).inMilliseconds,
+      );
+      if (result['accepted'] == true) {
+        await widget.conversionRecorder?.call('form_submit');
+      }
+      if (!mounted) return;
+      setState(() {
+        _message = result['accepted'] == false
+            ? 'Thanks. Your submission was received for review.'
+            : widget.props['successMessage']?.toString() ??
+                'Thanks — your submission was received.';
+      });
+      if (result['accepted'] == true) {
+        for (final controller in _controllers.values) {
+          controller.clear();
+        }
+      }
+    } catch (error) {
+      if (mounted) setState(() => _message = 'Could not submit: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if ((widget.props['title']?.toString() ?? '').isNotEmpty)
+          Text(
+            widget.props['title'].toString(),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+        const SizedBox(height: 12),
+        for (final entry in _controllers.entries) ...[
+          TextField(
+            controller: entry.value,
+            decoration: InputDecoration(
+              labelText:
+                  widget.props[entry.key]?.toString() ?? entry.key.toUpperCase(),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        FilledButton.icon(
+          onPressed: _busy || widget.submitter == null ? null : _submit,
+          icon: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.send_rounded),
+          label: Text(widget.props['submitText']?.toString() ?? 'Submit'),
+        ),
+        if (_message != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(_message!),
+          ),
+      ],
+    );
+  }
 }
