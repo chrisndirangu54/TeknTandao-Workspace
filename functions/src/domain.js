@@ -1,4 +1,6 @@
-export const catalog = Object.freeze({
+import {buildMasterCatalog} from './master_catalog.js';
+
+const coreCatalog = Object.freeze({
   crm: {name: 'CRM', price: 150000, shares: ['contacts', 'tasks']},
   marketing: {name: 'Marketing Automation', price: 130000, shares: []},
   bookings: {name: 'Bookings & Scheduling', price: 110000, shares: []},
@@ -47,6 +49,11 @@ export const catalog = Object.freeze({
   microfinance: {name: 'Microfinance & Credit Scoring', price: 320000, shares: []},
   attendance: {name: 'Attendance', price: 80000, shares: []},
   time: {name: 'Time tracking', price: 60000, shares: []}
+});
+
+export const catalog = Object.freeze({
+  ...coreCatalog,
+  ...buildMasterCatalog(coreCatalog)
 });
 
 export function identifier(value) {
