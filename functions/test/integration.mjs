@@ -4,6 +4,7 @@ import {getFirestore} from 'firebase-admin/firestore';
 import {getApps, deleteApp} from 'firebase-admin/app';
 if (!process.env.FIRESTORE_EMULATOR_HOST || process.env.GCLOUD_PROJECT !== 'demo-tandao') throw new Error('Integration tests require the demo-tandao Firestore emulator');
 const api = await import('../src/platform_entry.js');
+const {productRecordDigest} = await import('../src/website_business_ai_domain.js');
 const db = getFirestore();
 const owner = `test_${Date.now()}`;
 const request = (data, uid = owner) => ({data: {orgId: owner, ...data}, auth: {uid, token: {email: 'owner@example.test'}}});
@@ -133,6 +134,76 @@ test('shared workflow enforces auth, dependencies, tenant scope, stock transacti
   const installedTemplate = await api.installWebsiteTemplate.run(request({templateId:'integration-free-template',projectId:'website-from-template',publicId:`${publicId}_copy`}));
   assert.equal(installedTemplate.templateId, 'integration-free-template');
   assert.equal((await db.doc(`organizations/${owner}/websiteProjects/website-from-template`).get()).data().sourceTemplateId, 'integration-free-template');
+
+  // Website Business AI is wired to the same Business Graph/Agent Control
+  // Center. Inventory is projected into a live system-managed CMS collection.
+  const operator = await api.ensureWebsiteBusinessAgent.run(request({}));
+  assert.equal(operator.agentId, 'website_operator');
+  const catalogProjection = await api.refreshWebsiteBusinessCatalog.run(request({}));
+  assert.equal(catalogProjection.collectionId, 'business_products');
+  const mirroredTea = (await db.doc(`organizations/${owner}/websiteCmsCollections/business_products/entries/tea`).get()).data();
+  assert.equal(mirroredTea.values.name, 'Tea');
+  assert.equal(mirroredTea.values.stock, 1);
+
+  const context = await api.getWebsiteBusinessContext.run(request({projectId:'website-one'}));
+  assert.equal(context.metrics.products, 1);
+  assert.equal(context.metrics.unitsSold, 2);
+  assert.ok(context.graph.nodes >= 0);
+
+  // Seed a deterministic plan in the emulator so governance/execution can be
+  // tested without calling an external AI provider.
+  const teaBefore = (await db.doc(`organizations/${owner}/products/tea`).get()).data();
+  const aiDocument = JSON.parse(JSON.stringify(publicSnapshot.data().document));
+  aiDocument.title = 'AI Optimized Store';
+  await db.doc(`organizations/${owner}/websiteAiPlans/integration_ai_plan`).set({
+    planId:'integration_ai_plan',
+    projectId:'website-one',
+    sourceRevision:2,
+    document:aiDocument,
+    productChanges:[{
+      mutationId:'feature_tea',operation:'update',productId:'tea',
+      product:{featured:true},baseProductDigest:productRecordDigest('tea',teaBefore),reason:'Feature Tea'
+    }],
+    state:'proposed'
+  });
+
+  // Draft changes are allowed by default and still consume a governed permit.
+  const websiteAction = await api.requestWebsiteBusinessAction.run(request({
+    planId:'integration_ai_plan',kind:'apply_document'
+  }));
+  assert.equal(websiteAction.state, 'allowed');
+  const resolvedWebsiteAction = await api.resolveWebsiteBusinessAction.run(request({requestId:websiteAction.requestId}));
+  const applied = await api.executeAgentAction.run(request({
+    permitId:resolvedWebsiteAction.permitId,
+    action:resolvedWebsiteAction.action,
+    payload:resolvedWebsiteAction.payload
+  }));
+  assert.equal(applied.state, 'completed');
+  assert.equal((await db.doc(`organizations/${owner}/websiteProjects/website-one`).get()).data().revision, 3);
+
+  // Product database changes default to human approval. The approved permit is
+  // bound to the exact validated payload, so a tampered edit is rejected.
+  const productAction = await api.requestWebsiteBusinessAction.run(request({
+    planId:'integration_ai_plan',kind:'product',mutationId:'feature_tea'
+  }));
+  assert.equal(productAction.state, 'pending_approval');
+  const approvedProduct = await api.approveAgentAction.run(request({requestId:productAction.requestId,approved:true}));
+  assert.equal(approvedProduct.state, 'approved');
+  const resolvedProduct = await api.resolveWebsiteBusinessAction.run(request({requestId:productAction.requestId}));
+  await assert.rejects(api.executeAgentAction.run(request({
+    permitId:resolvedProduct.permitId,
+    action:resolvedProduct.action,
+    payload:{...resolvedProduct.payload,record:{featured:false}}
+  })), /payload does not match/);
+  const productExecution = await api.executeAgentAction.run(request({
+    permitId:resolvedProduct.permitId,
+    action:resolvedProduct.action,
+    payload:resolvedProduct.payload
+  }));
+  assert.equal(productExecution.state, 'completed');
+  assert.equal((await db.doc(`organizations/${owner}/products/tea`).get()).data().featured, true);
+  await api.refreshWebsiteBusinessCatalog.run(request({}));
+  assert.equal((await db.doc(`organizations/${owner}/websiteCmsCollections/business_products/entries/tea`).get()).data().values.featured, true);
 
   await api.uninstallApp.run(request({appId:'pos'}));
   await api.uninstallApp.run(request({appId:'inventory'}));
