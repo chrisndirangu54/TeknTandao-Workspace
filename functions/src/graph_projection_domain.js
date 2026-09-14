@@ -18,7 +18,7 @@ const definitions = Object.freeze({
 });
 
 function scalar(value) {
-  return value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+  return value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
 
 function labelFor(definition, id, data) {
