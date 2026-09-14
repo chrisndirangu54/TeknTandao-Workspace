@@ -1,6 +1,6 @@
 # African Business Operating System (BizOS)
 
-A production-grade, multi-tenant, modular business operating system built for African SMEs, enterprises, schools, hospitals, retailers, and professional services firms — designed as an AI-native alternative to Zoho.
+A multi-tenant, modular business operating system for African SMEs, enterprises, schools, hospitals, retailers, and professional services firms — designed as an AI-native alternative to large business software suites.
 
 ---
 
@@ -8,8 +8,8 @@ A production-grade, multi-tenant, modular business operating system built for Af
 
 ### 🧩 1. Jigsaw Puzzle Workspace Engine (`JigsawCanvas`)
 - Administrators manage their company workspace by dragging visual puzzle pieces onto an active canvas.
-- Dropping a module provisions its backend rules, subscribes to system events, and visualizes connected data flows (`POS ↔ Inventory ↔ Accounting ↔ KRA eTIMS`).
-- **Interactive Data Fabric Inspector**: Click connection badges to inspect cross-app data routing rules.
+- Production installation validates the server-side module catalog and automatically provisions required dependencies.
+- **Interactive Data Fabric Inspector**: Click connection badges to inspect intended cross-app data routing.
 
 ### ⌨️ 2. Universal Command Palette (`Cmd/Ctrl + K`)
 - Instant search and action dispatcher (`CommandPaletteDialog`).
@@ -17,40 +17,36 @@ A production-grade, multi-tenant, modular business operating system built for Af
 
 ### 🤖 3. AI Business Copilot (`AiCopilotDrawer`)
 - Global AI assistant with tenant RBAC boundaries.
-- Analyzes cash flow, overdue invoices, low stock risks, and KRA eTIMS tax compliance rates.
+- Production AI reports use bounded aggregate business facts and do not send employee or patient notes to the model.
 
-### 🌍 4. Pluggable Regional Tax Adapters (`CountryAdapter`)
-- Supported tax environments:
-  - **Kenya (`KE`)**: KRA eTIMS (OSCU / VSCU, 16% VAT)
-  - **Nigeria (`NG`)**: FIRS E-Invoicing (7.5% VAT)
-  - **Ghana (`GH`)**: GRA E-VAT Fiscal System (15% VAT)
-  - **South Africa (`ZA`)**: SARS eFiling VAT (15% VAT)
+### 🌍 4. Regional Configuration Layer (`CountryAdapter`)
+The UI includes country metadata for Kenya, Nigeria, Ghana and South Africa. Tax-provider integrations are not considered production-ready merely because a country adapter is listed. Kenya eTIMS remains blocked until certified OSCU/VSCU configuration and acceptance testing are completed.
 
 ### 📦 5. Modular Application Suite
-- **Point of Sale (`POS`)**: Multi-branch terminal, barcode scanning, M-Pesa STK push trigger, Paystack card checkout, thermal receipt preview, 16% VAT eTIMS calculation.
-- **Sales & CRM (`CRM`)**: Customer accounts, deal pipelines, automated WhatsApp follow-ups.
-- **Inventory & Warehousing (`Inventory`)**: SKU catalog, multi-warehouse stock levels, reorder alerts.
-- **Books & Accounting (`Accounting`)**: Double-entry ledger, tax invoices, accounts receivable.
-- **People & HR (`HR`)**: Staff directory, clock-in status, department tracking.
-- **Projects & Work (`Projects`)**: Kanban tasks, Gantt milestones, budget tracking, deliverable progress.
-- **Customer Desk (`Helpdesk`)**: Support tickets, SLA tracking, priority queues.
-- **Hospital & Clinic (`Hospital`)**: Patient intake, doctor assignments, clinical condition tracking.
-- **School Management (`School`)**: Student roster, guardian contacts, fee balances.
-- **Kenya KRA eTIMS (`eTIMS`)**: OSCU/VSCU fiscalization audit logs, control code signing, QR verification.
-- **M-Pesa & Paystack Hub (`Payments`)**: STK push initiation, Paystack card checkout, merchant payment reconciliation.
+The workspace catalog includes sales, finance, HR, productivity, supply-chain and industry modules. The backend now recognizes the same module IDs as the workspace catalog, while individual modules can still be at different implementation depths.
+
+Core implemented workflows include:
+- **POS + Inventory**: transaction-safe stock deduction and replay-safe sale creation.
+- **CRM**: shared customer records and post-sale follow-up automation.
+- **Accounting**: draft invoice creation from POS sales when Accounting is entitled.
+- **Subscriptions**: Paystack and M-Pesa subscription billing with server-side verification.
+- **AI Reports**: deterministic reporting with optional Gemini narrative generation.
+
+Important integration boundaries:
+- **M-Pesa merchant POS checkout is not yet production-enabled.** The visible STK terminal in preview mode is a simulator. Real M-Pesa support currently covers verified Tandao subscription billing.
+- **KRA eTIMS fiscal issuance is not yet production-enabled.** Sales create a blocked tax outbox item until taxpayer/device configuration and certified integration are available.
 
 ---
 
 ## 🚀 Quick Start & Development
 
 ### 1. Interactive Web Preview
-
-Run the dashboard app directly in Chrome:
+Preview mode must now be enabled explicitly so a production build can never silently fall back to demo data.
 
 ```powershell
 cd apps/dashboard
 flutter pub get
-flutter run -d chrome
+flutter run -d chrome --dart-define=PREVIEW=true
 ```
 
 ### 2. Local Firebase Emulator Setup
@@ -61,26 +57,37 @@ npm --prefix functions ci
 npm run emulators
 ```
 
-In a second terminal:
+In a second terminal, provide Firebase client configuration and opt into emulators explicitly:
 
 ```powershell
 cd apps/dashboard
-flutter run -d chrome --dart-define=PREVIEW=false --dart-define=USE_EMULATORS=true
+flutter run -d chrome --dart-define=PREVIEW=false --dart-define=USE_EMULATORS=true --dart-define=FIREBASE_PROJECT_ID=demo-tandao --dart-define=FIREBASE_API_KEY=demo-key --dart-define=FIREBASE_APP_ID=1:123:web:demo --dart-define=FIREBASE_MESSAGING_SENDER_ID=123
 ```
+
+For real environments, prefer `--dart-define-from-file=../../firebase-config.json` as documented in `docs/CONFIGURATION.md`.
 
 ---
 
 ## 🧪 Verification & Testing
 
 ```powershell
-# 1. Test Node.js Functions Backend
+# Backend unit tests
 npm test
 
-# 2. Test Flutter Dashboard Application
+# Firestore rules + Functions integration tests
+npm run test:rules
+
+# Flutter checks
 cd apps/dashboard
+dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
 
-# 3. Production Web Build Validation
-flutter build web --release --no-wasm-dry-run
+# Explicit preview build
+flutter build web --release --dart-define=PREVIEW=true --no-wasm-dry-run
+
+# Production build (requires a complete firebase-config.json)
+flutter build web --release --dart-define-from-file=../../firebase-config.json --no-wasm-dry-run
 ```
+
+GitHub Actions runs these checks on pull requests.
