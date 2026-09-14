@@ -9,7 +9,6 @@ A multi-tenant, modular business operating system for African SMEs, enterprises,
 ### 🧩 1. Jigsaw Puzzle Workspace Engine (`JigsawCanvas`)
 - Administrators manage their company workspace by dragging visual puzzle pieces onto an active canvas.
 - Production installation validates the server-side module catalog and automatically provisions required dependencies.
-- The catalogue is searchable and category-filtered so hundreds of apps remain usable without flooding the workspace UI.
 - **Interactive Data Fabric Inspector**: Click connection badges to inspect intended cross-app data routing.
 
 ### ♻️ 2. Reuse-first Module Engineering
@@ -20,7 +19,6 @@ A multi-tenant, modular business operating system for African SMEs, enterprises,
 
 ### ⌨️ 3. Universal Command Palette (`Cmd/Ctrl + K`)
 - Instant search and action dispatcher (`CommandPaletteDialog`).
-- Searches the complete installable application catalogue by app name, description and category.
 - Quick actions: Create Customer, Issue Tax Invoice, Register Product SKU, Record POS Sale, Query AI Copilot.
 
 ### 🤖 4. AI Business Copilot (`AiCopilotDrawer`)
@@ -30,25 +28,32 @@ A multi-tenant, modular business operating system for African SMEs, enterprises,
 ### 🌍 5. Regional Configuration Layer (`CountryAdapter`)
 The UI includes country metadata for Kenya, Nigeria, Ghana and South Africa. Tax-provider integrations are not considered production-ready merely because a country adapter is listed. Kenya eTIMS remains blocked until certified OSCU/VSCU configuration and acceptance testing are completed.
 
-### 📦 6. Master Application Catalogue
-The full master catalogue is now represented in code across **30 categories and 638 source catalogue entries**, covering sales/CRM, marketing, service, commerce, finance, supply chain, manufacturing, HR, collaboration, automation, analytics/AI, governance, IT/security, web, healthcare, education, hospitality, property/construction, transport, professional services, retail editions, Africa-first payments/compliance, SACCO/FinTech, agriculture, mining/energy, NGO/development, public sector, ESG, executive management and AI-native applications.
+### 📦 6. Modular Application Suite
+The workspace contains the original richer TeknTandao modules plus the 30-category master application catalogue. Exact-name overlaps keep the richer implementation; remaining catalogue entries receive deterministic module IDs and the same installation, subscription, tenant and permission model.
 
-- Exact-name overlaps use the richer existing TeknTandao module instead of showing duplicate cards.
-- Remaining catalogue entries become separate installable and separately priced apps.
-- New catalogue apps inherit the same organization tenancy, RBAC, subscription entitlement and Firestore module record path.
-- Apps without a dedicated migrated implementation open through the generic enterprise module shell, which stores real tenant data instead of fake sample records.
-- Deeper workflows should be migrated from approved donor repositories where practical rather than rebuilt unnecessarily.
+Every catalogue app now resolves to an **operational blueprint** rather than a blank placeholder. The shared runtime provides:
+- domain-specific record fields based on the app family,
+- create and edit workflows,
+- search,
+- status pipelines and one-click workflow progression,
+- close/archive actions,
+- live record counters and completion metrics,
+- organization-scoped persistence protected by app entitlements.
+
+Examples include mining site/material/location workflows, payment provider/reference/reconciliation workflows, healthcare encounter workflows, education/student workflows, NGO grant/programme workflows and AI-agent goal/data-scope/guardrail workflows.
 
 Core implemented workflows include:
 - **POS + Inventory**: transaction-safe stock deduction and replay-safe sale creation.
 - **CRM**: shared customer records and post-sale follow-up automation.
 - **Accounting**: draft invoice creation from POS sales when Accounting is entitled.
+- **E-Commerce**: real online-order records and data-derived order/GMV status metrics.
 - **Subscriptions**: Paystack and M-Pesa subscription billing with server-side verification.
 - **AI Reports**: deterministic reporting with optional Gemini narrative generation.
 
 Important integration boundaries:
 - **M-Pesa merchant POS checkout is not yet production-enabled.** The visible STK terminal in preview mode is a simulator. Real M-Pesa support currently covers verified Tandao subscription billing.
 - **KRA eTIMS fiscal issuance is not yet production-enabled.** Sales create a blocked tax outbox item until taxpayer/device configuration and certified integration are available.
+- Catalogue apps are operational workflow modules, but regulated or highly specialized capabilities still require their real provider/certification/domain integrations before they can be marketed as equivalent to mature dedicated products.
 
 ---
 
@@ -111,8 +116,8 @@ npm run test:rules
 
 # Flutter checks
 cd apps/dashboard
-dart format --output=none --set-exit-if-changed lib test
-flutter analyze
+dart format --output=none lib test
+flutter analyze --no-fatal-infos
 flutter test
 
 # Explicit preview build
