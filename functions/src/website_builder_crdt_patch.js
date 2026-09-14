@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {FieldValue, Timestamp, getFirestore} from 'firebase-admin/firestore';
 import {HttpsError, onCall} from 'firebase-functions/v2/https';
 import {canAccess, identifier} from './domain.js';
-import {validateWebsiteDocument, validateWebsitePatch} from './website_builder_domain.js';
+import {applyWebsitePatch, validateWebsiteDocument, validateWebsitePatch, websiteDigest} from './website_builder_domain.js';
 
 const db = getFirestore();
 const region = 'europe-west1';
@@ -27,12 +27,12 @@ async function authorize(request) {
 }
 
 /**
- * Compatibility endpoint for the existing visual editor. Instead of rejecting
- * stale revisions, every semantic patch becomes an immutable OpSet-CRDT
- * operation. Firestore's transaction allocates a monotonic clock per editor;
- * the advanced collaboration trigger deterministically materializes the union
- * of all operations. New/offline clients can use submitWebsiteCrdtOperation
- * directly with their own Lamport clock.
+ * Compatibility endpoint for the existing visual editor. Every semantic patch
+ * becomes an immutable OpSet-CRDT operation. The transaction also applies that
+ * patch to the latest materialized document immediately so existing clients
+ * preserve their synchronous revision contract. The collaboration trigger then
+ * replays the complete operation set in deterministic Lamport/actor order,
+ * making every replica converge even when calls arrive in a different order.
  */
 export const patchWebsiteProject = onCall({region}, async request => {
   try {
@@ -61,11 +61,15 @@ export const patchWebsiteProject = onCall({region}, async request => {
       const suppliedClock = Number(request.data.clock || 0);
       const clock = Number.isSafeInteger(suppliedClock) && suppliedClock > serverClock ? suppliedClock : serverClock;
       const operation = {actorId, opId, clock, epoch, patch, projectId, uid: user, createdAt: stamp()};
+      const currentDocument = validateWebsiteDocument(project.data().draft);
+      const nextDocument = applyWebsitePatch(currentDocument, patch);
+      const revision = Number(project.data().revision || 0) + 1;
+
       if (!state.exists) {
         tx.create(stateRef, {
           projectId,
           epoch,
-          base: validateWebsiteDocument(project.data().draft),
+          base: currentDocument,
           materializedOpCount: 0,
           materializedOpSetHash: '',
           createdAt: stamp()
@@ -80,7 +84,29 @@ export const patchWebsiteProject = onCall({region}, async request => {
         updatedAt: stamp(),
         expiresAt: Timestamp.fromMillis(Date.now() + 90000)
       }, {merge: true});
-      return {accepted: true, opId, actorId, epoch, clock, revision: project.data().revision || 1};
+      tx.update(projectRef, {
+        draft: nextDocument,
+        title: nextDocument.title,
+        revision,
+        collaborationEpoch: epoch,
+        status: project.data().publishedVersion ? 'modified' : 'draft',
+        updatedBy: user,
+        updatedAt: stamp()
+      });
+      tx.set(org.collection('websiteProjectEvents').doc(`${projectId}_${revision}`), {
+        projectId,
+        revision,
+        kind: 'crdt_patch',
+        opId,
+        actorId,
+        clock,
+        epoch,
+        digest: websiteDigest(nextDocument),
+        patch,
+        actorUid: user,
+        createdAt: stamp()
+      });
+      return {accepted: true, opId, actorId, epoch, clock, revision, digest: websiteDigest(nextDocument)};
     });
   } catch (error) {
     if (error instanceof HttpsError) throw error;
