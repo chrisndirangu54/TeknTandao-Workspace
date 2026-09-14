@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
-import {catalog, quote, canAccess, saleTotal, identifier} from '../src/domain.js';
+import {catalog, quote, canAccess, saleTotal, identifier, sanitizeRecord} from '../src/domain.js';
 import {masterCatalogueCategoryCount, masterCatalogueSourceAppCount} from '../src/master_catalog.js';
 import {verifyPaystack} from '../src/providers.js';
 
@@ -32,6 +32,28 @@ test('master catalogue is available to install and price', () => {
     quote(['mc25_mining_operations', 'mc30_ai_finance_analyst', 'mc22_airtel_money']).discountPercent,
     10
   );
+});
+
+test('generic and specialized records preserve validated scalar fields', () => {
+  assert.deepEqual(sanitizeRecord({title: 'Campaign A', segment: 'SMEs', status: 'ACTIVE'}), {
+    title: 'Campaign A',
+    segment: 'SMEs',
+    status: 'ACTIVE',
+    name: 'Campaign A'
+  });
+  assert.deepEqual(sanitizeRecord({vendor: 'Acme Supplies', item: 'Cement', qty: 40}), {
+    vendor: 'Acme Supplies',
+    item: 'Cement',
+    qty: 40,
+    name: 'Acme Supplies'
+  });
+  assert.deepEqual(sanitizeRecord({site: 'Kendege', task: 'Sample trench', status: 'ACTIVE'}), {
+    site: 'Kendege',
+    task: 'Sample trench',
+    status: 'ACTIVE',
+    name: 'Kendege'
+  });
+  assert.throws(() => sanitizeRecord({payload: {nested: true}}));
 });
 
 test('access requires membership, app permission, and an unexpired entitlement', () => {
