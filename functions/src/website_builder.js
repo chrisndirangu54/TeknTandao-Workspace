@@ -23,6 +23,7 @@ const geminiKey = defineSecret('GEMINI_API_KEY');
 const stamp = () => FieldValue.serverTimestamp();
 const orgRoot = orgId => db.doc(`organizations/${identifier(orgId)}`);
 const publicSiteRef = publicId => db.doc(`publishedWebsiteSites/${identifier(publicId)}`);
+const publicSiteOwnerRef = publicId => db.doc(`websitePublicSiteOwners/${identifier(publicId)}`);
 const templateRef = templateId => db.doc(`websiteTemplates/${identifier(templateId)}`);
 const purchaseRef = reference => db.doc(`websiteTemplatePurchases/${identifier(reference)}`);
 
@@ -88,11 +89,12 @@ export const createWebsiteProject = callable(async request => {
   const document = request.data.document ? validateWebsiteDocument(request.data.document) : createBlankWebsiteDocument(title);
   assertFirestoreSized(document);
   const projectRef = org.collection('websiteProjects').doc(projectId);
-  const publicRef = publicSiteRef(publicId);
+  const ownerRef = publicSiteOwnerRef(publicId);
   await db.runTransaction(async tx => {
-    const [existing, publicSnapshot] = await Promise.all([tx.get(projectRef), tx.get(publicRef)]);
+    const [existing, ownerSnapshot] = await Promise.all([tx.get(projectRef), tx.get(ownerRef)]);
     if (existing.exists) throw new Error('Website project already exists');
-    if (publicSnapshot.exists) throw new Error('Public site id is already in use');
+    if (ownerSnapshot.exists) throw new Error('Public site id is already in use');
+    tx.create(ownerRef, {publicId, orgId: org.id, projectId, reservedBy: user, reservedAt: stamp()});
     tx.create(projectRef, {
       projectId,
       title,
@@ -175,8 +177,10 @@ export const publishWebsiteProject = callable(async request => {
     const version = (Number.isInteger(project.publishedVersion) ? project.publishedVersion : 0) + 1;
     const digest = websiteDigest(document);
     const globalRef = publicSiteRef(project.publicId);
-    const global = await tx.get(globalRef);
-    if (global.exists && global.data().ownerOrgId !== org.id) throw new Error('Public site id belongs to another organization');
+    const ownerRef = publicSiteOwnerRef(project.publicId);
+    const ownerSnapshot = await tx.get(ownerRef);
+    const owner = ownerSnapshot.data();
+    if (!ownerSnapshot.exists || owner.orgId !== org.id || owner.projectId !== projectId) throw new Error('Public site id ownership mismatch');
     tx.set(org.collection('websiteVersions').doc(`${projectId}_${version}`), {
       projectId,
       version,
@@ -188,8 +192,6 @@ export const publishWebsiteProject = callable(async request => {
     });
     tx.set(globalRef, {
       publicId: project.publicId,
-      projectId,
-      ownerOrgId: org.id,
       version,
       revision: project.revision,
       digest,
@@ -336,11 +338,12 @@ export const installWebsiteTemplate = callable(async request => {
   const publicId = publicIdValue(request.data.publicId);
   const document = validateWebsiteDocument(template.document);
   const projectRef = org.collection('websiteProjects').doc(projectId);
-  const globalRef = publicSiteRef(publicId);
+  const ownerRef = publicSiteOwnerRef(publicId);
   await db.runTransaction(async tx => {
-    const [projectExisting, publicExisting] = await Promise.all([tx.get(projectRef), tx.get(globalRef)]);
+    const [projectExisting, ownerSnapshot] = await Promise.all([tx.get(projectRef), tx.get(ownerRef)]);
     if (projectExisting.exists) throw new Error('Website project already exists');
-    if (publicExisting.exists) throw new Error('Public site id is already in use');
+    if (ownerSnapshot.exists) throw new Error('Public site id is already in use');
+    tx.create(ownerRef, {publicId, orgId: org.id, projectId, reservedBy: user, reservedAt: stamp()});
     tx.create(projectRef, {
       projectId,
       title: document.title,
