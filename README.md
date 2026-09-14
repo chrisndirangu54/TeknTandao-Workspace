@@ -29,7 +29,7 @@ A multi-tenant, modular business operating system for African SMEs, enterprises,
 The UI includes country metadata for Kenya, Nigeria, Ghana and South Africa. Tax-provider integrations are not considered production-ready merely because a country adapter is listed. Kenya eTIMS remains blocked until certified OSCU/VSCU configuration and acceptance testing are completed.
 
 ### 📦 6. Modular Application Suite
-The workspace contains the original richer TeknTandao modules plus the 30-category master application catalogue. Exact-name overlaps keep the richer implementation; remaining catalogue entries receive deterministic module IDs and the same installation, subscription, tenant and permission model.
+The workspace contains the original richer TeknTandao modules plus the **30-category / 653-entry master application catalogue**. Exact-name overlaps keep the richer implementation; remaining catalogue entries receive deterministic module IDs and the same installation, subscription, tenant and permission model.
 
 Every catalogue app now resolves to an **operational blueprint** rather than a blank placeholder. The shared runtime provides:
 - domain-specific record fields based on the app family,
@@ -41,6 +41,8 @@ Every catalogue app now resolves to an **operational blueprint** rather than a b
 - organization-scoped persistence protected by app entitlements.
 
 Examples include mining site/material/location workflows, payment provider/reference/reconciliation workflows, healthcare encounter workflows, education/student workflows, NGO grant/programme workflows and AI-agent goal/data-scope/guardrail workflows.
+
+The strategic platform layer also includes **Agent Control Center, AI FinOps & Model Cost Manager, African Business Identity & Trust Network, Cross-Border Trade OS, African Supplier Network & B2B Marketplace, Autonomous Collections & Receivables, SME Cybersecurity Center / Virtual SOC, IoT & Device Cloud, Digital Twin & Physical Operations, Insurance & Risk Hub, Food & Retail Intelligence, Geo & Mining Intelligence, Business Process Marketplace, Autonomous Operations Center and Business Graph**.
 
 Core implemented workflows include:
 - **POS + Inventory**: transaction-safe stock deduction and replay-safe sale creation.
