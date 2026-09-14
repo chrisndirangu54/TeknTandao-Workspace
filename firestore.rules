@@ -30,14 +30,25 @@ service cloud.firestore {
       match /properties/{id} { allow read: if access(org, 'property'); }
       match /sacco_members/{id} { allow read: if access(org, 'sacco'); }
       match /etims_logs/{id} { allow read: if access(org, 'etims') || access(org, 'accounting'); }
+
+      match /marketing_campaigns/{id} { allow read: if access(org, 'marketing'); }
+      match /appointments/{id} { allow read: if access(org, 'bookings'); }
+      match /ecommerce_orders/{id} { allow read: if access(org, 'ecommerce'); }
+      match /procurement_pos/{id} { allow read: if access(org, 'procurement'); }
+      match /work_orders/{id} { allow read: if access(org, 'manufacturing'); }
+      match /field_dispatches/{id} { allow read: if access(org, 'fieldservice'); }
+      match /fleet_trips/{id} { allow read: if access(org, 'fleet'); }
+      match /hotel_rooms/{id} { allow read: if access(org, 'hotel'); }
+      match /restaurant_orders/{id} { allow read: if access(org, 'restaurant'); }
+      match /grants/{id} { allow read: if access(org, 'ngo'); }
+      match /documents/{id} { allow read: if access(org, 'documents'); }
+
       match /reports/{id} {
         allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
       }
       match /payments/{id} {
         allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
       }
-      // Generic module records use a top-level collection named by the module id.
-      // Access still requires a server-created, unexpired app entitlement.
       match /{app}/{id} {
         allow read: if access(org, app);
       }
