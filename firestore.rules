@@ -55,9 +55,9 @@ service cloud.firestore {
       match /grants/{id} { allow read: if access(org, 'ngo'); }
       match /documents/{id} { allow read: if access(org, 'documents'); }
 
-      // Cross-app graph, automation, agent and sync metadata can expose data from
-      // multiple installed apps. Direct client reads therefore remain owner-only;
-      // scoped member access is served through callable APIs after authorization.
+      // Cross-app graph, automation, agent, AI-cost and sync metadata can expose
+      // data from multiple installed apps. Direct client reads therefore remain
+      // owner-only; scoped member mutations are served through callable APIs.
       match /businessGraphNodes/{id} { allow read: if owner(org); }
       match /businessGraphEdges/{id} { allow read: if owner(org); }
       match /eventBus/{id} { allow read: if owner(org); }
@@ -66,9 +66,12 @@ service cloud.firestore {
       match /agents/{id} { allow read: if owner(org); }
       match /agentApprovals/{id} { allow read: if owner(org); }
       match /agentPermits/{id} { allow read: if owner(org); }
+      match /agentExecutions/{id} { allow read: if owner(org); }
       match /agentAudit/{id} { allow read: if owner(org); }
       match /agentUsage/{id} { allow read: if owner(org); }
       match /syncReceipts/{id} { allow read: if owner(org); }
+      match /aiUsage/{id} { allow read: if owner(org); }
+      match /aiFinOpsConfig/{id} { allow read: if owner(org); }
 
       match /reports/{id} { allow read: if owner(org); }
       match /payments/{id} { allow read: if owner(org); }
