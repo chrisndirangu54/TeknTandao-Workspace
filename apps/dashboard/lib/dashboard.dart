@@ -179,7 +179,8 @@ class _DashboardState extends State<Dashboard> {
     try {
       final result = await store.call('installApp', {'appId': moduleId});
       if (!mounted) return;
-      final installed = (result['installed'] as List?)?.cast<String>() ?? [moduleId];
+      final installed =
+          (result['installed'] as List?)?.cast<String>() ?? [moduleId];
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -193,7 +194,10 @@ class _DashboardState extends State<Dashboard> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to add app: $error'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Unable to add app: $error'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -203,12 +207,19 @@ class _DashboardState extends State<Dashboard> {
       await store.call('uninstallApp', {'appId': moduleId});
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${workspaceModuleById[moduleId]?.name ?? moduleId} removed from the workspace.')),
+        SnackBar(
+          content: Text(
+            '${workspaceModuleById[moduleId]?.name ?? moduleId} removed from the workspace.',
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to remove app: $error'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Unable to remove app: $error'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -217,8 +228,10 @@ class _DashboardState extends State<Dashboard> {
   Widget build(BuildContext context) {
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _openCommandPalette,
-        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _openCommandPalette,
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+            _openCommandPalette,
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+            _openCommandPalette,
       },
       child: Focus(
         autofocus: true,
@@ -235,17 +248,36 @@ class _DashboardState extends State<Dashboard> {
                     color: const Color(0xFF3B82F6),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.hub_rounded, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.hub_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 10),
-                const Text('African Business OS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A))),
+                const Text(
+                  'African Business OS',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                   child: Text(
                     '${workspaceModules.length} apps',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2563EB),
+                    ),
                   ),
                 ),
               ],
@@ -254,14 +286,21 @@ class _DashboardState extends State<Dashboard> {
               OutlinedButton.icon(
                 onPressed: _openCommandPalette,
                 icon: const Icon(Icons.search_rounded, size: 16),
-                label: const Text('Search apps · Cmd/Ctrl + K', style: TextStyle(fontSize: 12)),
+                label: const Text(
+                  'Search apps · Cmd/Ctrl + K',
+                  style: TextStyle(fontSize: 12),
+                ),
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(
-                onPressed: () => setState(() => _showAiDrawer = !_showAiDrawer),
+                onPressed: () =>
+                    setState(() => _showAiDrawer = !_showAiDrawer),
                 icon: const Icon(Icons.auto_awesome_rounded, size: 16),
                 label: const Text('Ask AI Copilot'),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5),
+                  foregroundColor: Colors.white,
+                ),
               ),
               const SizedBox(width: 16),
             ],
@@ -318,83 +357,148 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Widget _buildSidebar() {
-    return Container(
-      width: 240,
+    return Material(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _navGroup('WORKSPACE CONTROL'),
-          _navItem('workspace', 'Jigsaw Workspace', Icons.extension_rounded),
-          _navItem('billing', 'Apps & Subscriptions', Icons.credit_card_rounded),
-          _navItem('reports', 'Executive Analytics', Icons.insights_rounded),
-          const SizedBox(height: 20),
-          _navGroup('PROVISIONED APPS'),
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: store.watch('apps'),
-              builder: (context, snapshot) {
-                final installed = snapshot.data ?? const <Map<String, dynamic>>[];
-                final installedModules = installed
-                    .map((app) => workspaceModuleById[app['id']])
-                    .whereType<SuiteModule>()
-                    .toList(growable: false);
-                if (installedModules.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Text('No apps installed yet.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-                  );
-                }
-                return ListView(
-                  children: [
-                    for (final module in installedModules)
-                      ListTile(
-                        dense: true,
-                        leading: Icon(module.icon, color: module.color, size: 20),
-                        title: Text(module.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        onTap: () => _navigateToModule(module),
-                      ),
-                  ],
-                );
-              },
-            ),
+      child: SizedBox(
+        width: 240,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _navGroup('WORKSPACE CONTROL'),
+              _navItem(
+                'workspace',
+                'Jigsaw Workspace',
+                Icons.extension_rounded,
+              ),
+              _navItem(
+                'billing',
+                'Apps & Subscriptions',
+                Icons.credit_card_rounded,
+              ),
+              _navItem(
+                'reports',
+                'Executive Analytics',
+                Icons.insights_rounded,
+              ),
+              const SizedBox(height: 20),
+              _navGroup('PROVISIONED APPS'),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: store.watch('apps'),
+                  builder: (context, snapshot) {
+                    final installed =
+                        snapshot.data ?? const <Map<String, dynamic>>[];
+                    final installedModules = installed
+                        .map((app) => workspaceModuleById[app['id']])
+                        .whereType<SuiteModule>()
+                        .toList(growable: false);
+                    if (installedModules.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Text(
+                          'No apps installed yet.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      );
+                    }
+                    return ListView(
+                      children: [
+                        for (final module in installedModules)
+                          Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(
+                                module.icon,
+                                color: module.color,
+                                size: 20,
+                              ),
+                              title: Text(
+                                module.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              onTap: () => _navigateToModule(module),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Text(
+                  'Africa-first integrations are enabled only when their real provider configuration is complete.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ],
           ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: const Text(
-              'Africa-first integrations are enabled only when their real provider configuration is complete.',
-              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _navGroup(String title) => Padding(
         padding: const EdgeInsets.only(left: 12, bottom: 8),
-        child: Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 0.8)),
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF94A3B8),
+            letterSpacing: 0.8,
+          ),
+        ),
       );
 
   Widget _navItem(String id, String label, IconData icon) {
     final selected = _activeTab == id;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
         color: selected ? const Color(0xFFEFF6FF) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
-      ),
-      child: ListTile(
-        dense: true,
-        leading: Icon(icon, color: selected ? const Color(0xFF2563EB) : const Color(0xFF64748B), size: 20),
-        title: Text(label, style: TextStyle(fontWeight: selected ? FontWeight.bold : FontWeight.w500, color: selected ? const Color(0xFF1D4ED8) : const Color(0xFF334155), fontSize: 13)),
-        onTap: () => setState(() => _activeTab = id),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          dense: true,
+          leading: Icon(
+            icon,
+            color: selected
+                ? const Color(0xFF2563EB)
+                : const Color(0xFF64748B),
+            size: 20,
+          ),
+          title: Text(
+            label,
+            style: TextStyle(
+              fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+              color: selected
+                  ? const Color(0xFF1D4ED8)
+                  : const Color(0xFF334155),
+              fontSize: 13,
+            ),
+          ),
+          onTap: () => setState(() => _activeTab = id),
+        ),
       ),
     );
   }
@@ -403,16 +507,25 @@ class _DashboardState extends State<Dashboard> {
     final query = _billingQuery.trim().toLowerCase();
     final matches = workspaceModules.where((module) {
       if (query.isEmpty) return true;
-      return '${module.name} ${module.category} ${module.description}'.toLowerCase().contains(query);
+      return '${module.name} ${module.category} ${module.description}'
+          .toLowerCase()
+          .contains(query);
     }).toList(growable: false);
-    final visible = query.isEmpty ? matches.take(80).toList(growable: false) : matches;
+    final visible =
+        query.isEmpty ? matches.take(80).toList(growable: false) : matches;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Modular Subscription Engine', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const Text(
+          'Modular Subscription Engine',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 4),
-        const Text('Every app has its own monthly price. Bundle discounts apply automatically: 10% for 3–5 apps and 20% for 6+.', style: TextStyle(color: Color(0xFF64748B))),
+        const Text(
+          'Every app has its own monthly price. Bundle discounts apply automatically: 10% for 3–5 apps and 20% for 6+.',
+          style: TextStyle(color: Color(0xFF64748B)),
+        ),
         const SizedBox(height: 18),
         TextField(
           decoration: const InputDecoration(
@@ -428,22 +541,31 @@ class _DashboardState extends State<Dashboard> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: visible.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final module = visible[index];
-              final isInstalled = installed.any((app) => app['id'] == module.id);
+              final isInstalled =
+                  installed.any((app) => app['id'] == module.id);
               return ListTile(
                 leading: Icon(module.icon, color: module.color),
-                title: Text(module.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                title: Text(
+                  module.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: Text(module.category),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${kes(module.monthlyPriceKes)}/mo', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      '${kes(module.monthlyPriceKes)}/mo',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(width: 14),
                     Switch(
                       value: isInstalled,
-                      onChanged: (value) => value ? _installModule(module.id) : _uninstallModule(module.id),
+                      onChanged: (value) => value
+                          ? _installModule(module.id)
+                          : _uninstallModule(module.id),
                     ),
                   ],
                 ),
@@ -453,7 +575,13 @@ class _DashboardState extends State<Dashboard> {
         ),
         if (visible.length < matches.length) ...[
           const SizedBox(height: 10),
-          Text('Showing ${visible.length} of ${matches.length}. Search to locate any app in the full catalogue.', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          Text(
+            'Showing ${visible.length} of ${matches.length}. Search to locate any app in the full catalogue.',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+            ),
+          ),
         ],
       ],
     );
@@ -463,8 +591,14 @@ class _DashboardState extends State<Dashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Executive Cross-Module Analytics', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const Text('Bounded consolidated operational metrics from the shared tenant data fabric.', style: TextStyle(color: Color(0xFF64748B))),
+        const Text(
+          'Executive Cross-Module Analytics',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const Text(
+          'Bounded consolidated operational metrics from the shared tenant data fabric.',
+          style: TextStyle(color: Color(0xFF64748B)),
+        ),
         const SizedBox(height: 20),
         FutureBuilder<Map<String, dynamic>>(
           future: store.call('generateReport', {'useAi': false}),
@@ -473,7 +607,10 @@ class _DashboardState extends State<Dashboard> {
             return Card(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(snapshot.data!['narrative'] ?? '', style: const TextStyle(fontSize: 16, height: 1.6)),
+                child: Text(
+                  snapshot.data!['narrative'] ?? '',
+                  style: const TextStyle(fontSize: 16, height: 1.6),
+                ),
               ),
             );
           },
