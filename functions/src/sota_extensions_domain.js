@@ -216,7 +216,11 @@ export function validateAgentExecution(input, appId) {
     const record = appId === 'inventory'
       ? normalizeProductRecord(input.payload?.record, {partial: true})
       : sanitizeRecord(input.payload?.record);
-    return {action, payload: {recordId, record}};
+    const expectedRecordDigest = input.payload?.expectedRecordDigest == null
+      ? null
+      : String(input.payload.expectedRecordDigest).toLowerCase();
+    if (expectedRecordDigest && !/^[a-f0-9]{64}$/.test(expectedRecordDigest)) throw new Error('Invalid expected record digest');
+    return {action, payload: {recordId, record, expectedRecordDigest}};
   }
   if (action === 'task.create') {
     return {action, payload: {title: textValue(input.payload?.title || 'Agent task', 240)}};
