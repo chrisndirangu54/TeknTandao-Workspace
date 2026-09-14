@@ -317,7 +317,12 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
               'r${project['revision'] ?? 1} · ${project['status'] ?? 'draft'}',
               style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () => _publishTemplate(project),
+              tooltip: 'Sell as template',
+              icon: const Icon(Icons.sell_rounded),
+            ),
             OutlinedButton.icon(
               onPressed: () => _showJson(document),
               icon: const Icon(Icons.data_object_rounded),
@@ -758,7 +763,6 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
     if (accepted != true || name.isEmpty || !path.startsWith('/')) return;
     final document = _deepCopy(siteMap(project['draft']));
     final pageId = 'page_${DateTime.now().millisecondsSinceEpoch}';
-    siteList(document['pages']);
     final pages = (document['pages'] as List).cast<dynamic>();
     pages.add({
       'id': pageId,
