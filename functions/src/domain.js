@@ -42,7 +42,7 @@ const coreCatalog = Object.freeze({
   restaurant: {name: 'Restaurant & Bar POS', price: 190000, shares: []},
   ngo: {name: 'NGO & Grants Management', price: 220000, shares: []},
   hospital: {name: 'Hospital', price: 450000, shares: ['patients']},
-  school: {name: 'Schools', price: 350000, shares: ['students']},
+  school: {name: 'School Management', price: 350000, shares: ['students']},
   agri: {name: 'Agriculture & Outgrowers', price: 240000, shares: []},
   freight: {name: 'Cargo Freight & Customs', price: 290000, shares: []},
   legal: {name: 'Legal Practice & Cases', price: 210000, shares: []},
