@@ -1,11 +1,16 @@
 import {identifier, money, optionalText, sanitizeRecord, textValue} from './domain.js';
 import {scalarMap, validateAutomationRule, validateBusinessEvent, validateGraphNode} from './sota_domain.js';
+import {validateWebsiteDocument} from './website_builder_domain.js';
+import {normalizeProductRecord, websiteBuilderAppId} from './website_business_ai_domain.js';
 
 export const safeAgentExecutionActions = Object.freeze([
   'record.create',
+  'record.update',
   'task.create',
   'event.publish',
-  'graph.upsert'
+  'graph.upsert',
+  'website.document.apply',
+  'website.publish'
 ]);
 
 export const processTemplates = Object.freeze({
@@ -195,7 +200,23 @@ export function validateAgentExecution(input, appId) {
   const action = String(input.action || '');
   if (!safeAgentExecutionActions.includes(action)) throw new Error('Agent action is not executable by the safe runtime');
   if (action === 'record.create') {
-    return {action, payload: {record: sanitizeRecord(input.payload?.record)}};
+    const record = appId === 'inventory'
+      ? normalizeProductRecord(input.payload?.record, {partial: false})
+      : sanitizeRecord(input.payload?.record);
+    return {
+      action,
+      payload: {
+        record,
+        recordId: input.payload?.recordId ? identifier(input.payload.recordId) : null,
+      },
+    };
+  }
+  if (action === 'record.update') {
+    const recordId = identifier(input.payload?.recordId);
+    const record = appId === 'inventory'
+      ? normalizeProductRecord(input.payload?.record, {partial: true})
+      : sanitizeRecord(input.payload?.record);
+    return {action, payload: {recordId, record}};
   }
   if (action === 'task.create') {
     return {action, payload: {title: textValue(input.payload?.title || 'Agent task', 240)}};
@@ -209,8 +230,35 @@ export function validateAgentExecution(input, appId) {
     });
     return {action, payload: {event}};
   }
-  const node = validateGraphNode({...input.payload?.node, sourceApp: appId});
-  return {action, payload: {node}};
+  if (action === 'website.document.apply') {
+    if (appId !== websiteBuilderAppId) throw new Error('Website document changes require a Website Builder permit');
+    const expectedRevision = Number(input.payload?.expectedRevision);
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) throw new Error('Website document change requires expectedRevision');
+    return {
+      action,
+      payload: {
+        projectId: identifier(input.payload?.projectId),
+        expectedRevision,
+        document: validateWebsiteDocument(input.payload?.document),
+        planId: input.payload?.planId ? identifier(input.payload.planId) : null,
+      },
+    };
+  }
+  if (action === 'website.publish') {
+    if (appId !== websiteBuilderAppId) throw new Error('Website publishing requires a Website Builder permit');
+    return {
+      action,
+      payload: {
+        projectId: identifier(input.payload?.projectId),
+        planId: input.payload?.planId ? identifier(input.payload.planId) : null,
+      },
+    };
+  }
+  if (action === 'graph.upsert') {
+    const node = validateGraphNode({...input.payload?.node, sourceApp: appId});
+    return {action, payload: {node}};
+  }
+  throw new Error('Unsupported safe agent action');
 }
 
 export function validateConflictResolution(input) {
