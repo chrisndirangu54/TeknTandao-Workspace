@@ -9,6 +9,15 @@ service cloud.firestore {
       let a = get(/databases/$(database)/documents/organizations/$(org)/apps/$(app)).data;
       return member(org) && (m.role == 'owner' || app in m.apps) && a.expiresAt > request.time;
     }
+    function genericAppCollection(app) {
+      return app.matches('^mc[0-9][0-9]_.+$') || app in [
+        'social', 'livechat', 'events', 'surveys', 'wms', 'quality',
+        'expenses', 'subscriptions', 'assets', 'payroll', 'recruitment',
+        'lms', 'knowledge', 'contracts', 'discussions', 'analytics',
+        'vault', 'desk_phone', 'agri', 'freight', 'legal', 'microfinance',
+        'attendance', 'time'
+      ];
+    }
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
     }
@@ -50,7 +59,7 @@ service cloud.firestore {
         allow read: if member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
       }
       match /{app}/{id} {
-        allow read: if access(org, app);
+        allow read: if genericAppCollection(app) && access(org, app);
       }
     }
     match /{document=**} { allow write: if false; }
