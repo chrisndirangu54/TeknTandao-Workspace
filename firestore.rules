@@ -24,6 +24,15 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
     }
+
+    // A published website JSON snapshot is deliberately public and addressable
+    // by its opaque public id. Listing all sites is not allowed. All writes are
+    // server-side through the versioned Website Builder publish flow.
+    match /publishedWebsiteSites/{siteId} {
+      allow get: if true;
+      allow list: if false;
+    }
+
     match /organizations/{org} {
       allow read: if member(org);
       match /members/{uid} { allow read: if member(org) && request.auth.uid == uid; }
@@ -54,6 +63,15 @@ service cloud.firestore {
       match /restaurant_orders/{id} { allow read: if access(org, 'restaurant'); }
       match /grants/{id} { allow read: if access(org, 'ngo'); }
       match /documents/{id} { allow read: if access(org, 'documents'); }
+
+      // Website Builder project JSON can be read by entitled collaborators.
+      // Publishing, patching, version history, payments and template writes stay
+      // server-authoritative through callable functions.
+      match /websiteProjects/{id} { allow read: if access(org, 'mc14_website_builder'); }
+      match /websiteTemplateEntitlements/{id} { allow read: if access(org, 'mc14_website_builder'); }
+      match /websiteProjectEvents/{id} { allow read: if owner(org); }
+      match /websiteVersions/{id} { allow read: if owner(org); }
+      match /websiteTemplateEarnings/{id} { allow read: if owner(org); }
 
       // Cross-app graph, automation, agent, AI-cost and sync metadata can expose
       // data from multiple installed apps. Direct client reads therefore remain
