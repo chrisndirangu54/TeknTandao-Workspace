@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../app_blueprints.dart';
 import '../suite.dart';
+import 'platform_control_center.dart';
 
 class GenericEnterpriseModuleScreen extends StatefulWidget {
   final SuiteModule module;
@@ -199,6 +200,10 @@ class _GenericEnterpriseModuleScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (PlatformControlCenterScreen.supports(module.id)) {
+      return PlatformControlCenterScreen(module: module, store: store);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
