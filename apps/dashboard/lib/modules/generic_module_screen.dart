@@ -43,7 +43,7 @@ class _GenericEnterpriseModuleScreenState
     }
     await store.call('saveRecord', {
       'appId': module.id,
-      if (id != null) 'id': id,
+      'id': ?id,
       'record': record,
     });
   }

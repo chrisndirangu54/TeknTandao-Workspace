@@ -837,6 +837,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
     controller.dispose();
     if (accepted != true || prompt.isEmpty) return;
     if (store.demo) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('AI generation requires the configured production Gemini provider.')),
       );
@@ -849,10 +850,12 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
         'expectedRevision': project['revision'],
         'document': generated['document'],
       });
-      if (mounted) setState(() {
-        _selectedNodeId = null;
-        _selectedPageId = null;
-      });
+      if (mounted) {
+        setState(() {
+          _selectedNodeId = null;
+          _selectedPageId = null;
+        });
+      }
     });
   }
 
@@ -1123,7 +1126,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
       final result = await store.call('startWebsiteTemplatePurchase', {
         'templateId': template['templateId'],
         'provider': provider,
-        if (phone != null) 'phone': phone,
+        'phone': ?phone,
       });
       if (result['url'] != null) {
         final uri = Uri.tryParse(result['url'].toString());
@@ -1268,6 +1271,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
     price.dispose();
     if (accepted != true || templateName.isEmpty || creatorName.isEmpty || descriptionText.isEmpty) return;
     if (store.demo) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preview mode: template publication was not sent.')));
       return;
     }

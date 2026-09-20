@@ -1040,7 +1040,7 @@ class _PlatformControlCenterScreenState
       'mutationId': mutationId,
       'recordId': conflict['recordId'],
       'strategy': applyClient ? 'apply_client_record' : 'server_wins',
-      if (record != null) 'record': record,
+      'record': ?record,
     });
   }
 

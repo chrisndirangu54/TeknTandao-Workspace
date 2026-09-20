@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {"path": "sources/ClientFlow"},
+    {"path": "sources/employee-attendance"},
+    {"path": "sources/firebase-pos"},
+    {"path": "sources/FlareLine-CRM"},
+    {"path": "sources/Flutter-Firebase-Inventory-Management-App"},
+    {"path": "sources/flutter_hr_management_design"},
+    {"path": "sources/Hospital-Management-System-Mobile-App"},
+    {"path": "sources/SchoolMate-App"},
+    {"path": "sources/TallyAssist"},
+    {"path": "sources/The-POS-Flutter"},
+    {"path": "sources/time-tracking"},
+    {"path": "sources/account-financial-tools"},
+    {"path": "sources/agora-invoicing-community"},
+    {"path": "sources/EWork"},
+    {"path": "sources/sfdx-dreamhouse"}
+  ],
+  "settings": {}
+}

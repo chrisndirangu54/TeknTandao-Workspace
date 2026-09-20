@@ -151,7 +151,7 @@ class CostAwareFirebaseSuiteStore extends SuiteStore {
           .collection('organizations/$orgId/$path')
           .limit(limit),
       onStart: () => listenerStarts += 1,
-      onDocuments: (count) => observedDocuments += count,
+      onDocuments: (docCount) => observedDocuments += docCount,
     );
     _watches[key] = watch;
     return watch.stream;

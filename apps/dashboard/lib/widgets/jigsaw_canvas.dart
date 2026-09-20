@@ -365,7 +365,7 @@ class _JigsawCanvasState extends State<JigsawCanvas>
             SizedBox(
               width: 300,
               child: DropdownButtonFormField<String>(
-                value: _catalogCategory,
+                initialValue: _catalogCategory,
                 isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Category',

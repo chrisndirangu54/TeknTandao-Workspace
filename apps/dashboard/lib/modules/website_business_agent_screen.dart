@@ -210,7 +210,7 @@ class _WebsiteBusinessAgentScreenState extends State<WebsiteBusinessAgentScreen>
       final request = await store.call('requestWebsiteBusinessAction', {
         'planId': plan['planId'],
         'kind': kind,
-        if (mutationId != null) 'mutationId': mutationId,
+        'mutationId': ?mutationId,
       });
       final state = request['state']?.toString();
       if (state == 'allowed') {

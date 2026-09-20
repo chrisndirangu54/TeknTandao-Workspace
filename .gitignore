@@ -1,4 +1,6 @@
 sources/
+.toolchains/
+inventory/source-diagnostics/*.log
 **/node_modules/
 **/.dart_tool/
 **/build/
