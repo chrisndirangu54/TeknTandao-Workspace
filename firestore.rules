@@ -46,6 +46,12 @@ service cloud.firestore {
       match /products/{id} { allow read: if access(org, 'inventory') || access(org, 'pos'); }
       match /sales/{id} { allow read: if access(org, 'pos') || access(org, 'accounting'); }
       match /invoices/{id} { allow read: if access(org, 'accounting'); }
+      match /journals/{id} { allow read: if access(org, 'accounting'); }
+      match /payrollPayslips/{id} { allow read: if access(org, 'payroll'); }
+      match /attendancePunches/{id} { allow read: if access(org, 'attendance') && resource.data.employeeUid == request.auth.uid; }
+      match /attendanceProfiles/{id} { allow read: if access(org, 'attendance') && request.auth.uid == id; }
+      match /attendanceDepartments/{id} { allow read: if access(org, 'attendance'); }
+      match /accountingNettings/{id} { allow read: if access(org, 'accounting'); }
       match /tasks/{id} { allow read: if access(org, 'crm'); }
       match /employees/{id} { allow read: if access(org, 'hr'); }
       match /projects/{id} { allow read: if access(org, 'projects'); }

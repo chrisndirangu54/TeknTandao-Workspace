@@ -1,12 +1,34 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
+import 'connected_records.dart';
+import 'hospital_operations.dart';
 
 class HospitalModuleScreen extends StatelessWidget {
   final SuiteStore store;
 
   const HospitalModuleScreen({super.key, required this.store});
 
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Hospital & Clinic'), actions: [IconButton(tooltip: 'Hospital operations', icon: const Icon(Icons.settings), onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => HospitalOperations(store: store))))], bottom: const TabBar(tabs: [
+          Tab(text: 'Patients'), Tab(text: 'Clinical records'),
+        ])),
+        body: TabBarView(children: [
+          _PatientDirectory(store: store),
+          ConnectedRecords(store: store, appId: 'hospital', types: hospitalRecordTypes),
+        ]),
+      ),
+    );
+  }
+}
+
+class _PatientDirectory extends StatelessWidget {
+  final SuiteStore store;
+  const _PatientDirectory({required this.store});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,7 +93,7 @@ class HospitalModuleScreen extends StatelessWidget {
                           child: const Icon(Icons.medical_services_rounded, color: Color(0xFFEF4444)),
                         ),
                         title: Text('${p['name']} (${p['age']} yrs, ${p['gender']})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Doctor: ${p['doctor']} · Condition: ${p['condition']}'),
+                        subtitle: Text('Patient ID: ${p['id']}\nDoctor: ${p['doctor']} · Condition: ${p['condition']}'),
                         trailing: Chip(label: Text(p['status']), backgroundColor: const Color(0xFFFEE2E2)),
                       );
                     },

@@ -1,0 +1,58 @@
+{
+  "runtime": "apps/dashboard",
+  "targetStack": [
+    "Flutter",
+    "Firebase Authentication",
+    "Cloud Firestore",
+    "Cloud Functions",
+    "Cloud Storage"
+  ],
+  "retainedDonors": [
+    "FlareLine-CRM",
+    "Flutter-Firebase-Inventory-Management-App",
+    "Hospital-Management-System-Mobile-App",
+    "SchoolMate-App",
+    "TallyAssist",
+    "employee-attendance",
+    "firebase-pos",
+    "flutter_hr_management_design",
+    "time-tracking"
+  ],
+  "retainedWorkflowReferences": [
+    "EWork"
+  ],
+  "archived": [
+    {
+      "upstream": "ClientFlow",
+      "template": "sales-reports",
+      "replacement": "FlareLine-CRM",
+      "reason": "Keep one CRM donor; FlareLine has explicit licensing and a responsive dashboard."
+    },
+    {
+      "upstream": "The-POS-Flutter",
+      "template": "invoice-and-customer-store",
+      "replacement": "firebase-pos",
+      "reason": "Prefer the Firebase/Firestore POS with offline SQLite synchronization."
+    },
+    {
+      "upstream": "account-financial-tools",
+      "template": "document-reversal-and-netting",
+      "replacement": "TallyAssist",
+      "reason": "Replace the Odoo/Python reference with the Flutter accounting donor."
+    },
+    {
+      "upstream": "agora-invoicing-community",
+      "template": "order-payment-and-product",
+      "replacement": "TallyAssist",
+      "reason": "Replace the PHP invoicing reference with the Flutter accounting donor."
+    },
+    {
+      "upstream": "sfdx-dreamhouse",
+      "template": "property-and-favorite",
+      "replacement": "FlareLine-CRM",
+      "reason": "Salesforce reference is outside the Flutter/Firebase runtime."
+    }
+  ],
+  "migrationStatus": "in_progress_not_feature_complete",
+  "note": "Retained donors are references, not yet interchangeable modules of the shared runtime."
+}

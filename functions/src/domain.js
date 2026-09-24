@@ -48,6 +48,7 @@ const coreCatalog = Object.freeze({
   legal: {name: 'Legal Practice & Cases', price: 210000, shares: []},
   microfinance: {name: 'Microfinance & Credit Scoring', price: 320000, shares: []},
   attendance: {name: 'Attendance', price: 80000, shares: []},
+  ework: {name: 'EWork', price: 160000, shares: []},
   time: {name: 'Time tracking', price: 60000, shares: []}
 });
 

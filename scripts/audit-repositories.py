@@ -41,10 +41,16 @@ for repo in public:
     })
 
 sources = []
+prior_lock = {row['directory']: row for row in json.loads((root/'inventory/sources-lock.json').read_text())}
 source_root = root/'sources'
 source_root.mkdir(exist_ok=True)
-for folder in sorted(source_root.iterdir()):
-    if not (folder/'.git').exists(): continue
+archive_root = root/'source-archive'
+folders = list(source_root.iterdir()) + (list(archive_root.iterdir()) if archive_root.exists() else [])
+for folder in sorted(folders):
+    if not (folder/'.git').exists():
+        if (folder/'REFERENCE_MANIFEST.json').exists() and folder.name in prior_lock:
+            sources.append({**prior_lock[folder.name], 'integrationStatus': 'archived_reference_only', 'checkoutPath': folder.relative_to(root).as_posix()})
+        continue
     def git(*args): return subprocess.check_output(['git','-C',str(folder),*args], text=True).strip()
     pub = folder/'pubspec.yaml'
     text = pub.read_text(encoding='utf-8') if pub.exists() else ''
@@ -58,7 +64,8 @@ for folder in sorted(source_root.iterdir()):
         'sdk': sdk.group(1) if sdk else None,
         'firebasePackages': sorted(set(re.findall(r'^\s+(firebase_\w+|cloud_firestore):',text,re.M))),
         'licenseFiles': licenses,
-        'integrationStatus': 'approved_candidate' if licenses else 'license_review_required'
+        'checkoutPath': folder.relative_to(root).as_posix(),
+        'integrationStatus': 'archived_reference_only' if folder.parent == archive_root else 'approved_candidate' if licenses else 'license_review_required'
     }
     sources.append(source)
 
@@ -73,7 +80,7 @@ lines = [
     '|---|---|---|---|---|---|'
 ]
 for s in sources:
-    integration = 'Reusable candidate' if s['licenseFiles'] else 'Audit only; licensing review required'
+    integration = 'Archived; excluded from active donors' if s['integrationStatus'] == 'archived_reference_only' else 'Reusable candidate' if s['licenseFiles'] else 'Audit only; licensing review required'
     lines.append(f"| [{s['directory']}]({s['url'].removesuffix('.git')}) | {s['flutter']} | {', '.join(s['firebasePackages']) or 'None'} | {s['sdk'] or 'N/A'} | {', '.join(s['licenseFiles']) or 'Not found; review required'} | {integration} |")
 lines += [
     '',

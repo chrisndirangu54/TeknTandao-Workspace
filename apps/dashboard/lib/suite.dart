@@ -825,6 +825,16 @@ const List<SuiteModule> modules = [
     publishedEvents: ['case.filed', 'hearing.scheduled'],
   ),
   SuiteModule(
+    id: 'ework',
+    name: 'EWork',
+    description: 'Workflow gaps, freelancer briefs, matches, and accepted milestones',
+    icon: Icons.groups_rounded,
+    color: Color(0xFF0F766E),
+    category: 'Projects, Work & Collaboration',
+    monthlyPriceKes: 160000,
+    publishedEvents: ['ework.engagement_approved'],
+  ),
+  SuiteModule(
     id: 'microfinance',
     name: 'Microfinance & Credit Scoring',
     description: 'Micro-loan Origination, Automated Credit Bureau Check, Collateral & Collections',
@@ -925,6 +935,16 @@ class DemoSuiteStore extends SuiteStore {
     Map<String, dynamic> data = const {},
   ]) async {
     switch (name) {
+      case 'saveModuleRecord':
+        final app = data['appId'];
+        final path = 'modules/$app/records';
+        final id = '${DateTime.now().microsecondsSinceEpoch}';
+        records.putIfAbsent(path, () => []).add({
+          ...Map<String, dynamic>.from(data['record'] as Map),
+          'kind': data['kind'], 'id': id,
+        });
+        notifyListeners();
+        return {'id': id};
       case 'getWorkspaceContext':
         return {
           'orgId': orgId,
@@ -1100,6 +1120,18 @@ class DemoSuiteStore extends SuiteStore {
           'message': 'STK Push delivered to $phone. Payment confirmed with receipt $receipt.',
           'receipt': receipt,
         };
+      case 'reverseInvoice':
+        final reversed = _demoReverseInvoice(records['invoices']!, data);
+        notifyListeners();
+        return reversed;
+      case 'issueCreditNote':
+        final credit = _demoCreditNote(records, data);
+        notifyListeners();
+        return credit;
+      case 'netInvoices':
+        final netted = _demoNetInvoices(records, data);
+        notifyListeners();
+        return netted;
       case 'generateReport':
         final totalSales = records['sales']!.fold<num>(0, (n, s) => n + (s['total'] as num? ?? 0));
         final totalInvoices = records['invoices']!.fold<num>(0, (n, i) => n + (i['amount'] as num? ?? 0));
@@ -1133,3 +1165,116 @@ class DemoSuiteStore extends SuiteStore {
 }
 
 String kes(num minor) => 'KES ${(minor / 100).toStringAsFixed(2)}';
+
+int _demoOpen(Map<String, dynamic> invoice) {
+  final state = invoice['paymentState'];
+  if (invoice['reversedBy'] != null || state == 'void' || state == 'paid' || state == 'netted' || state == 'reversed' || state == 'applied') return 0;
+  final total = invoice['total'];
+  if (total is! int || total < 0) throw StateError('Invalid amount in minor units');
+  final netted = invoice['nettedMinor'];
+  final used = netted == null ? 0 : netted as int;
+  final remaining = total - used;
+  if (invoice['kind'] == 'reversal' || state == 'reversal') return -remaining;
+  if (state == null || state == 'unpaid') return remaining;
+  return 0;
+}
+
+Map<String, dynamic>? _demoFind(List<Map<String, dynamic>> rows, Object? id) {
+  for (final row in rows) {
+    if (row['id'] == id) return row;
+  }
+  return null;
+}
+
+Map<String, dynamic> _demoReverseInvoice(List<Map<String, dynamic>> invoices, Map<String, dynamic> data) {
+  final id = data['invoiceId'] as String;
+  final requestId = data['requestId'] as String;
+  final existing = _demoFind(invoices, requestId);
+  if (existing != null) {
+    if (existing['reverses'] != id) throw StateError('Request ID already used');
+    return {'id': requestId};
+  }
+  final invoice = _demoFind(invoices, id);
+  if (invoice == null) throw StateError('Invoice unavailable');
+  if (invoice['kind'] == 'reversal') throw StateError('A reversal cannot be reversed here');
+  if (invoice['reversedBy'] != null) throw StateError('Invoice is already reversed');
+  if (invoice['activePayment'] != null) throw StateError('Resolve the in-progress payment before reversal');
+  if (invoice['paymentState'] != null && invoice['paymentState'] != 'unpaid') throw StateError('Only an unpaid invoice can be reversed');
+  if ((invoice['nettedMinor'] ?? 0) != 0) throw StateError('Remove netting before reversing this invoice');
+  invoices.add({
+    'id': requestId,
+    'kind': 'reversal',
+    'name': 'Reversal of ${invoice['name'] ?? id}',
+    'reverses': id,
+    'total': invoice['total'],
+    'currency': invoice['currency'] ?? 'KES',
+    'paymentState': 'applied',
+    'source': invoice['source'] ?? 'accounting',
+    if (invoice['contactId'] != null) 'contactId': invoice['contactId'],
+    if (invoice['patientId'] != null) 'patientId': invoice['patientId'],
+  });
+  invoice['paymentState'] = 'reversed';
+  invoice['reversedBy'] = requestId;
+  return {'id': requestId};
+}
+
+Map<String, dynamic> _demoCreditNote(Map<String, List<Map<String, dynamic>>> records, Map<String, dynamic> data) {
+  final invoices = records['invoices']!;
+  final requestId = data['requestId'] as String? ?? 'credit_${DateTime.now().microsecondsSinceEpoch}';
+  final name = data['name'];
+  if (name is! String || name.trim().isEmpty) throw StateError('Invalid text');
+  final trimmed = name.trim();
+  final existing = _demoFind(invoices, requestId);
+  if (existing != null) {
+    if (existing['kind'] != 'reversal' || existing['total'] != data['total'] || existing['name'] != trimmed) throw StateError('Request ID already used');
+    return {'id': requestId};
+  }
+  final contactId = data['contactId'];
+  final patientId = data['patientId'];
+  if ((contactId == null) == (patientId == null)) throw StateError('Credit belongs to one customer or one patient');
+  final party = contactId == null ? records['patients'] : records['contacts'];
+  if (party == null || !party.any((row) => row['id'] == (contactId ?? patientId))) throw StateError('Select an existing customer or patient');
+  final total = data['total'];
+  if (total is! int || total <= 0) throw StateError('Credit must be a positive amount');
+  invoices.add({
+    'id': requestId, 'kind': 'reversal', 'name': trimmed, 'total': total, 'currency': 'KES',
+    'source': 'accounting', 'paymentState': 'reversal',
+    'contactId': ?contactId,
+    'patientId': ?patientId,
+  });
+  return {'id': requestId};
+}
+
+Map<String, dynamic> _demoNetInvoices(Map<String, List<Map<String, dynamic>>> records, Map<String, dynamic> data) {
+  final invoices = records['invoices']!;
+  final requestId = data['requestId'] as String;
+  final nettings = records.putIfAbsent('accountingNettings', () => []);
+  for (final prior in nettings) {
+    if (prior['id'] != requestId) continue;
+    final ids = prior['invoiceIds'];
+    if (ids is! List || !ids.contains(data['leftId']) || !ids.contains(data['rightId'])) throw StateError('Request ID already used');
+    return {'id': requestId};
+  }
+  final left = _demoFind(invoices, data['leftId']);
+  final right = _demoFind(invoices, data['rightId']);
+  if (left == null || right == null) throw StateError('Invoice unavailable');
+  if (left['id'] == right['id']) throw StateError('Choose two different invoices');
+  final leftParty = left['contactId'] ?? left['patientId'];
+  final rightParty = right['contactId'] ?? right['patientId'];
+  if (leftParty == null || leftParty != rightParty) throw StateError('Netting requires the same customer or patient');
+  if ((left['currency'] ?? 'KES') != (right['currency'] ?? 'KES')) throw StateError('Currency mismatch');
+  final a = _demoOpen(left);
+  final b = _demoOpen(right);
+  if (a == 0 || b == 0 || a.sign == b.sign) throw StateError('Netting needs one amount to receive and one amount to pay');
+  final amount = a.abs() < b.abs() ? a.abs() : b.abs();
+  for (final entry in [(left, a.sign * amount), (right, b.sign * amount)]) {
+    final invoice = entry.$1;
+    final apply = entry.$2;
+    final total = invoice['total'] as int;
+    final netted = ((invoice['nettedMinor'] as int?) ?? 0) + apply.abs();
+    invoice['nettedMinor'] = netted;
+    invoice['paymentState'] = netted == total ? 'netted' : (invoice['paymentState'] ?? 'unpaid');
+  }
+  nettings.add({'id': requestId, 'amount': amount, 'invoiceIds': [left['id'], right['id']]});
+  return {'id': requestId, 'amount': amount};
+}

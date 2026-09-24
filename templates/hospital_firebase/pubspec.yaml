@@ -1,0 +1,20 @@
+name: hospital_management_system
+description: Firebase patient portal for the shared Tandao hospital module.
+publish_to: none
+version: 2.0.0+2
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  donor_firebase:
+    path: ../../packages/donor_firebase
+  firebase_auth: ^5.6.0
+  cloud_functions: ^5.6.0
+  url_launcher: ^6.3.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

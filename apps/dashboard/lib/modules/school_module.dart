@@ -1,12 +1,33 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
+import 'connected_records.dart';
 
 class SchoolModuleScreen extends StatelessWidget {
   final SuiteStore store;
 
   const SchoolModuleScreen({super.key, required this.store});
 
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('School Management'), bottom: const TabBar(tabs: [
+          Tab(text: 'Students'), Tab(text: 'Learning records'),
+        ])),
+        body: TabBarView(children: [
+          _StudentDirectory(store: store),
+          ConnectedRecords(store: store, appId: 'school', types: schoolRecordTypes),
+        ]),
+      ),
+    );
+  }
+}
+
+class _StudentDirectory extends StatelessWidget {
+  final SuiteStore store;
+  const _StudentDirectory({required this.store});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,7 +92,7 @@ class SchoolModuleScreen extends StatelessWidget {
                           child: const Icon(Icons.person_rounded, color: Color(0xFF06B6D4)),
                         ),
                         title: Text('${s['name']} (${s['grade']})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Guardian: ${s['guardian']}'),
+                        subtitle: Text('Student ID: ${s['id']}\nGuardian: ${s['guardian']}'),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

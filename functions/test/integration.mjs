@@ -9,6 +9,24 @@ const db = getFirestore();
 const owner = `test_${Date.now()}`;
 const request = (data, uid = owner) => ({data: {orgId: owner, ...data}, auth: {uid, token: {email: 'owner@example.test'}}});
 
+test('connected clinical records enforce membership, same-tenant references and record types', async () => {
+  const tenant = `${owner}_clinical`;
+  const req = (data, user = tenant) => ({data: {orgId: tenant, ...data}, auth: {uid: user}});
+  await api.createOrganization.run(req({name: 'Clinical test'}));
+  await api.installApp.run(req({appId: 'hospital'}));
+  await api.saveRecord.run(req({appId: 'hospital', id: 'patient_1', record: {name: 'Patient'}}));
+  const input = {appId: 'hospital', kind: 'prescription', id: 'rx_1',
+    record: {name: 'Prescription', patientId: 'patient_1', medicine: 'Medicine', instructions: 'As directed'}};
+  await assert.rejects(api.saveModuleRecord.run(req(input, 'stranger')));
+  await assert.rejects(api.saveModuleRecord.run(req({...input, record: {...input.record, patientId: 'missing'}})));
+  await api.saveModuleRecord.run(req(input));
+  const saved = (await db.doc(`organizations/${tenant}/modules/hospital/records/rx_1`).get()).data();
+  assert.equal(saved.updatedBy, tenant);
+  assert.equal(saved.patientId, 'patient_1');
+  await assert.rejects(api.saveModuleRecord.run(req({...input, kind: 'clinicalNote',
+    record: {name: 'Note', patientId: 'patient_1', notes: 'Note'}})), /type cannot change/);
+});
+
 test('shared workflow enforces auth, dependencies, tenant scope, stock transaction, replay handling and uninstall safety', async () => {
   await assert.rejects(api.createOrganization.run({data: {name: 'No auth'}}));
   await api.createOrganization.run(request({name: 'Integration business'}));
@@ -208,6 +226,39 @@ test('shared workflow enforces auth, dependencies, tenant scope, stock transacti
   await api.uninstallApp.run(request({appId:'pos'}));
   await api.uninstallApp.run(request({appId:'inventory'}));
   assert.equal((await db.doc(`organizations/${owner}/apps/inventory`).get()).exists, false);
+});
+
+test('hospital portal derives patient identity and protects bookings, bills and prescriptions', async () => {
+  const tenant = `${owner}_hospital`;
+  const call = (uid, data) => ({auth: {uid, token: {email: `${uid}@example.test`}}, data: {orgId: tenant, ...data}});
+  await api.createOrganization.run(call(tenant, {name: 'Hospital'}));
+  await api.installApp.run(call(tenant, {appId: 'hospital'}));
+  await assert.rejects(api.hospitalRegisterPatient.run({data: {orgId: tenant, name: 'No auth', phone: '123'}}));
+  const p1 = await api.hospitalRegisterPatient.run(call('patient_one', {name: 'One', phone: '254700000001'}));
+  const p2 = await api.hospitalRegisterPatient.run(call('patient_two', {name: 'Two', phone: '254700000002'}));
+  assert.notEqual(p1.patientId, p2.patientId);
+  assert.equal((await api.hospitalRegisterPatient.run(call('patient_one', {name: 'One', phone: '123'}))).patientId, p1.patientId);
+  await assert.rejects(api.hospitalSaveService.run(call('patient_one', {kind: 'appointment', name: 'Fake', priceMinor: 1})));
+  await api.hospitalSaveService.run(call(tenant, {id: 'consult', kind: 'appointment', name: 'Consultation', priceMinor: 100000}));
+  const booking = {requestId: 'visit_1', kind: 'appointment', serviceId: 'consult', scheduledAt: '2030-01-01T09:00:00Z', patientId: p2.patientId, priceMinor: 1};
+  await api.hospitalBook.run(call('patient_one', booking));
+  await api.hospitalBook.run(call('patient_one', booking));
+  await assert.rejects(api.hospitalBook.run(call('patient_two', booking)));
+  const list = await api.hospitalListRecords.run(call('patient_one', {}));
+  assert.equal(list.records.length, 1);
+  assert.equal(list.records[0].priceMinor, 100000);
+  assert.equal((await api.hospitalListRecords.run(call('patient_two', {}))).records.length, 0);
+  assert.equal((await api.hospitalListBills.run(call('patient_two', {}))).bills.length, 0);
+  await assert.rejects(api.hospitalUpdateBooking.run(call('patient_two', {id: 'visit_1', cancel: true})));
+  await api.hospitalUpdateBooking.run(call('patient_one', {id: 'visit_1', scheduledAt: '2030-01-02T09:00:00Z'}));
+  await api.saveModuleRecord.run(call(tenant, {appId: 'hospital', kind: 'prescription', id: 'rx', record: {
+    name: 'Prescription', patientId: p1.patientId, medicine: 'Medicine', instructions: 'As directed'}}));
+  await assert.rejects(api.hospitalReceivePrescription.run(call('patient_two', {id: 'rx'})));
+  await api.hospitalReceivePrescription.run(call('patient_one', {id: 'rx'}));
+  await api.hospitalUpdateBooking.run(call('patient_one', {id: 'visit_1', cancel: true}));
+  assert.equal((await api.hospitalListBills.run(call('patient_one', {}))).bills[0].paymentState, 'void');
+  const otherTenant = {...call('patient_one', {}), data: {orgId: `${tenant}_other`}};
+  await assert.rejects(api.hospitalListRecords.run(otherTenant));
 });
 
 after(async () => { await Promise.all(getApps().map(deleteApp)); });

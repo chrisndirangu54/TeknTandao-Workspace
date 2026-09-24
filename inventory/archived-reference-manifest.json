@@ -1,0 +1,78 @@
+[
+  {
+    "directory": "sales-reports",
+    "kind": "flutter-firebase-template",
+    "language": "Flutter/Firebase",
+    "purpose": "Parts to donate. Not a runnable project.",
+    "upstream": "ClientFlow",
+    "replacement": "FlareLine-CRM",
+    "recoveryZip": "source-recovery/ClientFlow-full.zip",
+    "sha256": "cd21646141c2d7ba0e523809e9bf6bcd6e2a02617727645a2f2331e482cf24ea",
+    "originalFileCount": 274,
+    "parts": [
+      "lib/sales_reports.dart"
+    ]
+  },
+  {
+    "directory": "invoice-and-customer-store",
+    "kind": "flutter-firebase-template",
+    "language": "Flutter/Firebase",
+    "purpose": "Parts to donate. Not a runnable project.",
+    "upstream": "The-POS-Flutter",
+    "replacement": "firebase-pos",
+    "recoveryZip": "source-recovery/The-POS-Flutter-full.zip",
+    "sha256": "d648650f23df5fbcf36fcd60492bcdade6a174116c67f3c4c419296127ba18d1",
+    "originalFileCount": 302,
+    "parts": [
+      "lib/customer.dart",
+      "lib/invoice.dart",
+      "lib/store_panels.dart",
+      "test/store_round_trip_test.dart"
+    ]
+  },
+  {
+    "directory": "document-reversal-and-netting",
+    "kind": "flutter-firebase-template",
+    "language": "Flutter/Firebase",
+    "purpose": "Parts to donate. Not a runnable project.",
+    "upstream": "account-financial-tools",
+    "replacement": "TallyAssist",
+    "recoveryZip": "source-recovery/account-financial-tools-full.zip",
+    "sha256": "9e895183c78a10db09c153118cc9c0acbfe13214178678d1eb6df803b9378610",
+    "originalFileCount": 1113,
+    "parts": [
+      "lib/ledger.dart",
+      "test/ledger_request_test.dart"
+    ]
+  },
+  {
+    "directory": "order-payment-and-product",
+    "kind": "flutter-firebase-template",
+    "language": "Flutter/Firebase",
+    "purpose": "Parts to donate. Not a runnable project.",
+    "upstream": "agora-invoicing-community",
+    "replacement": "TallyAssist",
+    "recoveryZip": "source-recovery/agora-invoicing-community-full.zip",
+    "sha256": "df7450481110d12a78c6c672e769daaa6c2a1e35458c71bb98a8b75fa06a05eb",
+    "originalFileCount": 16450,
+    "parts": [
+      "lib/billing_records.dart",
+      "lib/product_panel.dart",
+      "test/billing_records_test.dart"
+    ]
+  },
+  {
+    "directory": "property-and-favorite",
+    "kind": "flutter-firebase-template",
+    "language": "Flutter/Firebase",
+    "purpose": "Parts to donate. Not a runnable project.",
+    "upstream": "sfdx-dreamhouse",
+    "replacement": "FlareLine-CRM",
+    "recoveryZip": "source-recovery/sfdx-dreamhouse-full.zip",
+    "sha256": "3d44d8904a2f142490f93541763d10afefc6f086887036b66c699d4933f2598a",
+    "originalFileCount": 431,
+    "parts": [
+      "lib/property_panels.dart"
+    ]
+  }
+]

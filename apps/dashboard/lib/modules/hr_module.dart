@@ -30,6 +30,22 @@ class HrModuleScreen extends StatelessWidget {
                 const Text('EMPLOYEE DIRECTORY & CLOCK-IN STATUS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
                 ElevatedButton.icon(
                   onPressed: () async {
+                    final details = await recordForm(context, 'Statutory payroll', ['Employee ID', 'Period YYYY-MM', 'Gross pay in shillings']);
+                    if (details == null || details[0].isEmpty) return;
+                    final shillings = int.tryParse(details[2].trim());
+                    if (shillings == null) return;
+                    final result = await store.call('runStatutoryPayroll', {'employeeId': details[0].trim(), 'period': details[1].trim(), 'grossMinor': shillings * 100});
+                    if (context.mounted) {
+                      final net = result['netMinor'];
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(net is num ? 'Payslip posted. Net ${kes(net)}. Rate card ${result['rateCard']}.' : 'Payroll request sent.')));
+                    }
+                  },
+                  icon: const Icon(Icons.payments_rounded, size: 16),
+                  label: const Text('Run Payroll'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: () async {
                     final details = await recordForm(context, 'Add New Staff Member', ['Full Name', 'Job Role', 'Department', 'Branch']);
                     if (details != null && details[0].isNotEmpty) {
                       await store.call('saveRecord', {

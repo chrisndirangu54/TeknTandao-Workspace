@@ -1,64 +1,65 @@
 [
   {
-    "directory": "account-financial-tools",
+    "directory": "document-reversal-and-netting",
+    "upstreamDirectory": "account-financial-tools",
     "url": "https://github.com/chrisndirangu54/account-financial-tools.git",
     "commit": "b576b2c9956dc76cd98c966d04f36d92197b9690",
-    "flutter": false,
-    "sdk": null,
-    "firebasePackages": [],
-    "licenseFiles": [
-      "LICENSE"
-    ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "flutter": true,
+    "sdk": ">=3.3.0 <4.0.0",
+    "firebasePackages": ["cloud_firestore", "cloud_functions"],
+    "licenseFiles": [],
+    "integrationStatus": "archived_reference_only",
+    "checkoutPath": "source-archive/document-reversal-and-netting"
   },
   {
-    "directory": "agora-invoicing-community",
+    "directory": "order-payment-and-product",
+    "upstreamDirectory": "agora-invoicing-community",
     "url": "https://github.com/chrisndirangu54/agora-invoicing-community.git",
     "commit": "75e2f677c738bc1cc8b600d5210434b9ff72a808",
-    "flutter": false,
-    "sdk": null,
-    "firebasePackages": [],
-    "licenseFiles": [
-      "LICENSE"
-    ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "flutter": true,
+    "sdk": ">=3.3.0 <4.0.0",
+    "firebasePackages": ["cloud_firestore", "cloud_functions"],
+    "licenseFiles": [],
+    "integrationStatus": "archived_reference_only",
+    "checkoutPath": "source-archive/order-payment-and-product"
   },
   {
-    "directory": "ClientFlow",
+    "directory": "sales-reports",
+    "upstreamDirectory": "ClientFlow",
     "url": "https://github.com/chrisndirangu54/ClientFlow.git",
     "commit": "320d4dba894ea8e3231146e76620a21b33dc206b",
     "flutter": true,
-    "sdk": ">=3.3.0 <4.0.0'",
-    "firebasePackages": [
-      "firebase_core",
-      "firebase_messaging"
-    ],
+    "sdk": ">=3.3.0 <4.0.0",
+    "firebasePackages": ["cloud_firestore", "cloud_functions"],
     "licenseFiles": [],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "archived_reference_only",
+    "checkoutPath": "source-archive/sales-reports"
   },
   {
     "directory": "employee-attendance",
     "url": "https://github.com/zwayth/Employee-Attendance-Management-App.git",
     "commit": "6e7c47e38ee7c2cffa6be2f09320b053a905fad1",
     "flutter": true,
-    "sdk": ">=2.19.6 <3.0.0'",
-    "firebasePackages": [],
+    "sdk": ">=3.3.0 <4.0.0",
+    "firebasePackages": ["cloud_firestore", "cloud_functions", "firebase_auth"],
     "licenseFiles": [
       "LICENSE"
     ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "flutter_firebase_donor",
+    "checkoutPath": "sources/employee-attendance"
   },
   {
     "directory": "EWork",
     "url": "https://github.com/chrisndirangu54/EWork.git",
     "commit": "0b4474bb67ecc2341e2833cc58f854fea13ffd5d",
-    "flutter": false,
-    "sdk": null,
-    "firebasePackages": [],
+    "flutter": true,
+    "sdk": ">=3.3.0 <4.0.0",
+    "firebasePackages": ["cloud_functions", "firebase_auth"],
     "licenseFiles": [
       "LICENSE"
     ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "flutter_firebase_donor",
+    "checkoutPath": "sources/EWork"
   },
   {
     "directory": "firebase-pos",
@@ -78,7 +79,8 @@
     "licenseFiles": [
       "LICENSE"
     ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "cloned_for_audit_not_migrated",
+    "checkoutPath": "sources/firebase-pos"
   },
   {
     "directory": "FlareLine-CRM",
@@ -90,7 +92,8 @@
     "licenseFiles": [
       "LICENSE"
     ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "cloned_for_audit_not_migrated",
+    "checkoutPath": "sources/FlareLine-CRM"
   },
   {
     "directory": "Flutter-Firebase-Inventory-Management-App",
@@ -105,7 +108,8 @@
       "firebase_storage"
     ],
     "licenseFiles": [],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "cloned_for_audit_not_migrated",
+    "checkoutPath": "sources/Flutter-Firebase-Inventory-Management-App"
   },
   {
     "directory": "flutter_hr_management_design",
@@ -117,7 +121,8 @@
     "licenseFiles": [
       "LICENSE"
     ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "cloned_for_audit_not_migrated",
+    "checkoutPath": "sources/flutter_hr_management_design"
   },
   {
     "directory": "Hospital-Management-System-Mobile-App",
@@ -127,7 +132,8 @@
     "sdk": ">=2.7.0 <3.0.0\"",
     "firebasePackages": [],
     "licenseFiles": [],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "cloned_for_audit_not_migrated",
+    "checkoutPath": "sources/Hospital-Management-System-Mobile-App"
   },
   {
     "directory": "SchoolMate-App",
@@ -142,19 +148,20 @@
       "firebase_storage"
     ],
     "licenseFiles": [],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "cloned_for_audit_not_migrated",
+    "checkoutPath": "sources/SchoolMate-App"
   },
   {
-    "directory": "sfdx-dreamhouse",
+    "directory": "property-and-favorite",
+    "upstreamDirectory": "sfdx-dreamhouse",
     "url": "https://github.com/chrisndirangu54/sfdx-dreamhouse.git",
     "commit": "df9ee587d46e934913e6da31f8c1abd6f3eeb502",
-    "flutter": false,
-    "sdk": null,
-    "firebasePackages": [],
-    "licenseFiles": [
-      "LICENSE"
-    ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "flutter": true,
+    "sdk": ">=3.3.0 <4.0.0",
+    "firebasePackages": ["cloud_firestore", "cloud_functions"],
+    "licenseFiles": [],
+    "integrationStatus": "archived_reference_only",
+    "checkoutPath": "source-archive/property-and-favorite"
   },
   {
     "directory": "TallyAssist",
@@ -172,17 +179,20 @@
     "licenseFiles": [
       "LICENSE"
     ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "cloned_for_audit_not_migrated",
+    "checkoutPath": "sources/TallyAssist"
   },
   {
-    "directory": "The-POS-Flutter",
+    "directory": "invoice-and-customer-store",
+    "upstreamDirectory": "The-POS-Flutter",
     "url": "https://github.com/chrisndirangu54/The-POS-Flutter.git",
     "commit": "c3aa373f353b3ef7538d3d85a0bca5cffd854106",
     "flutter": true,
-    "sdk": ">=2.12.0 <3.0.0'",
-    "firebasePackages": [],
+    "sdk": ">=3.3.0 <4.0.0",
+    "firebasePackages": ["cloud_firestore", "cloud_functions"],
     "licenseFiles": [],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "archived_reference_only",
+    "checkoutPath": "source-archive/invoice-and-customer-store"
   },
   {
     "directory": "time-tracking",
@@ -200,6 +210,7 @@
     "licenseFiles": [
       "LICENSE.md"
     ],
-    "integrationStatus": "cloned_for_audit_not_migrated"
+    "integrationStatus": "cloned_for_audit_not_migrated",
+    "checkoutPath": "sources/time-tracking"
   }
 ]

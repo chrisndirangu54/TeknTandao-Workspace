@@ -40,4 +40,12 @@ with zipfile.ZipFile(archive) as zipped:
         if not (target/name).resolve().is_relative_to(target): raise RuntimeError('Unsafe archive path')
     zipped.extractall(target)
 (target/'engine-dart-sdk.stamp').write_text(engine)
+sky = ROOT/'.toolchains/sky_engine.zip'
+urllib.request.urlretrieve(f'https://storage.googleapis.com/flutter_infra_release/flutter/{engine}/sky_engine.zip', sky)
+sky_target = (target/'pkg').resolve()
+with zipfile.ZipFile(sky) as zipped:
+    if zipped.testzip() is not None: raise RuntimeError('sky_engine archive CRC failed')
+    for name in zipped.namelist():
+        if not (sky_target/name).resolve().is_relative_to(sky_target): raise RuntimeError('Unsafe archive path')
+    zipped.extractall(sky_target)
 print('Legacy Dart SDK installed and archive integrity verified.', flush=True)

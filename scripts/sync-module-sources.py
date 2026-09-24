@@ -41,13 +41,17 @@ def eligible(donor: dict) -> bool:
         donor.get("repository")
         and donor.get("commit")
         and "audit_only" not in status
+        and "archived" not in status
+        and "non_flutter" not in status
         and "review_required" not in license_name
     )
 
 
-def sync(repo: str, commit: str) -> None:
-    name = repo.rsplit("/", 1)[-1]
+def sync(repo: str, commit: str, directory: str | None = None) -> None:
+    name = directory or repo.rsplit("/", 1)[-1]
     destination = SOURCES / name
+    if destination.resolve().parent != SOURCES.resolve():
+        raise RuntimeError('Invalid source directory')
     url = f"https://github.com/{repo}.git"
     if not destination.exists():
         subprocess.check_call(["git", "clone", "--filter=blob:none", "--no-checkout", url, str(destination)])
@@ -75,7 +79,7 @@ def main() -> None:
         for donor in donor_entries(modules[module_id]):
             if not eligible(donor):
                 continue
-            sync(donor["repository"], donor["commit"])
+            sync(donor["repository"], donor["commit"], donor.get("directory"))
             count += 1
     print(f"Synced {count} licensed/pinned donor repositories. No upstream code was executed.")
 

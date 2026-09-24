@@ -5,8 +5,10 @@ import {onCall, onRequest, HttpsError} from 'firebase-functions/v2/https';
 import {onDocumentCreated} from 'firebase-functions/v2/firestore';
 import {defineSecret} from 'firebase-functions/params';
 import {randomUUID} from 'node:crypto';
+import {prepareModuleRecord} from './module_records.js';
 import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expandRequiredApps, sanitizeRecord} from './domain.js';
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
+import {invoiceJournal} from './ledger_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -158,6 +160,25 @@ export const saveRecord = callable(async request => {
   return {id};
 });
 
+export const saveModuleRecord = callable(async request => {
+  const app = identifier(request.data.appId);
+  const {org, user} = await authorize(request, app);
+  const {record, reference} = prepareModuleRecord(app, request.data.kind, request.data.record);
+  const id = identifier(request.data.id || randomUUID());
+  const target = org.collection('modules').doc(app).collection('records').doc(id);
+  await db.runTransaction(async tx => {
+    const existing = await tx.get(target);
+    if (existing.exists && existing.data().kind !== record.kind) throw new Error('Record type cannot change');
+    if (reference) {
+      const parent = await tx.get(org.collection(reference[1]).doc(record[reference[0]]));
+      if (!parent.exists) throw new Error('Select an existing record in this organization');
+    }
+    tx.set(target, {...record, updatedAt: stamp(), updatedBy: user,
+      ...(existing.exists ? {} : {createdAt: stamp(), createdBy: user})}, {merge: true});
+  });
+  return {id};
+});
+
 export const createSale = callable(async request => {
   const {org, user} = await authorize(request, 'pos');
   const id = identifier(request.data.requestId);
@@ -192,7 +213,8 @@ export const saleAutomation = onDocumentCreated({document: 'organizations/{orgId
     if (run.exists || !saleSnap.exists) return;
     const sale = saleSnap.data();
     if (books.data()?.expiresAt?.toMillis() > Date.now()) {
-      tx.set(org.collection('invoices').doc(saleId), {saleId, contactId: sale.contactId, total: sale.total, currency: sale.currency, status: 'draft', taxStatus: 'requires_tax_configuration', createdAt: stamp()});
+      tx.set(org.collection('invoices').doc(saleId), {saleId, contactId: sale.contactId, total: sale.total, currency: sale.currency, paymentState: 'unpaid', status: 'draft', taxStatus: 'requires_tax_configuration', createdAt: stamp()});
+      tx.set(org.collection('journals').doc(`invoice_${saleId}`), {...invoiceJournal(sale.total), source: 'sale', sourceId: saleId, createdAt: stamp()});
       tx.set(org.collection('taxOutbox').doc(saleId), {invoiceId: saleId, status: 'blocked_configuration', provider: 'kra-etims', createdAt: stamp()});
     }
     if (crm.data()?.expiresAt?.toMillis() > Date.now()) tx.set(org.collection('tasks').doc(`followup_${saleId}`), {name: 'Follow up after sale', contactId: sale.contactId, saleId, status: 'open', createdAt: stamp()});

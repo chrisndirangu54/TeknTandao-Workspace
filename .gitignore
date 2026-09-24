@@ -1,5 +1,8 @@
 sources/
+source-archive/
+source-recovery/
 .toolchains/
+**/__pycache__/
 inventory/source-diagnostics/*.log
 **/node_modules/
 **/.dart_tool/
