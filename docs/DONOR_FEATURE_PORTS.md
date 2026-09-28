@@ -22,7 +22,7 @@ Run each donor with Dart defines for `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIR
 
 ## Still separate
 
-SchoolMate and legacy TallyAssist still require a separate tenancy review. Attendance now uses the shared Firebase backend. Time tracking now stores jobs and entries under `organizations/{orgId}/timeMembers/{uid}` and uses the `mutateTimeRecord` callable for writes. Dashboard school and clinical record tabs remain the suite workflows for those domains. Merchant M-Pesa POS checkout and certified KRA eTIMS issuance are unchanged and are not production-enabled.
+SchoolMate and TallyAssist still require a separate tenancy review. Attendance now uses the shared Firebase backend. Time tracking now stores jobs and entries under `organizations/{orgId}/timeMembers/{uid}` and uses the `mutateTimeRecord` callable for writes. Dashboard school and clinical record tabs remain the suite workflows for those domains. Merchant M-Pesa POS checkout and certified KRA eTIMS issuance are unchanged and are not production-enabled.
 
 No upstream code with unclear licensing was copied for the sales report, hospital portal, payroll runs, or invoice reversal. Those are new implementations of the workflow behavior. Donor modifications are exported by `scripts/export-source-fixes.py`, including newly added Dart source and test files. Keep `packages/donor_firebase` alongside `sources` when applying the patches.
 

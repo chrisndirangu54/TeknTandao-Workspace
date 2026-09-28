@@ -65,11 +65,11 @@
   },
   {
     "source": "TallyAssist",
-    "exitCode": 2,
+    "exitCode": 0,
     "sdk": "current",
     "ERROR": 0,
-    "WARNING": 155,
-    "INFO": 47
+    "WARNING": 0,
+    "INFO": 45
   },
   {
     "source": "time-tracking",

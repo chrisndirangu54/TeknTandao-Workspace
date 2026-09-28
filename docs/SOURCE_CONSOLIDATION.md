@@ -14,7 +14,7 @@ The supported integration target is `apps/dashboard`: Flutter, Firebase Authenti
 | Time tracking | time-tracking | Distinct billable-hours workflow; donor tenancy migration remains. |
 | Hospital | Hospital-Management-System-Mobile-App | PHP client and Stripe calls are replaced by the Firebase patient portal. PDF lab reports and catalogue-priced payments are callable workflows. This is not a full electronic medical record. |
 | School | SchoolMate-App | New dashboard lesson, assignment, announcement and grade records use Firebase. Messaging, learning resources, role-specific portals and full workflow parity remain. |
-| Accounting | TallyAssist | Flutter/Firebase reference on a legacy SDK; invoice/statement/PDF parity remains. |
+| Accounting | TallyAssist | Current-SDK Flutter/Firebase donor; organization tenancy integration remains. |
 
 ## Archived sources
 

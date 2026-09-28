@@ -9,7 +9,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 for folder in (ROOT/'sources').iterdir():
     if not (folder/'pubspec.yaml').exists(): continue
     paths = ['pubspec.yaml','lib','test','.vscode/settings.json']
-    if folder.name == 'TallyAssist': paths += ['android/build.gradle', 'android/settings.gradle', 'android/app/build.gradle', 'android/app/src/main/AndroidManifest.xml', 'android/app/src/main/kotlin/com/example/tassist/MainActivity.kt', 'android/gradle/wrapper/gradle-wrapper.properties']
+    if folder.name == 'TallyAssist': paths += ['pubspec.lock', '.gitignore', 'android/build.gradle', 'android/settings.gradle', 'android/app/build.gradle', 'android/app/src/main/AndroidManifest.xml', 'android/app/src/main/kotlin/com/example/tassist/MainActivity.kt', 'android/gradle/wrapper/gradle-wrapper.properties']
     if folder.name == 'Hospital-Management-System-Mobile-App': paths += ['README.md', 'web/index.html', 'web/manifest.json', 'analysis_options.yaml']
     result = subprocess.run(['git','-C',str(folder),'diff','--',*paths], capture_output=True, text=True, encoding='utf-8', errors='replace', check=True)
     patch = result.stdout
