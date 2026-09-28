@@ -125,6 +125,8 @@ service cloud.firestore {
       match /aiFinOpsConfig/{id} { allow read: if owner(org); }
 
       match /reports/{id} { allow read: if owner(org); }
+      match /timeMembers/{uid}/jobs/{id} { allow read: if access(org, 'time') && request.auth.uid == uid; }
+      match /timeMembers/{uid}/entries/{id} { allow read: if access(org, 'time') && request.auth.uid == uid; }
       match /payments/{id} { allow read: if owner(org); }
       match /{app}/{id} {
         allow read: if genericAppCollection(app) && access(org, app);

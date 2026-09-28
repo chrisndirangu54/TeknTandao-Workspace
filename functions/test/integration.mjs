@@ -261,4 +261,22 @@ test('hospital portal derives patient identity and protects bookings, bills and 
   await assert.rejects(api.hospitalListRecords.run(otherTenant));
 });
 
+test('time tracking scopes jobs and entries to the organization and authenticated member', async () => {
+  const tenant = `${owner}_time`;
+  const requestFor = (uid, data) => ({auth: {uid}, data: {orgId: tenant, ...data}});
+  await api.createOrganization.run(requestFor(tenant, {name: 'Time test'}));
+  await api.installApp.run(requestFor(tenant, {appId: 'time'}));
+  await api.grantMember.run(requestFor(tenant, {uid: 'time_other', apps: ['time']}));
+  await api.mutateTimeRecord.run(requestFor(tenant, {kind: 'jobs', action: 'save', id: 'job1', record: {name: 'Work', ratePerHour: 500}}));
+  const entry = {kind: 'entries', action: 'save', id: 'entry1', record: {jobId: 'job1', start: 1000, end: 3601000, comment: 'Work'}};
+  await assert.rejects(api.mutateTimeRecord.run(requestFor('time_other', {...entry, uid: tenant})));
+  await assert.rejects(api.mutateTimeRecord.run(requestFor(tenant, {...entry, record: {...entry.record, end: 0}})));
+  await api.mutateTimeRecord.run(requestFor(tenant, entry));
+  const saved = (await db.doc(`organizations/${tenant}/timeMembers/${tenant}/entries/entry1`).get()).data();
+  assert.equal(saved.updatedBy, tenant);
+  await api.mutateTimeRecord.run(requestFor(tenant, {kind: 'jobs', action: 'delete', id: 'job1'}));
+  assert.equal((await db.doc(`organizations/${tenant}/timeMembers/${tenant}/entries/entry1`).get()).exists, false);
+  await assert.rejects(api.mutateTimeRecord.run(requestFor('outsider', {kind: 'jobs', action: 'save', id: 'job1', record: {name: 'Attack', ratePerHour: 1}})));
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });

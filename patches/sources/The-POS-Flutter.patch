@@ -1,0 +1,431 @@
+diff --git a/lib/features/carts/presentation/views/mobile/cart_view.dart b/lib/features/carts/presentation/views/mobile/cart_view.dart
+index 6e8fa4e..f7afc56 100644
+--- a/lib/features/carts/presentation/views/mobile/cart_view.dart
++++ b/lib/features/carts/presentation/views/mobile/cart_view.dart
+@@ -53,17 +53,17 @@ class CartView extends StatelessWidget {
+                 borderRadius: BorderRadius.circular(5.0)),
+             child: DropdownSearch<DropListItem>(
+               //mode of dropdown
+-              mode: Mode.MENU,
++              popupProps: PopupProps.menu(showSearchBox: true, isFilterOnline: true, showSelectedItems: true, itemBuilder: _customPopupItemBuilder),
+               //to show search box
+-              showSearchBox: true,
+-              isFilteredOnline: true,
+-              onFind: (String? value) => customerController.onSearch(value!),
+-              showSelectedItems: true,
+-              dropDownButton: const Icon(
++
++
++              asyncItems: (String value) => customerController.onSearch(value),
++
++              dropdownButtonProps: const DropdownButtonProps(icon: Icon(
+                 Icons.account_circle_outlined,
+                 color: Color(0xffF79624),
+                 size: 30,
+-              ),
++              )),
+               //list of dropdown items
+               onChanged: (DropListItem? customer) {
+                 if (customer != null) {
+@@ -76,18 +76,17 @@ class CartView extends StatelessWidget {
+               //show selected item
+               selectedItem: cartsController.listCarts[cartsController.selectedCart.value].customer,
+ 
+-              hint: "... اختر العميل",
+-              dropdownSearchDecoration: const InputDecoration(
++              dropdownDecoratorProps: DropDownDecoratorProps(dropdownSearchDecoration: const InputDecoration(hintText: "... اختر العميل",
+                   border: InputBorder.none,
+                   disabledBorder: InputBorder.none,
+                   enabledBorder: InputBorder.none,
+-                  contentPadding: EdgeInsets.zero),
++                  contentPadding: EdgeInsets.zero)),
+               compareFn: (item, selectedItem) {
+                 return item != null &&
+                     selectedItem != null &&
+                     (item == selectedItem);
+               },
+-              popupItemBuilder: _customPopupItemBuilder,
++
+               dropdownBuilder: _customDropDown,
+             ),
+           ),
+@@ -153,7 +152,7 @@ class CartView extends StatelessWidget {
+     return ElevatedButton(
+       onPressed: onPressed,
+       style: ElevatedButton.styleFrom(
+-        primary: Colors.transparent,
++        backgroundColor: Colors.transparent,
+         shadowColor: Colors.transparent,
+       ),
+       child: SvgPicture.asset(assets),
+diff --git a/lib/features/carts/presentation/views/mobile/edit_cart_item_view.dart b/lib/features/carts/presentation/views/mobile/edit_cart_item_view.dart
+index 113763e..c69fb20 100644
+--- a/lib/features/carts/presentation/views/mobile/edit_cart_item_view.dart
++++ b/lib/features/carts/presentation/views/mobile/edit_cart_item_view.dart
+@@ -101,7 +101,7 @@ class EditCartItemViewState extends State<EditCartItemView> {
+       child: ElevatedButton(
+         onPressed: onPressed,
+         style: ElevatedButton.styleFrom(
+-          primary: color,
++          backgroundColor: color,
+         ),
+         child: SizedBox(
+           height: 50,
+diff --git a/lib/features/carts/presentation/views/web/cart_view.dart b/lib/features/carts/presentation/views/web/cart_view.dart
+index ce35227..0bcffbd 100644
+--- a/lib/features/carts/presentation/views/web/cart_view.dart
++++ b/lib/features/carts/presentation/views/web/cart_view.dart
+@@ -68,17 +68,17 @@ class _CartViewState extends State<CartView> {
+                       borderRadius: BorderRadius.circular(5.0)),
+                     child: DropdownSearch<DropListItem>(
+                       //mode of dropdown
+-                      mode: Mode.MENU,
++                      popupProps: PopupProps.menu(showSearchBox: true, isFilterOnline: true, showSelectedItems: true, itemBuilder: _customPopupItemBuilder),
+                       //to show search box
+-                      showSearchBox: true,
+-                      isFilteredOnline: true,
+-                      onFind: (String? value) => customerController.onSearch(value!),
+-                      showSelectedItems: true,
+-                      dropDownButton: const Icon(
++
++
++                      asyncItems: (String value) => customerController.onSearch(value),
++
++                      dropdownButtonProps: const DropdownButtonProps(icon: Icon(
+                         Icons.account_circle_outlined,
+                         color: Color(0xffF79624),
+                         size: 30,
+-                      ),
++                      )),
+                       //list of dropdown items
+                       onChanged: (DropListItem? customer) {
+                         if (customer != null) {
+@@ -91,18 +91,18 @@ class _CartViewState extends State<CartView> {
+                       },
+                       //show selected item
+                       selectedItem: cartsController.listCarts[cartsController.selectedCart.value].customer,
+-                      hint: "... اختر العميل",
+-                      dropdownSearchDecoration: const InputDecoration(
++
++                      dropdownDecoratorProps: DropDownDecoratorProps(dropdownSearchDecoration: const InputDecoration(hintText: "... اختر العميل",
+                           border: InputBorder.none,
+                           disabledBorder: InputBorder.none,
+                           enabledBorder: InputBorder.none,
+-                          contentPadding: EdgeInsets.zero),
++                          contentPadding: EdgeInsets.zero)),
+                       compareFn: (item, selectedItem) {
+                         return item != null &&
+                             selectedItem != null &&
+                             (item == selectedItem);
+                       },
+-                      popupItemBuilder: _customPopupItemBuilder,
++
+                       dropdownBuilder: _customDropDown,
+                     ),
+                   ),
+@@ -199,8 +199,8 @@ class _CartViewState extends State<CartView> {
+                       cartsController.pay();
+                     },
+                     style: ElevatedButton.styleFrom(
+-                      primary: const Color(0xff178f49), // background
+-                      onPrimary: const Color(0xffF79624),
++                      backgroundColor: const Color(0xff178f49), // background
++                      foregroundColor: const Color(0xffF79624),
+                       // foreground
+                     ),
+                     child: cartsController.isPayLoading.value
+diff --git a/lib/features/carts/presentation/widgets/common/key_pad.dart b/lib/features/carts/presentation/widgets/common/key_pad.dart
+index fd56a45..ba43138 100644
+--- a/lib/features/carts/presentation/widgets/common/key_pad.dart
++++ b/lib/features/carts/presentation/widgets/common/key_pad.dart
+@@ -82,8 +82,8 @@ class KeyPad extends StatelessWidget {
+     return Expanded(
+       child: ElevatedButton(
+         style: ElevatedButton.styleFrom(
+-          primary: Colors.white,
+-          onPrimary: Colors.green,
++          backgroundColor: Colors.white,
++          foregroundColor: Colors.green,
+           elevation: 0,
+           shape: RoundedRectangleBorder(
+             borderRadius: BorderRadius.circular(0),
+@@ -118,8 +118,8 @@ class KeyPad extends StatelessWidget {
+     return Expanded(
+       child: ElevatedButton.icon(
+         style: ElevatedButton.styleFrom(
+-          primary: Colors.white,
+-          onPrimary: Colors.green,
++          backgroundColor: Colors.white,
++          foregroundColor: Colors.green,
+           elevation: 0,
+           shape: RoundedRectangleBorder(
+             borderRadius: BorderRadius.circular(0),
+diff --git a/lib/features/carts/presentation/widgets/mobile/pay_button.dart b/lib/features/carts/presentation/widgets/mobile/pay_button.dart
+index 37bdb31..f0a047a 100644
+--- a/lib/features/carts/presentation/widgets/mobile/pay_button.dart
++++ b/lib/features/carts/presentation/widgets/mobile/pay_button.dart
+@@ -18,8 +18,8 @@ class PayButton extends StatelessWidget {
+     return ElevatedButton(
+       onPressed: onPressed,
+       style: ElevatedButton.styleFrom(
+-        primary: const Color(0xff178f49), // background
+-        onPrimary: const Color(0xffF79624),
++        backgroundColor: const Color(0xff178f49), // background
++        foregroundColor: const Color(0xffF79624),
+         fixedSize: Size(MediaQuery.of(context).size.width, 55),
+         // foreground
+       ),
+diff --git a/lib/features/customer/data/serives/data_sources/api_customer/customer_remote_data_source.dart b/lib/features/customer/data/serives/data_sources/api_customer/customer_remote_data_source.dart
+index fdad9c3..17ad577 100644
+--- a/lib/features/customer/data/serives/data_sources/api_customer/customer_remote_data_source.dart
++++ b/lib/features/customer/data/serives/data_sources/api_customer/customer_remote_data_source.dart
+@@ -96,11 +96,11 @@ class CustomerRemoteDataSource extends RemoteCustomer {
+ 
+   Map<String, String> _buildHeader() {
+     final Map<String, String> headers = <String, String>{
+-      'Content-Type': 'application/json'
++      'Content-Type': 'application/json; charset=utf-8'
+     };
+     if (_token != null) {
+       headers['Authorization'] = 'Bearer $_token';
+     }
+     return headers;
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/lib/features/customer/data/serives/data_sources/local_store_customer.dart b/lib/features/customer/data/serives/data_sources/local_store_customer.dart
+index 334e289..d25883f 100644
+--- a/lib/features/customer/data/serives/data_sources/local_store_customer.dart
++++ b/lib/features/customer/data/serives/data_sources/local_store_customer.dart
+@@ -19,7 +19,7 @@ class LocalStoreCustomer  {
+   Future<List<Customer>> load() async {
+     final bool isCacheExpired = await _isCacheExpired();
+     if (isCacheExpired) {
+-      await hiveBox.deleteFromDisk();
++      await hiveBox.clear();
+       return <Customer>[];
+     }
+     final List<Customer> customers = hiveBox.values
+@@ -34,7 +34,7 @@ class LocalStoreCustomer  {
+ 
+   Future<bool> _isCacheExpired() async {
+     final int cachedProductTime = await PreferenceUtils.getCacheTime();
+-    if (cachedProductTime == null) {
++    if (cachedProductTime <= 0) {
+       return false;
+     }
+     final DateTime cachedDateTime =
+diff --git a/lib/features/customer/presentation/widgets/common/add_customer_widget.dart b/lib/features/customer/presentation/widgets/common/add_customer_widget.dart
+index de00996..85a1514 100644
+--- a/lib/features/customer/presentation/widgets/common/add_customer_widget.dart
++++ b/lib/features/customer/presentation/widgets/common/add_customer_widget.dart
+@@ -154,7 +154,7 @@ class AddCustomerWidget extends StatelessWidget {
+     return ElevatedButton(
+       onPressed: onPressed,
+       style: ElevatedButton.styleFrom(
+-        primary: errorValidateMessage.value.isEmpty
++        backgroundColor: errorValidateMessage.value.isEmpty
+             ? const Color(0xff178f49)
+             : const Color(0xff178f49),
+         shadowColor: Colors.transparent,
+diff --git a/lib/features/home/presentation/widgets/mobile/home_silver_app_bar.dart b/lib/features/home/presentation/widgets/mobile/home_silver_app_bar.dart
+index 4e08ae5..dfe7e42 100644
+--- a/lib/features/home/presentation/widgets/mobile/home_silver_app_bar.dart
++++ b/lib/features/home/presentation/widgets/mobile/home_silver_app_bar.dart
+@@ -92,7 +92,7 @@ class HomeSilverAppBar extends SliverAppBar {
+     return ElevatedButton(
+       onPressed: onBarCodeButtonPressed ?? () {},
+       style: ElevatedButton.styleFrom(
+-        primary: Colors.transparent,
++        backgroundColor: Colors.transparent,
+         shadowColor: Colors.transparent,
+       ),
+       child: SvgPicture.asset(
+diff --git a/lib/features/invoice/data/data_sources/api_invoice/remote_store_invoice.dart b/lib/features/invoice/data/data_sources/api_invoice/remote_store_invoice.dart
+index df17d81..1b96261 100644
+--- a/lib/features/invoice/data/data_sources/api_invoice/remote_store_invoice.dart
++++ b/lib/features/invoice/data/data_sources/api_invoice/remote_store_invoice.dart
+@@ -40,7 +40,7 @@ class RemoteStoreInvoice extends StoreInvoice {
+ 
+   Map<String, String> _buildRequestHeader() {
+     final Map<String, String> headers = <String, String>{
+-      'Content-Type': 'application/json'
++      'Content-Type': 'application/json; charset=utf-8'
+     };
+     if (_token != null) {
+       headers['Authorization'] = 'Bearer $_token';
+diff --git a/lib/features/invoice/data/models/invoice.dart b/lib/features/invoice/data/models/invoice.dart
+index ccbefac..a890179 100644
+--- a/lib/features/invoice/data/models/invoice.dart
++++ b/lib/features/invoice/data/models/invoice.dart
+@@ -12,7 +12,9 @@ class Invoice {
+     for (final Map<String, dynamic> value in items) {
+       invoiceItems.add(InvoiceItem.fromJson(value));
+     }
+-    final Customer customer = Customer.fromJson(json['customer']);
++    final Customer? customer = json['customer'] == null
++        ? null
++        : Customer.fromJson(json['customer']);
+     return Invoice(clientId: clientId, items: invoiceItems,customer: customer);
+   }
+ 
+diff --git a/lib/features/login/presentation/views/login_view.dart b/lib/features/login/presentation/views/login_view.dart
+index 40072f7..f7de0e6 100644
+--- a/lib/features/login/presentation/views/login_view.dart
++++ b/lib/features/login/presentation/views/login_view.dart
+@@ -76,7 +76,7 @@ class LoginView extends StatelessWidget {
+         }
+       },
+       style: ElevatedButton.styleFrom(
+-        primary: Theme.of(context).primaryColor,
++        backgroundColor: Theme.of(context).primaryColor,
+       ),
+       child: SizedBox(
+         height: 50,
+diff --git a/lib/main.dart b/lib/main.dart
+index c45c1c2..ad8765a 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -31,15 +31,15 @@ class MyApp extends StatelessWidget {
+       locale: LocalizationService.locale,
+       navigatorKey: navigatorKey,
+       translations: LocalizationService(),
+-      builder: (context, widget) => ResponsiveWrapper.builder(
+-        widget,
+-        maxWidth: 1200,
+-        minWidth: 480,
+-        defaultScale: true,
++      builder: (context, widget) => ResponsiveBreakpoints.builder(
++        child: LayoutBuilder(builder: (context, constraints) => ResponsiveScaledBox(
++          width: constraints.maxWidth.clamp(480.0, 1200.0).toDouble(),
++          child: widget ?? const SizedBox.shrink(),
++        )),
+         breakpoints: [
+-          const ResponsiveBreakpoint.resize(480, name: MOBILE),
+-          const ResponsiveBreakpoint.autoScale(800, name: TABLET),
+-          const ResponsiveBreakpoint.resize(1000, name: DESKTOP),
++          const Breakpoint(start: 0, end: 799, name: MOBILE),
++          const Breakpoint(start: 800, end: 999, name: TABLET),
++          const Breakpoint(start: 1000, end: double.infinity, name: DESKTOP),
+         ],
+       ),
+       theme: ThemeData(
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 3e79644..272947b 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+ version: 1.0.0+1
+ 
+ environment:
+-  sdk: '>=2.12.0 <3.0.0'
++  sdk: '>=3.3.0 <4.0.0'
+ 
+ # Dependencies specify other packages that your package needs in order to work.
+ # To automatically upgrade your package dependencies to the latest versions
+@@ -34,14 +34,14 @@ dependencies:
+   # The following adds the Cupertino Icons font to your application.
+   # Use with the CupertinoIcons class for iOS style icons.
+   cupertino_icons: ^1.0.2
+-  get: 4.5.1
+-  flutter_svg: ^0.22.0
+-  google_fonts: ^2.1.0
++  get: ^4.7.3
++  flutter_svg: ^2.0.10
++  google_fonts: ^6.2.1
+   hive: ^2.0.4
+   hive_flutter: ^1.1.0
+   get_it: ^7.2.0
+   connectivity: ^3.0.6
+-  http: ^0.13.3
++  http: ^1.2.0
+   responsive_framework:
+   faker_dart: ^0.1.2
+   shared_preferences: ^2.0.8
+@@ -50,7 +50,7 @@ dependencies:
+   flutter_barcode_scanner: ^2.0.0
+   permission_handler: ^8.3.0
+   equatable: ^2.0.3
+-  dropdown_search: ^2.0.1
++  dropdown_search: ^5.0.6
+ 
+ dev_dependencies:
+   flutter_test:
+diff --git a/test/customer/local_store_customer_test.dart b/test/customer/local_store_customer_test.dart
+index 430ad57..516e6d9 100644
+--- a/test/customer/local_store_customer_test.dart
++++ b/test/customer/local_store_customer_test.dart
+@@ -1,4 +1,7 @@
++import 'dart:io';
+ import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:thepos/core/preferences_utils.dart';
+ import 'package:hive/hive.dart';
+ import 'package:thepos/features/customer/data/models/customer.dart';
+ import 'package:thepos/features/customer/data/serives/data_sources/local_store_customer.dart';
+@@ -6,12 +9,21 @@ import 'package:thepos/features/customer/data/serives/data_sources/local_store_c
+ import 'helper/customer_test_helper.dart';
+ 
+ void main() {
++  TestWidgetsFlutterBinding.ensureInitialized();
++  late Directory testDirectory;
+   setUpAll(() {
+-    Hive.init('testPath');
++    Hive.registerAdapter(CustomerAdapter());
++  });
++  setUp(() async {
++    testDirectory = await Directory.systemTemp.createTemp('tandao_customer_test_');
++    Hive.init(testDirectory.path);
++    PreferenceUtils.prefs = null;
++    SharedPreferences.setMockInitialValues({});
+   });
+ 
+   tearDown(() async {
+     await Hive.deleteFromDisk();
++    await testDirectory.delete();
+   });
+ 
+   Future<LocalStoreCustomer> makeSUT() async {
+@@ -37,4 +49,12 @@ void main() {
+ 
+   });
+ 
+-}
+\ No newline at end of file
++  test('expired cache remains writable for a subsequent refresh', () async {
++    SharedPreferences.setMockInitialValues({PreferenceUtils.PREF_CACHE_TIME: 1});
++    final LocalStoreCustomer sut = await makeSUT();
++    await sut.store(anyCustomer);
++    expect(await sut.load(), isEmpty);
++    await expectLater(sut.store(anyCustomer), completes);
++  });
++
++}
+diff --git a/test/invoice/local_store_invoice_test.dart b/test/invoice/local_store_invoice_test.dart
+index 38a1d4b..37a826b 100644
+--- a/test/invoice/local_store_invoice_test.dart
++++ b/test/invoice/local_store_invoice_test.dart
+@@ -1,3 +1,4 @@
++import 'dart:io';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:hive_flutter/adapters.dart';
+ import 'package:thepos/features/invoice/data/data_sources/local_store_invoice.dart';
+@@ -6,12 +7,15 @@ import 'package:thepos/features/invoice/data/models/invoice.dart';
+ import 'helpers/shared_test_helper.dart';
+ 
+ void main() {
+-  setUpAll(() {
+-    Hive.init('testPath');
++  late Directory testDirectory;
++  setUp(() async {
++    testDirectory = await Directory.systemTemp.createTemp('tandao_invoice_test_');
++    Hive.init(testDirectory.path);
+   });
+ 
+   tearDown(() async {
+     await Hive.deleteFromDisk();
++    await testDirectory.delete();
+   });
+ 
+   Future<LocalStoreInvoice> makeSUT() async {

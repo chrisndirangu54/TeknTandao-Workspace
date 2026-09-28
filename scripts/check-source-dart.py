@@ -13,8 +13,7 @@ DART_WRAPPER = pathlib.Path(shutil.which('dart'))
 DART = str(DART_WRAPPER.parent / 'cache/dart-sdk/bin/dart.exe') if DART_WRAPPER.suffix == '.bat' else str(DART_WRAPPER)
 
 def analyze(folder):
-    legacy = ROOT / '.toolchains/flutter-2.10.5/bin/cache/dart-sdk/bin/dart.exe'
-    executable = str(legacy) if folder.name == 'TallyAssist' and legacy.exists() else DART
+    executable = DART
     result = subprocess.run([executable, 'analyze', '--format', 'machine'], cwd=folder,
                             capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=240)
     diagnostics = result.stdout + result.stderr

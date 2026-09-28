@@ -1,0 +1,10 @@
+diff --git a/pubspec.yaml b/pubspec.yaml
+index a7eaab9..c3368b0 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,4 +1,4 @@
+-name: ClientFlow
++name: clientflow
+ description: "Client Flow - CRM Tool"
+ publish_to: 'none'
+ version: 0.1.0

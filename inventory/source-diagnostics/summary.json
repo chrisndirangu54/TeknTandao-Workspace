@@ -25,11 +25,11 @@
   },
   {
     "source": "FlareLine-CRM",
-    "exitCode": 3,
+    "exitCode": 0,
     "sdk": "current",
-    "ERROR": 2,
+    "ERROR": 0,
     "WARNING": 0,
-    "INFO": 144
+    "INFO": 138
   },
   {
     "source": "Flutter-Firebase-Inventory-Management-App",
@@ -65,11 +65,11 @@
   },
   {
     "source": "TallyAssist",
-    "exitCode": 0,
-    "sdk": "legacy",
+    "exitCode": 2,
+    "sdk": "current",
     "ERROR": 0,
-    "WARNING": 0,
-    "INFO": 128
+    "WARNING": 155,
+    "INFO": 47
   },
   {
     "source": "time-tracking",

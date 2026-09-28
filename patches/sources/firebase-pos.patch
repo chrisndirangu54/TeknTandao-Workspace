@@ -1,0 +1,218 @@
+diff --git a/lib/main.dart b/lib/main.dart
+index 36f94c6..5f7ac97 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,4 +1,3 @@
+-import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:firebase_core/firebase_core.dart';
+ import 'package:flutter/material.dart';
+ import 'package:flutter/services.dart';
+@@ -17,15 +16,13 @@ void main() async {
+ 
+   // Initialize Firebase (use `flutterfire configure` to generate the options)
+   await Firebase.initializeApp(
+-    name: DefaultFirebaseOptions.currentPlatform.projectId,
+     options: DefaultFirebaseOptions.currentPlatform,
+   );
+ 
+   // Initialize app local db
+   await DatabaseService.instance.init();
+ 
+-  // Ensure persistence is cleared
+-  await FirebaseFirestore.instance.clearPersistence();
++  // Keep the default app's cached records available across offline restarts.
+ 
+   // Initialize date formatting
+   await initializeDateFormatting();
+diff --git a/lib/presentation/screens/transactions/transactions_screen.dart b/lib/presentation/screens/transactions/transactions_screen.dart
+index 2018077..d4c1d21 100644
+--- a/lib/presentation/screens/transactions/transactions_screen.dart
++++ b/lib/presentation/screens/transactions/transactions_screen.dart
+@@ -8,6 +8,7 @@ import '../../widgets/app_loading_more_indicator.dart';
+ import '../../widgets/app_progress_indicator.dart';
+ import '../../widgets/app_text_field.dart';
+ import 'components/transaction_card.dart';
++import 'sales_report_screen.dart';
+ 
+ class TransactionsScreen extends ConsumerStatefulWidget {
+   const TransactionsScreen({super.key});
+@@ -58,6 +59,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
+     return Scaffold(
+       appBar: AppBar(
+         title: const Text('Transactions'),
++        actions: [IconButton(
++          tooltip: 'Sales insights', icon: const Icon(Icons.analytics_outlined),
++          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SalesReportScreen())),
++        )],
+         elevation: 0,
+         shadowColor: Colors.transparent,
+       ),
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 434c35c..ab82f90 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -46,7 +46,7 @@ dependencies:
+   logger: ^2.0.2+1
+   cupertino_icons: ^1.0.6
+   google_fonts: ^8.0.2
+-  material_color_utilities: ^0.13.0
++  material_color_utilities: ^0.11.1
+   google_sign_in: ^7.1.1
+   firebase_auth: ^6.1.4
+   cached_network_image: ^3.3.1
+diff --git a/lib/domain/entities/sales_report.dart b/lib/domain/entities/sales_report.dart
+new file mode 100644
+--- /dev/null
++++ b/lib/domain/entities/sales_report.dart
+@@ -0,0 +1,45 @@
++import 'transaction_entity.dart';
++
++class ProductSales {
++  final int id;
++  final String name;
++  int quantity = 0;
++  int revenue = 0;
++  ProductSales(this.id, this.name);
++}
++
++/// Actual recorded sales, not a prediction or a count of cash tendered.
++class SalesReport {
++  final List<ProductSales> products = [];
++  final Map<String, int> customerSpend = {};
++  final Map<String, int> paymentTotals = {};
++  int total = 0;
++  int count = 0;
++  int missingProductDetails = 0;
++
++  SalesReport(Iterable<TransactionEntity> transactions) {
++    final seen = <String>{};
++    final items = <int, ProductSales>{};
++    for (final sale in transactions) {
++      if (sale.id != null && !seen.add('${sale.createdById}:${sale.id}')) continue;
++      count++;
++      total += sale.totalAmount;
++      final customer = sale.customerName?.trim();
++      if (customer != null && customer.isNotEmpty) {
++        customerSpend.update(customer, (value) => value + sale.totalAmount, ifAbsent: () => sale.totalAmount);
++      }
++      paymentTotals.update(sale.paymentMethod, (value) => value + sale.totalAmount, ifAbsent: () => sale.totalAmount);
++      if (sale.orderedProducts == null || sale.orderedProducts!.isEmpty) missingProductDetails++;
++      for (final line in sale.orderedProducts ?? []) {
++        final item = items.putIfAbsent(line.productId, () => ProductSales(line.productId, line.name));
++        item.quantity += line.quantity as int;
++        item.revenue += (line.quantity * line.price) as int;
++      }
++    }
++    products.addAll(items.values);
++    products.sort((a, b) {
++      final quantity = b.quantity.compareTo(a.quantity);
++      return quantity != 0 ? quantity : a.id.compareTo(b.id);
++    });
++  }
++}
+diff --git a/lib/presentation/screens/transactions/sales_report_screen.dart b/lib/presentation/screens/transactions/sales_report_screen.dart
+new file mode 100644
+--- /dev/null
++++ b/lib/presentation/screens/transactions/sales_report_screen.dart
+@@ -0,0 +1,66 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../../../app/di/app_providers.dart';
++import '../../../core/utilities/currency_formatter.dart';
++import '../../../domain/entities/sales_report.dart';
++import '../../../domain/entities/transaction_entity.dart';
++import '../../providers/auth/auth_notifier.dart';
++
++class SalesReportScreen extends ConsumerStatefulWidget {
++  const SalesReportScreen({super.key});
++  @override
++  ConsumerState<SalesReportScreen> createState() => _SalesReportScreenState();
++}
++
++class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
++  late Future<SalesReport> report;
++  @override
++  void initState() {
++    super.initState();
++    report = load();
++  }
++
++  Future<SalesReport> load() async {
++    final user = ref.read(authNotifierProvider).user;
++    if (user == null) throw StateError('Sign in to view sales reports');
++    final repository = ref.read(transactionRepositoryProvider);
++    final sales = <TransactionEntity>[];
++    for (var offset = 0;; offset += 100) {
++      final result = await repository.getUserTransactions(user.id, limit: 100, offset: offset);
++      if (!result.isSuccess) throw result.error ?? StateError('Could not load sales');
++      final page = result.data ?? [];
++      sales.addAll(page);
++      if (page.length < 100) break;
++    }
++    return SalesReport(sales);
++  }
++
++  @override
++  Widget build(BuildContext context) => Scaffold(
++    appBar: AppBar(title: const Text('Sales insights'), actions: [
++      IconButton(tooltip: 'Refresh', onPressed: () => setState(() => report = load()), icon: const Icon(Icons.refresh)),
++    ]),
++    body: FutureBuilder<SalesReport>(future: report, builder: (context, snapshot) {
++      if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
++      if (snapshot.hasError) return Center(child: Text('Could not load report: ${snapshot.error}'));
++      final data = snapshot.data!;
++      final customers = data.customerSpend.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
++      return ListView(padding: const EdgeInsets.all(20), children: [
++        const Text('All sales currently stored on this device. Offline sales are included; synchronize to include other devices.'),
++        ListTile(title: const Text('Recorded sales'), subtitle: Text('${data.count} transactions'), trailing: Text(CurrencyFormatter.format(data.total))),
++        const Divider(),
++        Text('Top-selling products', style: Theme.of(context).textTheme.titleLarge),
++        if (data.missingProductDetails > 0) Text('${data.missingProductDetails} transactions lack product details and are excluded from product rankings.'),
++        if (data.products.isEmpty) const ListTile(title: Text('No product sales yet')),
++        for (final item in data.products) ListTile(title: Text(item.name), subtitle: Text('${item.quantity} units'), trailing: Text(CurrencyFormatter.format(item.revenue))),
++        const Divider(),
++        Text('Customer spending', style: Theme.of(context).textTheme.titleLarge),
++        const Text('Grouped by entered customer name; unnamed customers are excluded.'),
++        for (final customer in customers) ListTile(title: Text(customer.key), trailing: Text(CurrencyFormatter.format(customer.value))),
++        const Divider(),
++        Text('Payment methods', style: Theme.of(context).textTheme.titleLarge),
++        for (final method in data.paymentTotals.entries) ListTile(title: Text(method.key), trailing: Text(CurrencyFormatter.format(method.value))),
++      ]);
++    }),
++  );
++}
+diff --git a/test/sales_report_test.dart b/test/sales_report_test.dart
+new file mode 100644
+--- /dev/null
++++ b/test/sales_report_test.dart
+@@ -0,0 +1,30 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:flutter_pos/domain/entities/sales_report.dart';
++import 'package:flutter_pos/domain/entities/transaction_entity.dart';
++import 'package:flutter_pos/domain/entities/ordered_product_entity.dart';
++
++TransactionEntity sale(int id, {String name = 'Tea', int quantity = 2}) => TransactionEntity(
++  id: id, paymentMethod: 'cash', customerName: ' Amina ', createdById: 'owner',
++  receivedAmount: 10000, returnAmount: 9600, totalAmount: quantity * 200, totalOrderedProduct: quantity,
++  orderedProducts: [OrderedProductEntity(productId: 7, quantity: quantity, stock: 20, name: name, imageUrl: '', price: 200)],
++);
++
++void main() {
++  test('sales reports deduplicate transactions and use product IDs across renames', () {
++    final report = SalesReport([sale(1), sale(1), sale(2, name: 'Renamed tea', quantity: 3)]);
++    expect(report.count, 2);
++    expect(report.total, 1000);
++    expect(report.products.single.quantity, 5);
++    expect(report.products.single.revenue, 1000);
++    expect(report.customerSpend['Amina'], 1000);
++    expect(report.paymentTotals['cash'], 1000);
++  });
++  test('missing line details do not erase transaction totals', () {
++    final report = SalesReport([const TransactionEntity(id: 1, paymentMethod: 'card', createdById: 'owner',
++      receivedAmount: 500, returnAmount: 0, totalAmount: 500, totalOrderedProduct: 1)]);
++    expect(report.total, 500);
++    expect(report.missingProductDetails, 1);
++    expect(report.customerSpend, isEmpty);
++    expect(report.products, isEmpty);
++  });
++}

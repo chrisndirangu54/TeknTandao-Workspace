@@ -1,0 +1,265 @@
+diff --git a/lib/common/app_responsive.dart b/lib/common/app_responsive.dart
+index 6419c3a..61743e6 100644
+--- a/lib/common/app_responsive.dart
++++ b/lib/common/app_responsive.dart
+@@ -18,16 +18,13 @@ class AppResponsive extends StatelessWidget {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final Size _size = MediaQuery.of(context).size;
+-
+     if (isDesktop(context)) {
+       return desktop;
+-    } else if (isTablet(context) && tablet != null) {
++    } else if (isTablet(context)) {
+       return tablet;
+     } else {
+       return mobile;
+     }
+ 
+-    return Container();
+   }
+ }
+diff --git a/lib/pages/dashboard/widget/recruitment_data_widget.dart b/lib/pages/dashboard/widget/recruitment_data_widget.dart
+index e454fe5..fb79332 100644
+--- a/lib/pages/dashboard/widget/recruitment_data_widget.dart
++++ b/lib/pages/dashboard/widget/recruitment_data_widget.dart
+@@ -1,192 +1,25 @@
+ import 'package:flutter/material.dart';
+-import 'package:flutter_hr_management/common/app_colors.dart';
+-import 'package:flutter_hr_management/common/app_responsive.dart';
++import 'package:donor_firebase/donor_firebase.dart';
+ 
+-class RecruitmentDataWidget extends StatefulWidget {
++class RecruitmentDataWidget extends StatelessWidget {
++  const RecruitmentDataWidget({super.key});
+   @override
+-  _RecruitmentDataWidgetState createState() => _RecruitmentDataWidgetState();
+-}
+-
+-class _RecruitmentDataWidgetState extends State<RecruitmentDataWidget> {
+-  @override
+-  Widget build(BuildContext context) {
+-    return Container(
+-      decoration: BoxDecoration(
+-          color: AppColor.white, borderRadius: BorderRadius.circular(20)),
+-      padding: EdgeInsets.all(20),
+-      child: Column(
+-        children: [
+-          Row(
+-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+-            children: [
+-              Text(
+-                "Recruitment Progress",
+-                style: TextStyle(
+-                  fontWeight: FontWeight.bold,
+-                  color: AppColor.black,
+-                  fontSize: 22,
+-                ),
+-              ),
+-              Container(
+-                decoration: BoxDecoration(
+-                    color: AppColor.yellow,
+-                    borderRadius: BorderRadius.circular(100)),
+-                padding: EdgeInsets.symmetric(
+-                  vertical: 10,
+-                  horizontal: 20,
+-                ),
+-                child: Text(
+-                  "View All",
+-                  style: TextStyle(
+-                      fontWeight: FontWeight.bold, color: AppColor.black),
+-                ),
+-              )
+-            ],
+-          ),
+-          Divider(
+-            thickness: 0.5,
+-            color: Colors.grey,
+-          ),
+-          Table(
+-            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+-            children: [
+-              /// Table Header
+-              TableRow(
+-                decoration: BoxDecoration(
+-                  border: Border(
+-                      bottom: BorderSide(
+-                    color: Colors.grey,
+-                    width: 0.5,
+-                  )),
+-                ),
+-                children: [
+-                  tableHeader("Full Name"),
+-                  if (!AppResponsive.isMobile(context))
+-                    tableHeader("Designation"),
+-                  tableHeader("Status"),
+-                  if (!AppResponsive.isMobile(context)) tableHeader(""),
+-                ],
+-              ),
+-
+-              /// Table Data
+-              tableRow(
+-                context,
+-                name: "Mary G Lolus",
+-                color: Colors.blue,
+-                image: "assets/user1.jpg",
+-                designation: "Project Manager",
+-                status: "Practical Round",
+-              ),
+-              tableRow(
+-                context,
+-                name: "Vince Jacob",
+-                color: Colors.blue,
+-                image: "assets/user2.jpg",
+-                designation: "UI/UX Designer",
+-                status: "Practical Round",
+-              ),
+-              tableRow(
+-                context,
+-                name: "Nell Brian",
+-                color: Colors.green,
+-                image: "assets/user3.jpg",
+-                designation: "React Developer",
+-                status: "Final Round",
+-              ),
+-              tableRow(
+-                context,
+-                name: "Vince Jacob",
+-                color: Colors.yellow,
+-                image: "assets/user2.jpg",
+-                designation: "UI/UX Designer",
+-                status: "HR Round",
+-              ),
+-            ],
+-          ),
+-          Container(
+-            margin: EdgeInsets.symmetric(vertical: 10),
+-            child: Row(
+-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+-              children: [
+-                Text("Showing 4 out of 4 Results"),
+-                Text(
+-                  "View All",
+-                  style: TextStyle(fontWeight: FontWeight.bold),
+-                ),
+-              ],
+-            ),
+-          )
+-        ],
+-      ),
+-    );
+-  }
+-
+-  TableRow tableRow(context, {name, image, designation, status, color}) {
+-    return TableRow(
+-        decoration: BoxDecoration(
+-          border: Border(
+-            bottom: BorderSide(
+-              color: Colors.grey,
+-              width: 0.5,
+-            ),
+-          ),
+-        ),
+-        children: [
+-          //Full Name
+-          Container(
+-            margin: EdgeInsets.symmetric(vertical: 15),
+-            child: Row(
+-              children: [
+-                ClipRRect(
+-                  borderRadius: BorderRadius.circular(1000),
+-                  child: Image.asset(
+-                    image,
+-                    width: 30,
+-                  ),
+-                ),
+-                SizedBox(
+-                  width: 10,
+-                ),
+-                Text(name)
+-              ],
+-            ),
+-          ),
+-          // Designation
+-          if (!AppResponsive.isMobile(context)) Text(designation),
+-          //Status
+-          Row(
+-            children: [
+-              Container(
+-                decoration: BoxDecoration(
+-                  shape: BoxShape.circle,
+-                  color: color,
+-                ),
+-                height: 10,
+-                width: 10,
+-              ),
+-              SizedBox(
+-                width: 10,
+-              ),
+-              Text(status),
+-            ],
+-          ),
+-          // Menu icon
+-          if (!AppResponsive.isMobile(context))
+-            Image.asset(
+-              "assets/more.png",
+-              color: Colors.grey,
+-              height: 30,
+-            )
+-        ]);
+-  }
+-
+-  Widget tableHeader(text) {
+-    return Container(
+-      margin: EdgeInsets.symmetric(vertical: 15),
+-      child: Text(
+-        text,
+-        style: TextStyle(fontWeight: FontWeight.bold, color: AppColor.black),
+-      ),
+-    );
+-  }
++  Widget build(BuildContext context) => const Column(children: [
++    Padding(padding: EdgeInsets.all(20), child: FirebaseDonorPanel(
++      title: 'Employees', appId: 'hr', collection: 'employees',
++      fields: {'name': 'Name', 'email': 'Email', 'department': 'Department', 'position': 'Position'},
++    )),
++    ExpansionTile(title: Text('Recruitment'), children: [Padding(padding: EdgeInsets.all(20), child: FirebaseDonorPanel(
++      title: 'Applications', appId: 'hr', collection: 'modules/hr/records', recordKind: 'application',
++      fields: {'name': 'Applicant', 'email': 'Email', 'position': 'Position', 'stage': 'Stage: applied, screening, interview, offered, hired, rejected', 'notes': 'Notes'},
++    ))]),
++    ExpansionTile(title: Text('Leave requests'), children: [Padding(padding: EdgeInsets.all(20), child: FirebaseDonorPanel(
++      title: 'Leave requests', appId: 'hr', collection: 'modules/hr/records', recordKind: 'leave',
++      fields: {'name': 'Request', 'employeeId': 'Employee ID', 'startAt': 'Start (ISO date with timezone)', 'endAt': 'End (ISO date with timezone)', 'status': 'Status: requested, approved, rejected, cancelled', 'notes': 'Notes'},
++    ))]),
++    ExpansionTile(title: Text('Payroll runs'), children: [Padding(padding: EdgeInsets.all(20), child: FirebaseDonorPanel(
++      title: 'Payroll runs', appId: 'hr', collection: 'modules/hr/records', recordKind: 'payRun',
++      fields: {'name': 'Run name', 'employeeId': 'Employee ID', 'period': 'Period (YYYY-MM)', 'grossMinor': 'Gross pay in minor units', 'status': 'Status: draft, approved, paid, void', 'notes': 'Notes. Gross only; this does not calculate PAYE, NSSF, SHA, or housing levy'},
++    ))]),
++  ]);
+ }
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 5ce076f..6dff0c1 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -18,9 +18,11 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+ version: 1.0.0+1
+ 
+ environment:
+-  sdk: ">=2.12.0 <3.0.0"
++  sdk: '>=3.3.0 <4.0.0'
+ 
+ dependencies:
++  donor_firebase:
++    path: ../../packages/donor_firebase
+   flutter:
+     sdk: flutter
+ 
+@@ -33,6 +35,7 @@ dependencies:
+   provider: ^5.0.0
+ 
+ dev_dependencies:
++  flutter_lints: ^6.0.0
+   flutter_test:
+     sdk: flutter
+ 

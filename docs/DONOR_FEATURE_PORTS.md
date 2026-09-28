@@ -22,6 +22,15 @@ Run each donor with Dart defines for `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIR
 
 ## Still separate
 
-SchoolMate, the Supabase attendance app, the time-tracking app, and legacy TallyAssist still keep their own sign-in and storage. Their SDKs or backends do not match `packages/donor_firebase`, so those checkouts were not rewritten in place. Dashboard school and clinical record tabs remain the suite workflows for those domains. Merchant M-Pesa POS checkout and certified KRA eTIMS issuance are unchanged and are not production-enabled.
+SchoolMate and legacy TallyAssist still require a separate tenancy review. Attendance now uses the shared Firebase backend. Time tracking now stores jobs and entries under `organizations/{orgId}/timeMembers/{uid}` and uses the `mutateTimeRecord` callable for writes. Dashboard school and clinical record tabs remain the suite workflows for those domains. Merchant M-Pesa POS checkout and certified KRA eTIMS issuance are unchanged and are not production-enabled.
 
 No upstream code with unclear licensing was copied for the sales report, hospital portal, payroll runs, or invoice reversal. Those are new implementations of the workflow behavior. Donor modifications are exported by `scripts/export-source-fixes.py`, including newly added Dart source and test files. Keep `packages/donor_firebase` alongside `sources` when applying the patches.
+
+
+## CRM authentication and time tracking follow-up
+
+CRM entry screens now authenticate through Firebase instead of a hard-coded demo password. Signup validates password confirmation, password reset uses Firebase, social buttons use configured Firebase providers, and toolbar logout clears the Firebase session. Signing up does not grant organization membership. Social providers must be enabled in the Firebase project.
+
+Time tracking requires `TANDAO_ORG_ID` and an active Time subscription for the signed-in organization member. Client reads are limited to that member's jobs and entries. Server writes validate rates, job ownership and time ranges, and atomically delete up to 400 associated entries when deleting a job. Larger jobs require removing entries first. Rates preserve the donor's original whole-currency-unit convention; existing user-path data is not automatically copied. The older Firebase UI dependency requires Cloud Functions client 5.3.4 in this donor.
+
+Validated CRM auth paths with three focused tests; Firestore rules and integration checks cover tenant/member separation and server-only time mutations. Deploy the new callable and rules before using the updated time donor against a live project.

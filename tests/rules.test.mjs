@@ -5,6 +5,21 @@ const require = createRequire(import.meta.url);
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
 const {doc, setDoc, getDoc, Timestamp} = require('firebase/firestore');
 let env;
+test('time tracking reads require an active subscription and the matching member UID', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'organizations/a/apps/time'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
+    await setDoc(doc(db, 'organizations/a/timeMembers/a/jobs/job1'), {name: 'Private job'});
+    await setDoc(doc(db, 'organizations/a/timeMembers/a/entries/entry1'), {jobId: 'job1'});
+  });
+  const own = env.authenticatedContext('a').firestore();
+  const other = env.authenticatedContext('clerk').firestore();
+  await assertSucceeds(getDoc(doc(own, 'organizations/a/timeMembers/a/jobs/job1')));
+  await assertSucceeds(getDoc(doc(own, 'organizations/a/timeMembers/a/entries/entry1')));
+  await assertFails(getDoc(doc(other, 'organizations/a/timeMembers/a/jobs/job1')));
+  await assertFails(getDoc(doc(own, 'organizations/b/timeMembers/a/jobs/job1')));
+  await assertFails(setDoc(doc(own, 'organizations/a/timeMembers/a/jobs/forged'), {name: 'Direct write'}));
+});
 before(async () => {
   env = await initializeTestEnvironment({projectId: 'demo-tandao', firestore: {rules: readFileSync('firestore.rules', 'utf8')}});
   await env.withSecurityRulesDisabled(async context => {

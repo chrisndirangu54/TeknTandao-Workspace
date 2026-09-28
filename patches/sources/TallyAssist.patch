@@ -1,0 +1,1002 @@
+diff --git a/.vscode/settings.json b/.vscode/settings.json
+index aac3ec8..340d7a4 100644
+--- a/.vscode/settings.json
++++ b/.vscode/settings.json
+@@ -1,4 +1,3 @@
+ {
+-    "python.pythonPath": "/home/analytical-monk/miniconda3/envs/sci_python/bin/python",
+-    "python.dataScience.jupyterServerURI": "https://hostname:8080/?token=849d61a414abafab97bc4aab1f3547755ddc232c2b8cb7fe"
+-}
+\ No newline at end of file
++  "dart.flutterSdkPath": "../../.toolchains/flutter-2.10.5"
++}
+diff --git a/lib/main.dart b/lib/main.dart
+index efcfbe2..c9d8f96 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,4 +1,3 @@
+-import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:firebase_messaging/firebase_messaging.dart';
+ import 'package:flutter/material.dart';
+@@ -9,7 +8,6 @@ import 'package:tassist/core/models/receivables.dart';
+ import 'package:tassist/core/models/stockitem.dart';
+ import 'package:tassist/core/models/vouchers.dart';
+ import 'package:tassist/core/services/auth.dart';
+-import 'package:tassist/core/services/database.dart';
+ import 'package:tassist/core/services/inactivecustomerservice.dart';
+ import 'package:tassist/core/services/payablesservice.dart';
+ import 'package:tassist/core/services/receivablesservice.dart';
+@@ -190,7 +188,7 @@ class _TopWidgetState extends State<TopWidget> {
+         // home: RootPage(),
+         theme: ThemeData(
+           appBarTheme: AppBarTheme(
+-            textTheme: TextTheme(headline6: primaryAppBarTitle),
++            titleTextStyle: primaryAppBarTitle,
+           ),
+           textTheme: TextTheme(
+               headline6: secondaryListTitle,
+diff --git a/lib/templates/invoice_pdf_template.dart b/lib/templates/invoice_pdf_template.dart
+index bf8845d..73ac426 100644
+--- a/lib/templates/invoice_pdf_template.dart
++++ b/lib/templates/invoice_pdf_template.dart
+@@ -50,7 +50,7 @@ createInvoicePdf({
+             alignment: Alignment.topLeft,
+             margin: const EdgeInsets.only(bottom: 3.0 * PdfPageFormat.mm),
+             padding: const EdgeInsets.only(bottom: 3.0 * PdfPageFormat.mm),
+-            decoration: const BoxDecoration(
++            decoration: BoxDecoration(
+                 border:
+                     BoxBorder(bottom: true, width: 0.5, color: PdfColors.grey)),
+             child: Text('TallyAssist',
+diff --git a/lib/templates/ledgeraccount_pdf_template.dart b/lib/templates/ledgeraccount_pdf_template.dart
+index 470f594..4e8e1aa 100644
+--- a/lib/templates/ledgeraccount_pdf_template.dart
++++ b/lib/templates/ledgeraccount_pdf_template.dart
+@@ -52,7 +52,7 @@ createLedgerPdf({
+           alignment: Alignment.centerRight,
+           margin: const EdgeInsets.only(bottom: 3.0 * PdfPageFormat.mm),
+           padding: const EdgeInsets.only(bottom: 3.0 * PdfPageFormat.mm),
+-          decoration: const BoxDecoration(
++          decoration: BoxDecoration(
+               border:
+                   BoxBorder(bottom: true, width: 0.5, color: PdfColors.grey)),
+           child: Column(
+@@ -131,4 +131,4 @@ createLedgerPdf({
+     ),
+   );
+   return pdf;
+-}
+\ No newline at end of file
++}
+diff --git a/lib/ui/shared/bottomsheetcustom.dart b/lib/ui/shared/bottomsheetcustom.dart
+index 644140c..dfb6321 100644
+--- a/lib/ui/shared/bottomsheetcustom.dart
++++ b/lib/ui/shared/bottomsheetcustom.dart
+@@ -1,7 +1,6 @@
+ import 'dart:async';
+ 
+ import 'package:flutter/foundation.dart';
+-import 'package:flutter/widgets.dart';
+ import 'package:flutter/material.dart';
+ 
+ const Duration _kBottomSheetDuration = Duration(milliseconds: 200);
+@@ -209,6 +208,8 @@ class _ModalBottomSheetState<T> extends State<_ModalBottomSheet<T>> {
+         routeLabel = localizations.dialogLabel;
+         break;
+       case TargetPlatform.macOS:
++      case TargetPlatform.linux:
++      case TargetPlatform.windows:
+         break;
+     }
+ 
+@@ -325,7 +326,7 @@ Future<T> showModalBottomSheetCustom<T>({
+   assert(debugCheckHasMaterialLocalizations(context));
+   return Navigator.push(context, _ModalBottomSheetRoute<T>(
+     builder: builder,
+-    theme: Theme.of(context, shadowThemeOnly: true),
++    theme: Theme.of(context),
+     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+   ));
+ }
+@@ -374,4 +375,4 @@ PersistentBottomSheetController<T> showBottomSheet<T>({
+   assert(context != null);
+   assert(builder != null);
+   return Scaffold.of(context).showBottomSheet<T>(builder);
+-}
+\ No newline at end of file
++}
+diff --git a/lib/ui/views/accountsreceivablelist.dart b/lib/ui/views/accountsreceivablelist.dart
+index 5b39336..636a403 100644
+--- a/lib/ui/views/accountsreceivablelist.dart
++++ b/lib/ui/views/accountsreceivablelist.dart
+@@ -17,7 +17,7 @@ class _ARLedgerItemListState extends State<ARLedgerItemList> {
+ TextEditingController editingController = TextEditingController();
+ 
+   List<ReceivablesItem> ledgerItemData;
+-  List<ReceivablesItem> ledgerItemDataforDisplay= List<ReceivablesItem>();
++  List<ReceivablesItem> ledgerItemDataforDisplay= <ReceivablesItem>[];
+ 
+   @override
+   void initState() {
+@@ -28,10 +28,10 @@ TextEditingController editingController = TextEditingController();
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<ReceivablesItem> dummySearchList = List<ReceivablesItem>();
++    List<ReceivablesItem> dummySearchList = <ReceivablesItem>[];
+     dummySearchList.addAll(ledgerItemData);
+     if (query.isNotEmpty) {
+-      List<ReceivablesItem> dummyListData = List<ReceivablesItem>();
++      List<ReceivablesItem> dummyListData = <ReceivablesItem>[];
+       dummySearchList.forEach((item) {
+         if (item.name.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/lib/ui/views/dashboard.dart b/lib/ui/views/dashboard.dart
+index 9fae7af..5a07f86 100644
+--- a/lib/ui/views/dashboard.dart
++++ b/lib/ui/views/dashboard.dart
+@@ -1,6 +1,5 @@
+ // Pending issue - dropdown widget not displaying value
+ 
+-import 'dart:ui';
+ 
+ import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:firebase_auth/firebase_auth.dart';
+diff --git a/lib/ui/views/home.dart b/lib/ui/views/home.dart
+index d6083e8..db5ce54 100644
+--- a/lib/ui/views/home.dart
++++ b/lib/ui/views/home.dart
+@@ -1,6 +1,5 @@
+ // Pending issue - dropdown widget not displaying value
+ 
+-import 'dart:ui';
+ 
+ import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:firebase_auth/firebase_auth.dart';
+diff --git a/lib/ui/views/ledgerinput.dart b/lib/ui/views/ledgerinput.dart
+index 9484498..1166389 100644
+--- a/lib/ui/views/ledgerinput.dart
++++ b/lib/ui/views/ledgerinput.dart
+@@ -16,8 +16,6 @@ import 'package:tassist/core/services/storageservice.dart';
+ import 'package:tassist/core/services/voucher-item-service.dart';
+ import 'package:tassist/core/services/vouchers.dart';
+ import 'package:tassist/templates/invoice_pdf_template.dart';
+-import 'package:tassist/theme/colors.dart';
+-import 'package:tassist/theme/texts.dart';
+ import 'package:tassist/theme/theme.dart';
+ import 'package:tassist/ui/shared/drawer.dart';
+ import 'package:tassist/ui/shared/headernav.dart';
+@@ -36,7 +34,7 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+ 
+   String _invoiceNumber = Random().nextInt(1000).toString();
+-  String _masterId = Random().nextInt(1000  ).toString();
++  String _masterId = Random().nextInt(1000).toString();
+   // Customer details
+   LedgerItem _customerLedger;
+   String _customerName = '';
+@@ -116,24 +114,29 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+                                 context: context,
+                                 initialDate: DateTime.now(),
+                                 firstDate: DateTime(2001),
+-                                lastDate: DateTime(2022),
++                                lastDate:
++                                    DateTime(DateTime.now().year + 10, 12, 31),
+                                 builder: (BuildContext context, Widget child) {
+                                   return Theme(
+                                     data: ThemeData.light().copyWith(
+                                         //OK/Cancel button text color
+-                                        primaryColor: const Color(
+-                                            0xFF4A5BF6), //Head background
+-                                        accentColor: const Color(
+-                                            0xFF4A5BF6) //selection color
++                                        primaryColor: const Color(0xFF4A5BF6),
++                                        colorScheme: ColorScheme.fromSwatch()
++                                            .copyWith(
++                                                secondary: const Color(
++                                                    0xFF4A5BF6)) //selection color
+                                         //dialogBackgroundColor: Colors.white,//Background color
+                                         ),
+                                     child: child,
+                                   );
+                                 },
+                               ).then((date) {
+-                                _invoiceDateRaw = date;
+-                                _currentDate =
+-                                    DateFormat('dd-MM-yyyy').format(date);
++                                if (!mounted || date == null) return;
++                                setState(() {
++                                  _invoiceDateRaw = date;
++                                  _currentDate =
++                                      DateFormat('dd-MM-yyyy').format(date);
++                                });
+                               });
+                             },
+                           )
+@@ -168,22 +171,28 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+                               initialDate:
+                                   DateTime.now().add(new Duration(days: 30)),
+                               firstDate: DateTime(2001),
+-                              lastDate: DateTime(2022),
++                              lastDate:
++                                  DateTime(DateTime.now().year + 10, 12, 31),
+                               builder: (BuildContext context, Widget child) {
+                                 return Theme(
+                                   data: ThemeData.light().copyWith(
+                                       //OK/Cancel button text color
+-                                      primaryColor: const Color(
+-                                          0xFF4A5BF6), //Head background
+-                                      accentColor: const Color(
+-                                          0xFF4A5BF6) //selection color
++                                      primaryColor: const Color(0xFF4A5BF6),
++                                      colorScheme: ColorScheme.fromSwatch()
++                                          .copyWith(
++                                              secondary: const Color(
++                                                  0xFF4A5BF6)) //selection color
+                                       //dialogBackgroundColor: Colors.white,//Background color
+                                       ),
+                                   child: child,
+                                 );
+                               },
+                             ).then((date) {
+-                              _dueDate = DateFormat('dd-MM-yyyy').format(date);
++                              if (!mounted || date == null) return;
++                              setState(() {
++                                _dueDate =
++                                    DateFormat('dd-MM-yyyy').format(date);
++                              });
+                             });
+                           },
+                         ),
+@@ -322,28 +331,32 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+                           isExpanded: true,
+                           items: <DropdownMenuItem>[
+                             DropdownMenuItem(
+-                              child: Text('IGST', style: secondaryListDisc.copyWith(fontSize: 12)),
++                              child: Text('IGST',
++                                  style:
++                                      secondaryListDisc.copyWith(fontSize: 12)),
+                               value: 'igst',
+                             ),
+                             DropdownMenuItem(
+-                              child:
+-                                  Text('CGST & SGST', style: secondaryListDisc.copyWith(fontSize: 12)),
++                              child: Text('CGST & SGST',
++                                  style:
++                                      secondaryListDisc.copyWith(fontSize: 12)),
+                               value: 'cgst & sgst',
+                             ),
+                           ],
+                           // value: 'igst',
+-                          decoration: InputDecoration( 
++                          decoration: InputDecoration(
+                               isDense: true,
+                               enabledBorder: UnderlineInputBorder(
+-                                  borderSide: BorderSide(color: Colors.white),
+-                                ),
++                                borderSide: BorderSide(color: Colors.white),
++                              ),
+                               labelText: 'GST Type',
+                               // AT: This should be a dropdown
+-                              labelStyle: secondaryListDisc.copyWith(fontSize: 14)),
++                              labelStyle:
++                                  secondaryListDisc.copyWith(fontSize: 14)),
+                           onChanged: (val) => setState(() => _gstType = val),
+                         ),
+                       ),
+-                          SizedBox(width: 10),
++                      SizedBox(width: 10),
+                       Flexible(
+                         flex: 1,
+                         child: new TextFormField(
+@@ -352,7 +365,8 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+                           decoration: InputDecoration(
+                               labelText: 'GST %',
+                               // AT: This should be a dropdown
+-                              labelStyle: secondaryListDisc.copyWith(fontSize: 14)),
++                              labelStyle:
++                                  secondaryListDisc.copyWith(fontSize: 14)),
+                           onChanged: (val) =>
+                               setState(() => _gstPercentage = val),
+                         ),
+@@ -444,7 +458,7 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+                                 _productName,
+                                 'HSN Code: ',
+                                 '$_productQuantity Qty @ $_productPrice/item',
+-                                'CGST & SGST @ ${double.parse(_gstPercentage) / 2 } % : $gstAmount',
++                                'CGST & SGST @ ${double.parse(_gstPercentage) / 2} % : $gstAmount',
+                                 'Amount: $amount',
+                                 'Discount: ',
+                               ];
+@@ -557,7 +571,8 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+                         child: Column(
+                           children: <Widget>[
+                             Text('Total: $_totalAmount',
+-                                style: secondaryListTitle.copyWith(fontSize: 18)),
++                                style:
++                                    secondaryListTitle.copyWith(fontSize: 18)),
+                             Text(
+                               'Tax: $_totalTax',
+                               style: secondaryListTitle2,
+@@ -601,7 +616,9 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+                           logoPath: logoPath,
+                         );
+                       },
+-                      child: Text('Preview', style: TextStyle(fontSize: 20, fontFamily: 'Proxima-Nova')),
++                      child: Text('Preview',
++                          style: TextStyle(
++                              fontSize: 20, fontFamily: 'Proxima-Nova')),
+                       color: TassistInfoGrey,
+                       textColor: Colors.white,
+                       elevation: 5,
+@@ -668,7 +685,9 @@ class _LedgerInputScreenState extends State<LedgerInputScreen> {
+                           logoPath: logoPath,
+                         );
+                       },
+-                      child: Text('Send', style: TextStyle(fontSize: 20, fontFamily: 'Proxima-Nova`')),
++                      child: Text('Send',
++                          style: TextStyle(
++                              fontSize: 20, fontFamily: 'Proxima-Nova`')),
+                       color: TassistPrimary,
+                       textColor: Colors.white,
+                       elevation: 5,
+diff --git a/lib/ui/views/ledgervoucher.dart b/lib/ui/views/ledgervoucher.dart
+index 9077db3..addb9f7 100644
+--- a/lib/ui/views/ledgervoucher.dart
++++ b/lib/ui/views/ledgervoucher.dart
+@@ -52,7 +52,7 @@ class _VoucherListState extends State<VoucherList> {
+   TextEditingController editingController = TextEditingController();
+ 
+   List<LedgerVoucherModel> voucherData;
+-  List<LedgerVoucherModel> voucherDataforDisplay = List<LedgerVoucherModel>();
++  List<LedgerVoucherModel> voucherDataforDisplay = <LedgerVoucherModel>[];
+ 
+   String uid;
+ 
+@@ -70,10 +70,10 @@ class _VoucherListState extends State<VoucherList> {
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<LedgerVoucherModel> dummySearchList = List<LedgerVoucherModel>();
++    List<LedgerVoucherModel> dummySearchList = <LedgerVoucherModel>[];
+     dummySearchList.addAll(voucherData);
+     if (query.isNotEmpty) {
+-      List<LedgerVoucherModel> dummyListData = List<LedgerVoucherModel>();
++      List<LedgerVoucherModel> dummyListData = <LedgerVoucherModel>[];
+       dummySearchList.forEach((item) {
+         if (item.primaryVoucherType.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/lib/ui/views/productinput.dart b/lib/ui/views/productinput.dart
+index 41d74be..e774145 100644
+--- a/lib/ui/views/productinput.dart
++++ b/lib/ui/views/productinput.dart
+@@ -2,7 +2,6 @@ import 'dart:math';
+ 
+ import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
+-import 'package:flutter/services.dart';
+ import 'package:provider/provider.dart';
+ import 'package:tassist/core/services/stockservice.dart';
+ import 'package:tassist/theme/theme.dart';
+diff --git a/lib/ui/views/settingsscreen.dart b/lib/ui/views/settingsscreen.dart
+index 3b5d891..d695dc8 100644
+--- a/lib/ui/views/settingsscreen.dart
++++ b/lib/ui/views/settingsscreen.dart
+@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
+ import 'package:provider/provider.dart';
+ import 'package:tassist/core/services/companyservice.dart';
+ import 'package:tassist/core/services/storageservice.dart';
+-import 'package:tassist/theme/dimensions.dart';
+ import 'package:tassist/theme/theme.dart';
+ import 'package:tassist/ui/shared/drawer.dart';
+ import 'package:tassist/ui/shared/headernav.dart';
+@@ -32,9 +31,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
+   String _registeredAddress;
+ 
+   Future<void> _pickImage(ImageSource source) async {
+-    File selected = await ImagePicker.pickImage(source: source);
++    final selected = await ImagePicker().getImage(source: source);
++    if (!mounted || selected == null) return;
+     setState(() {
+-      _imageFile = selected;
++      _imageFile = File(selected.path);
+     });
+   }
+ 
+diff --git a/lib/ui/views/voucher/paymentvouchers.dart b/lib/ui/views/voucher/paymentvouchers.dart
+index aa64786..8456271 100644
+--- a/lib/ui/views/voucher/paymentvouchers.dart
++++ b/lib/ui/views/voucher/paymentvouchers.dart
+@@ -47,7 +47,7 @@ class PaymentVoucherList extends StatefulWidget {
+ class _PaymentVoucherListState extends State<PaymentVoucherList> {
+   TextEditingController editingController = TextEditingController();
+   Iterable<Voucher> paymentVoucherData;
+-  List<Voucher> paymentVoucherDataforDisplay = List<Voucher>();
++  List<Voucher> paymentVoucherDataforDisplay = <Voucher>[];
+ 
+   @override
+   void initState() {
+@@ -61,10 +61,10 @@ class _PaymentVoucherListState extends State<PaymentVoucherList> {
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<Voucher> dummySearchList = List<Voucher>();
++    List<Voucher> dummySearchList = <Voucher>[];
+     dummySearchList.addAll(paymentVoucherData);
+     if (query.isNotEmpty) {
+-      List<Voucher> dummyListData = List<Voucher>();
++      List<Voucher> dummyListData = <Voucher>[];
+       dummySearchList.forEach((item) {
+         if (item.partyname.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/lib/ui/views/voucher/purchasevouchers.dart b/lib/ui/views/voucher/purchasevouchers.dart
+index 80d2c7c..4005048 100644
+--- a/lib/ui/views/voucher/purchasevouchers.dart
++++ b/lib/ui/views/voucher/purchasevouchers.dart
+@@ -48,7 +48,7 @@ class _PurchaseVoucherListState extends State<PurchaseVoucherList> {
+   TextEditingController editingController = TextEditingController();
+ 
+   Iterable<Voucher> purchaseVoucherData;
+-  List<Voucher> purchaseVoucherDataforDisplay = List<Voucher>();
++  List<Voucher> purchaseVoucherDataforDisplay = <Voucher>[];
+ 
+   @override
+   void initState() {
+@@ -62,10 +62,10 @@ class _PurchaseVoucherListState extends State<PurchaseVoucherList> {
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<Voucher> dummySearchList = List<Voucher>();
++    List<Voucher> dummySearchList = <Voucher>[];
+     dummySearchList.addAll(purchaseVoucherData);
+     if (query.isNotEmpty) {
+-      List<Voucher> dummyListData = List<Voucher>();
++      List<Voucher> dummyListData = <Voucher>[];
+       dummySearchList.forEach((item) {
+         if (item.partyname.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/lib/ui/views/voucher/receiptvouchers.dart b/lib/ui/views/voucher/receiptvouchers.dart
+index 7e66c0e..d278d91 100644
+--- a/lib/ui/views/voucher/receiptvouchers.dart
++++ b/lib/ui/views/voucher/receiptvouchers.dart
+@@ -48,7 +48,7 @@ class _ReceiptVoucherListState extends State<ReceiptVoucherList> {
+   TextEditingController editingController = TextEditingController();
+ 
+   Iterable<Voucher> receiptVoucherData;
+-  List<Voucher> receiptVoucherDataforDisplay = List<Voucher>();
++  List<Voucher> receiptVoucherDataforDisplay = <Voucher>[];
+ 
+   @override
+   void initState() {
+@@ -62,10 +62,10 @@ class _ReceiptVoucherListState extends State<ReceiptVoucherList> {
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<Voucher> dummySearchList = List<Voucher>();
++    List<Voucher> dummySearchList = <Voucher>[];
+     dummySearchList.addAll(receiptVoucherData);
+     if (query.isNotEmpty) {
+-      List<Voucher> dummyListData = List<Voucher>();
++      List<Voucher> dummyListData = <Voucher>[];
+       dummySearchList.forEach((item) {
+         if (item.partyname.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/lib/ui/views/voucherview.dart b/lib/ui/views/voucherview.dart
+index 9be9de8..871989f 100644
+--- a/lib/ui/views/voucherview.dart
++++ b/lib/ui/views/voucherview.dart
+@@ -16,7 +16,6 @@ import 'package:tassist/templates/invoice_pdf_template.dart';
+ import 'package:tassist/ui/shared/drawer.dart';
+ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+ import 'package:tassist/theme/theme.dart';
+-import 'package:tassist/theme/colors.dart';
+ import 'package:tassist/ui/widgets/detailcard.dart';
+ import 'package:url_launcher/url_launcher.dart';
+ import 'package:tassist/core/services/voucher-item-service.dart';
+diff --git a/lib/ui/widgets/accountspayables/accountspayablelist.dart b/lib/ui/widgets/accountspayables/accountspayablelist.dart
+index c899dc1..d71e7a3 100644
+--- a/lib/ui/widgets/accountspayables/accountspayablelist.dart
++++ b/lib/ui/widgets/accountspayables/accountspayablelist.dart
+@@ -18,7 +18,7 @@ class _APLedgerItemListState extends State<APLedgerItemList> {
+ TextEditingController editingController = TextEditingController();
+ 
+   List<PayablesItem> ledgerItemData;
+-  List<PayablesItem> ledgerItemDataforDisplay= List<PayablesItem>();
++  List<PayablesItem> ledgerItemDataforDisplay= <PayablesItem>[];
+ 
+   @override
+   void initState() {
+@@ -29,10 +29,10 @@ TextEditingController editingController = TextEditingController();
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<PayablesItem> dummySearchList = List<PayablesItem>();
++    List<PayablesItem> dummySearchList = <PayablesItem>[];
+     dummySearchList.addAll(ledgerItemData);
+     if (query.isNotEmpty) {
+-      List<PayablesItem> dummyListData = List<PayablesItem>();
++      List<PayablesItem> dummyListData = <PayablesItem>[];
+       dummySearchList.forEach((item) {
+         if (item.name.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/lib/ui/widgets/inactivecustomerlist.dart b/lib/ui/widgets/inactivecustomerlist.dart
+index 987fbb9..d867ca6 100644
+--- a/lib/ui/widgets/inactivecustomerlist.dart
++++ b/lib/ui/widgets/inactivecustomerlist.dart
+@@ -1,7 +1,6 @@
+ import 'package:flutter/material.dart';
+ import 'package:provider/provider.dart';
+ import 'package:tassist/core/models/inactivecustomer.dart';
+-import 'package:tassist/theme/dimensions.dart';
+ import 'package:tassist/theme/theme.dart';
+ import 'package:tassist/ui/widgets/partyscreen/ledgertile.dart';
+ 
+diff --git a/lib/ui/widgets/khataScreen/khataform.dart b/lib/ui/widgets/khataScreen/khataform.dart
+index 713e635..a7dfb0e 100644
+--- a/lib/ui/widgets/khataScreen/khataform.dart
++++ b/lib/ui/widgets/khataScreen/khataform.dart
+@@ -1,6 +1,5 @@
+ import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
+-import 'package:flutter/services.dart';
+ import 'package:intl/intl.dart';
+ import 'package:provider/provider.dart';
+ import 'package:tassist/core/services/database.dart';
+@@ -40,7 +39,10 @@ class _KhataFormState extends State<KhataForm> {
+             items: trantype.map((trantype) {
+               return DropdownMenuItem(
+                 value: trantype,
+-                child: Text('$trantype', style: Theme.of(context).textTheme.bodyText2,),
++                child: Text(
++                  '$trantype',
++                  style: Theme.of(context).textTheme.bodyText2,
++                ),
+               );
+             }).toList(),
+             decoration: new InputDecoration(
+@@ -50,7 +52,8 @@ class _KhataFormState extends State<KhataForm> {
+                   Icons.fast_forward,
+                   color: TassistBlack,
+                 )),
+-            validator: (val) => val.isEmpty ? 'Please select a type' : null,
++            validator: (val) =>
++                val == null || val.isEmpty ? 'Please select a type' : null,
+             onChanged: (val) => setState(() => _currentTranType = val),
+           ),
+           SizedBox(height: 20.0),
+@@ -71,26 +74,28 @@ class _KhataFormState extends State<KhataForm> {
+                 color: TassistBgLightPurple,
+                 onPressed: () {
+                   showDatePicker(
+-                          context: context,
+-                          initialDate: DateTime.now(),
+-                          firstDate: DateTime(2001),
+-                          lastDate: DateTime(2022),
+-                          builder: (BuildContext context, Widget child) {
+-                                return Theme(
+-                                  data: ThemeData.light().copyWith(
+-                                      //OK/Cancel button text color
+-                                      primaryColor: const Color(
+-                                          0xFF4A5BF6), //Head background
+-                                      accentColor: const Color(
+-                                          0xFF4A5BF6) //selection color
+-                                      //dialogBackgroundColor: Colors.white,//Background color
+-                                      ),
+-                                  child: child,
+-                                );
+-                              },
+-                            )
+-                      .then((date) {
+-                    _currentDate = date;
++                    context: context,
++                    initialDate: DateTime.now(),
++                    firstDate: DateTime(2001),
++                    lastDate: DateTime(DateTime.now().year + 10, 12, 31),
++                    builder: (BuildContext context, Widget child) {
++                      return Theme(
++                        data: ThemeData.light().copyWith(
++                            //OK/Cancel button text color
++                            primaryColor: const Color(0xFF4A5BF6),
++                            colorScheme: ColorScheme.fromSwatch().copyWith(
++                                secondary:
++                                    const Color(0xFF4A5BF6)) //selection color
++                            //dialogBackgroundColor: Colors.white,//Background color
++                            ),
++                        child: child,
++                      );
++                    },
++                  ).then((date) {
++                    if (!mounted || date == null) return;
++                    setState(() {
++                      _currentDate = date;
++                    });
+                   });
+                 },
+               )
+diff --git a/lib/ui/widgets/partyscreen/ledgeritemlist.dart b/lib/ui/widgets/partyscreen/ledgeritemlist.dart
+index f64085d..8e765a7 100644
+--- a/lib/ui/widgets/partyscreen/ledgeritemlist.dart
++++ b/lib/ui/widgets/partyscreen/ledgeritemlist.dart
+@@ -17,7 +17,7 @@ class _LedgerItemListState extends State<LedgerItemList> {
+ TextEditingController editingController = TextEditingController();
+ 
+   List<LedgerItem> ledgerItemData;
+-  List<LedgerItem> ledgerItemDataforDisplay= List<LedgerItem>();
++  List<LedgerItem> ledgerItemDataforDisplay= <LedgerItem>[];
+ 
+   @override
+   void initState() {
+@@ -28,10 +28,10 @@ TextEditingController editingController = TextEditingController();
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<LedgerItem> dummySearchList = List<LedgerItem>();
++    List<LedgerItem> dummySearchList = <LedgerItem>[];
+     dummySearchList.addAll(ledgerItemData);
+     if (query.isNotEmpty) {
+-      List<LedgerItem> dummyListData = List<LedgerItem>();
++      List<LedgerItem> dummyListData = <LedgerItem>[];
+       dummySearchList.forEach((item) {
+         if (item.name.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/lib/ui/widgets/productcard.dart b/lib/ui/widgets/productcard.dart
+index 3e8e913..be40a3e 100644
+--- a/lib/ui/widgets/productcard.dart
++++ b/lib/ui/widgets/productcard.dart
+@@ -1,5 +1,4 @@
+ import 'package:flutter/material.dart';
+-import 'package:tassist/theme/dimensions.dart';
+ import 'package:tassist/theme/theme.dart';
+ 
+ class ProductCard extends StatelessWidget {
+diff --git a/lib/ui/widgets/productionForm.dart b/lib/ui/widgets/productionForm.dart
+index 97547f8..0095cf6 100644
+--- a/lib/ui/widgets/productionForm.dart
++++ b/lib/ui/widgets/productionForm.dart
+@@ -1,27 +1,23 @@
+-
+ import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
+-import 'package:flutter/services.dart';
+ import 'package:intl/intl.dart';
+ import 'package:provider/provider.dart';
+ import 'package:tassist/core/services/database.dart';
+ import 'package:tassist/theme/colors.dart';
+ 
+-
+ class ProductionForm extends StatefulWidget {
+   @override
+   _ProductionFormState createState() => _ProductionFormState();
+ }
+ 
+ class _ProductionFormState extends State<ProductionForm> {
+-  
+   var formatter = new DateFormat('dd-MM-yyyy');
+ 
+   final _formKey = GlobalKey<FormState>();
+   final List<String> product = ['Product A', 'Product B', 'Product C'];
+ 
+   DateTime _currentDate;
+-  String  _currentProduct;
++  String _currentProduct;
+   String _currentProduction;
+ 
+   @override
+@@ -30,45 +26,55 @@ class _ProductionFormState extends State<ProductionForm> {
+     var user = Provider.of<FirebaseUser>(context);
+ 
+     return Form(
+-      key:  _formKey,
++      key: _formKey,
+       child: Column(
+         children: <Widget>[
+           SizedBox(height: 20.0),
+           Text('Enter data for the day'),
+-          SizedBox(height: 20.0,),
+-           Row(children: <Widget>[ 
+-      Padding(
+-        padding: const EdgeInsets.fromLTRB(2.0, 8.0, 10.0, 8.0),
+-        child: Icon(Icons.date_range),
+-      ),
+-      Text(_currentDate == null ? 'Select a date': formatter.format(_currentDate).toString()),
+-      SizedBox(width: 10.0,),
+-      RaisedButton(
+-      child: Text('Date Picker'),
+-      color: TassistBgLightPurple,
+-      onPressed: () {
+-        showDatePicker(
+-          context: context,
+-          initialDate: DateTime.now(),
+-          firstDate: DateTime(2001),
+-          lastDate: DateTime(2022)
+-        ).then( (date) {
+-          _currentDate = date;
+-        }
+-        );
+-      },
+-      )
+-      ],
+-      ),
++          SizedBox(
++            height: 20.0,
++          ),
++          Row(
++            children: <Widget>[
++              Padding(
++                padding: const EdgeInsets.fromLTRB(2.0, 8.0, 10.0, 8.0),
++                child: Icon(Icons.date_range),
++              ),
++              Text(_currentDate == null
++                  ? 'Select a date'
++                  : formatter.format(_currentDate).toString()),
++              SizedBox(
++                width: 10.0,
++              ),
++              RaisedButton(
++                child: Text('Date Picker'),
++                color: TassistBgLightPurple,
++                onPressed: () {
++                  showDatePicker(
++                          context: context,
++                          initialDate: DateTime.now(),
++                          firstDate: DateTime(2001),
++                          lastDate: DateTime(DateTime.now().year + 10, 12, 31))
++                      .then((date) {
++                    if (!mounted || date == null) return;
++                    setState(() {
++                      _currentDate = date;
++                    });
++                  });
++                },
++              )
++            ],
++          ),
+           SizedBox(height: 20.0),
+           DropdownButtonFormField(
+-              value: _currentProduct ?? 'Product A',
+-             items: product.map( (product){
++            value: _currentProduct ?? 'Product A',
++            items: product.map((product) {
+               return DropdownMenuItem(
+-                value: product,
+-                child: Text('$product', style: Theme.of(context).textTheme.bodyText2,)
+-                );   
+-
++                  value: product,
++                  child: Text(
++                    '$product',
++                    style: Theme.of(context).textTheme.bodyText2,
++                  ));
+             }).toList(),
+             onChanged: (val) => setState(() => _currentProduct = val),
+           ),
+@@ -77,36 +83,36 @@ class _ProductionFormState extends State<ProductionForm> {
+             style: Theme.of(context).textTheme.bodyText2,
+             keyboardType: TextInputType.number,
+             decoration: new InputDecoration(
+-            hintText: 'Enter Production',
+-            hintStyle: Theme.of(context).textTheme.bodyText2,
+-            icon: new Icon(
+-              Icons.note_add,
+-              color: TassistBlack,
+-            )),
+-            validator: (val) => val.isEmpty ? 'Please enter production': null,
++                hintText: 'Enter Production',
++                hintStyle: Theme.of(context).textTheme.bodyText2,
++                icon: new Icon(
++                  Icons.note_add,
++                  color: TassistBlack,
++                )),
++            validator: (val) => val.isEmpty ? 'Please enter production' : null,
+             onChanged: (val) => setState(() => _currentProduction = val),
+           ),
+           RaisedButton(
+             color: TassistPrimary,
+-            child: Text('Submit', style: Theme.of(context).textTheme.bodyText1.copyWith(
+-        color: TassistWhite
+-      )),
++            child: Text('Submit',
++                style: Theme.of(context)
++                    .textTheme
++                    .bodyText1
++                    .copyWith(color: TassistWhite)),
+             onPressed: () async {
+-                if(_formKey.currentState.validate()) {
+-                  // IDFix - pass current user
+-                  await DatabaseService(uid: user.uid).createProductionRecord(
+-                    _currentDate ?? DateTime.now(), 
+-                    _currentProduct ?? 'Product A',
+-                    _currentProduction ?? '0',
+-                  );
+-                  Navigator.pop(context);
+-                }
+-               
++              if (_formKey.currentState.validate()) {
++                // IDFix - pass current user
++                await DatabaseService(uid: user.uid).createProductionRecord(
++                  _currentDate ?? DateTime.now(),
++                  _currentProduct ?? 'Product A',
++                  _currentProduction ?? '0',
++                );
++                Navigator.pop(context);
++              }
+             },
+           )
+         ],
+       ),
+-      
+     );
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/lib/ui/widgets/salesvoucherslist.dart b/lib/ui/widgets/salesvoucherslist.dart
+index 669f79e..2123f11 100644
+--- a/lib/ui/widgets/salesvoucherslist.dart
++++ b/lib/ui/widgets/salesvoucherslist.dart
+@@ -17,7 +17,7 @@ class _SalesVoucherListState extends State<SalesVoucherList> {
+   TextEditingController editingController = TextEditingController();
+ 
+   Iterable<Voucher> salesVoucherData;
+-  List<Voucher> salesVoucherDataforDisplay = List<Voucher>();
++  List<Voucher> salesVoucherDataforDisplay = <Voucher>[];
+ 
+   @override
+   void initState() {
+@@ -32,10 +32,10 @@ class _SalesVoucherListState extends State<SalesVoucherList> {
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<Voucher> dummySearchList = List<Voucher>();
++    List<Voucher> dummySearchList = <Voucher>[];
+     dummySearchList.addAll(salesVoucherData);
+     if (query.isNotEmpty) {
+-      List<Voucher> dummyListData = List<Voucher>();
++      List<Voucher> dummyListData = <Voucher>[];
+       dummySearchList.forEach((item) {
+         if (item.partyname.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/lib/ui/widgets/stockscreen/stocklist.dart b/lib/ui/widgets/stockscreen/stocklist.dart
+index 319656d..34aefc1 100644
+--- a/lib/ui/widgets/stockscreen/stocklist.dart
++++ b/lib/ui/widgets/stockscreen/stocklist.dart
+@@ -18,7 +18,7 @@ class _StockItemListState extends State<StockItemList> {
+   TextEditingController editingController = TextEditingController();
+ 
+   List<StockItem> stockItemData;
+-  List<StockItem> stockItemDataforDisplay = List<StockItem>();
++  List<StockItem> stockItemDataforDisplay = <StockItem>[];
+ 
+   @override
+   void initState() {
+@@ -49,10 +49,10 @@ class _StockItemListState extends State<StockItemList> {
+   }
+ 
+   void filterSearchResults(String query) {
+-    List<StockItem> dummySearchList = List<StockItem>();
++    List<StockItem> dummySearchList = <StockItem>[];
+     dummySearchList.addAll(stockItemData);
+     if (query.isNotEmpty) {
+-      List<StockItem> dummyListData = List<StockItem>();
++      List<StockItem> dummyListData = <StockItem>[];
+       dummySearchList.forEach((item) {
+         if (item.name.toLowerCase().contains(query)) {
+           dummyListData.add(item);
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 659a62d..3adf22c 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -28,7 +28,7 @@ dependencies:
+   url_launcher: ^5.4.1
+   pdf: ^1.5.0
+   path_provider: ^1.6.5
+-  provider: ^3.0.0+1
++  provider: ^4.3.3
+   get_it: ^1.0.3+2
+   image_picker: ^0.6.1+4
+   intl: ^0.16.1
+@@ -56,6 +56,11 @@ dependencies:
+   firebase_analytics: ^5.0.11
+   # flutter_spinkit: "^4.1.1"
+ 
++# Firebase Messaging 6 pins platform 2, whose packageRoot API was removed
++# in the configured Dart SDK. Its LocalPlatform usage is compatible with Flutter's version.
++dependency_overrides:
++  platform: 3.1.0
++
+ dev_dependencies:
+   flutter_test:
+     sdk: flutter
+diff --git a/test/widget_test.dart b/test/widget_test.dart
+deleted file mode 100644
+index 8d23059..0000000
+--- a/test/widget_test.dart
++++ /dev/null
+@@ -1,29 +0,0 @@
+-// This is a basic Flutter widget test.
+-//
+-// To perform an interaction with a widget in your test, use the WidgetTester
+-// utility that Flutter provides. For example, you can send tap and scroll
+-// gestures. You can also use WidgetTester to find child widgets in the widget
+-// tree, read text, and verify that the values of widget properties are correct.
+-
+-import 'package:flutter/material.dart';
+-import 'package:flutter_test/flutter_test.dart';
+-import 'package:tassist/main.dart';
+-
+-void main() {
+-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+-    // Build our app and trigger a frame.
+-    await tester.pumpWidget(MyApp());
+-
+-    // Verify that our counter starts at 0.
+-    expect(find.text('0'), findsOneWidget);
+-    expect(find.text('1'), findsNothing);
+-
+-    // Tap the '+' icon and trigger a frame.
+-    await tester.tap(find.byIcon(Icons.add));
+-    await tester.pump();
+-
+-    // Verify that our counter has incremented.
+-    expect(find.text('0'), findsNothing);
+-    expect(find.text('1'), findsOneWidget);
+-  });
+-}
+diff --git a/test/date_forms_test.dart b/test/date_forms_test.dart
+new file mode 100644
+--- /dev/null
++++ b/test/date_forms_test.dart
+@@ -0,0 +1,52 @@
++import 'package:firebase_auth/firebase_auth.dart';
++import 'package:flutter/material.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:intl/intl.dart';
++import 'package:provider/provider.dart';
++import 'package:tassist/ui/widgets/productionForm.dart';
++import 'package:tassist/ui/widgets/khataScreen/khataform.dart';
++
++void main() {
++  testWidgets('khata requires a transaction type without throwing',
++      (tester) async {
++    await tester.pumpWidget(Provider<FirebaseUser>.value(
++      value: null,
++      child: MaterialApp(home: Scaffold(body: KhataForm())),
++    ));
++    await tester.tap(find.text('Submit'));
++    await tester.pump();
++    expect(find.text('Please select a type'), findsOneWidget);
++    expect(tester.takeException(), isNull);
++  });
++  for (final name in ['production', 'khata']) {
++    testWidgets('$name date selection updates and survives cancellation',
++        (tester) async {
++      await tester.pumpWidget(Provider<FirebaseUser>.value(
++        value: null,
++        child: MaterialApp(
++          home: Scaffold(
++            body: name == 'production' ? ProductionForm() : KhataForm(),
++          ),
++        ),
++      ));
++      expect(find.text('Select a date'), findsOneWidget);
++      await tester.tap(find.text('Date Picker'));
++      await tester.pumpAndSettle();
++      expect(tester.takeException(), isNull);
++      expect(find.byType(DatePickerDialog), findsOneWidget);
++      final selected = tester
++          .widget<DatePickerDialog>(find.byType(DatePickerDialog))
++          .initialDate;
++      await tester.tap(find.text('OK'));
++      await tester.pumpAndSettle();
++      final expected = DateFormat('dd-MM-yyyy').format(selected);
++      expect(find.text(expected), findsOneWidget);
++      await tester.tap(find.text('Date Picker'));
++      await tester.pumpAndSettle();
++      await tester.tap(find.text('CANCEL'));
++      await tester.pumpAndSettle();
++      expect(find.text(expected), findsOneWidget);
++      expect(tester.takeException(), isNull);
++    });
++  }
++}

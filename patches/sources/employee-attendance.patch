@@ -1,0 +1,517 @@
+diff --git a/lib/main.dart b/lib/main.dart
+index 7fe9a44..667d00f 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,28 +1,20 @@
+-import 'package:employee_attendance/screens/login_screen.dart';
++import 'package:donor_firebase/donor_firebase.dart';
+ import 'package:employee_attendance/screens/splash_screen.dart';
+ import 'package:employee_attendance/services/attendance_service.dart';
+ import 'package:employee_attendance/services/auth_service.dart';
+ import 'package:employee_attendance/services/db_service.dart';
+ import 'package:flutter/material.dart';
+-import 'package:flutter_dotenv/flutter_dotenv.dart';
+ import 'package:provider/provider.dart';
+-import 'package:supabase_flutter/supabase_flutter.dart';
+ 
+-void main() async {
++Future<void> main() async {
+   WidgetsFlutterBinding.ensureInitialized();
+-  // load env
+-  await dotenv.load();
+-  // Initialize Supabase
+-  String supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+-  String supabaseKey = dotenv.env['SUPABASE_KEY'] ?? '';
+-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
++  await initializeDonorFirebase();
+   runApp(const MyApp());
+ }
+ 
+ class MyApp extends StatelessWidget {
+   const MyApp({super.key});
+ 
+-  // This widget is the root of your application.
+   @override
+   Widget build(BuildContext context) {
+     return MultiProvider(
+@@ -32,12 +24,11 @@ class MyApp extends StatelessWidget {
+         ChangeNotifierProvider(create: (context) => AttendanceService()),
+       ],
+       child: MaterialApp(
+-          debugShowCheckedModeBanner: false,
+-          title: 'Employee Attendance',
+-          theme: ThemeData(
+-            primarySwatch: Colors.blue,
+-          ),
+-          home: const SplashScreen()),
++        debugShowCheckedModeBanner: false,
++        title: 'Employee Attendance',
++        theme: ThemeData(primarySwatch: Colors.blue),
++        home: const SplashScreen(),
++      ),
+     );
+   }
+ }
+diff --git a/lib/models/attendance_model.dart b/lib/models/attendance_model.dart
+index 78a4a67..59876ed 100644
+--- a/lib/models/attendance_model.dart
++++ b/lib/models/attendance_model.dart
+@@ -1,3 +1,5 @@
++import 'package:intl/intl.dart';
++
+ class AttendanceModel {
+   final String id;
+   final String date;
+@@ -7,24 +9,20 @@ class AttendanceModel {
+   final Map? checkInLocation;
+   final Map? checkOutLocation;
+ 
+-  AttendanceModel(
+-      {required this.id,
+-      required this.date,
+-      required this.checkIn,
+-      this.checkOut,
+-      required this.createdAt,
+-      this.checkInLocation,
+-      this.checkOutLocation});
++  AttendanceModel({required this.id, required this.date, required this.checkIn, this.checkOut, required this.createdAt, this.checkInLocation, this.checkOutLocation});
+ 
+   factory AttendanceModel.fromJson(Map<String, dynamic> data) {
++    final checkInAt = DateTime.parse('${data['checkIn']}');
++    final checkOutRaw = data['checkOut'];
++    final checkOutAt = checkOutRaw == null ? null : DateTime.parse('$checkOutRaw');
+     return AttendanceModel(
+-      id: data['employee_id'],
+-      date: data['date'],
+-      checkIn: data['check_in'],
+-      checkOut: data['check_out'],
+-      createdAt: DateTime.parse(data['created_at']),
+-      checkInLocation: data['check_in_location'],
+-      checkOutLocation: data['check_out_location'],
++      id: '${data['id']}',
++      date: '${data['date']}',
++      checkIn: DateFormat('HH:mm').format(checkInAt.toLocal()),
++      checkOut: checkOutAt == null ? null : DateFormat('HH:mm').format(checkOutAt.toLocal()),
++      createdAt: checkInAt.toLocal(),
++      checkInLocation: data['checkInLocation'] as Map?,
++      checkOutLocation: data['checkOutLocation'] as Map?,
+     );
+   }
+ }
+diff --git a/lib/models/department_model.dart b/lib/models/department_model.dart
+index 4788468..0627159 100644
+--- a/lib/models/department_model.dart
++++ b/lib/models/department_model.dart
+@@ -1,10 +1,10 @@
+ class DepartmentModel {
+-  final int id;
++  final String id;
+   final String title;
+ 
+   DepartmentModel({required this.id, required this.title});
+ 
+   factory DepartmentModel.fromJson(Map<String, dynamic> data) {
+-    return DepartmentModel(id: data['id'], title: data['title']);
++    return DepartmentModel(id: '${data['id']}', title: '${data['title']}');
+   }
+ }
+diff --git a/lib/models/user_model.dart b/lib/models/user_model.dart
+index 6da7e94..e1e3f4c 100644
+--- a/lib/models/user_model.dart
++++ b/lib/models/user_model.dart
+@@ -2,22 +2,18 @@ class UserModel {
+   final String id;
+   final String email;
+   final String name;
+-  final int? department;
++  final String? department;
+   final String employeeId;
+ 
+-  UserModel(
+-      {required this.id,
+-      required this.email,
+-      required this.name,
+-      this.department,
+-      required this.employeeId});
++  UserModel({required this.id, required this.email, required this.name, this.department, required this.employeeId});
+ 
+   factory UserModel.fromJson(Map<String, dynamic> data) {
+     return UserModel(
+-        id: data['id'],
+-        email: data['email'],
+-        name: data['name'],
+-        department: data['department'],
+-        employeeId: data['employee_id']);
++      id: '${data['id']}',
++      email: '${data['email'] ?? ''}',
++      name: '${data['name'] ?? ''}',
++      department: data['departmentId'] as String?,
++      employeeId: '${data['employeeCode'] ?? data['employee_id'] ?? ''}',
++    );
+   }
+ }
+diff --git a/lib/screens/profile_screen.dart b/lib/screens/profile_screen.dart
+index 29d8f5c..497cfca 100644
+--- a/lib/screens/profile_screen.dart
++++ b/lib/screens/profile_screen.dart
+@@ -80,7 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
+                           ? const LinearProgressIndicator()
+                           : SizedBox(
+                               width: double.infinity,
+-                              child: DropdownButtonFormField(
++                              child: DropdownButtonFormField<String>(
+                                 decoration: const InputDecoration(
+                                     border: OutlineInputBorder()),
+                                 value: dbService.employeeDepartment ??
+diff --git a/lib/services/attendance_service.dart b/lib/services/attendance_service.dart
+index 2232cbc..45f69e2 100644
+--- a/lib/services/attendance_service.dart
++++ b/lib/services/attendance_service.dart
+@@ -1,91 +1,63 @@
+-import 'package:employee_attendance/constants/constants.dart';
++import 'package:cloud_functions/cloud_functions.dart';
+ import 'package:employee_attendance/models/attendance_model.dart';
+ import 'package:employee_attendance/services/location_service.dart';
+ import 'package:employee_attendance/utils/utils.dart';
+ import 'package:flutter/material.dart';
+ import 'package:intl/intl.dart';
+-import 'package:supabase_flutter/supabase_flutter.dart';
+ 
+ class AttendanceService extends ChangeNotifier {
+-  final SupabaseClient _supabase = Supabase.instance.client;
++  static const orgId = String.fromEnvironment('TANDAO_ORG_ID');
+   AttendanceModel? attendanceModel;
+-
+-  String todayDate = DateFormat("dd MMMM yyyy").format(DateTime.now());
+-
++  String todayDate = DateFormat('dd MMMM yyyy').format(DateTime.now());
+   bool _isLoading = false;
+-
+   bool get isLoading => _isLoading;
++  String _attendanceHistoryMonth = DateFormat('MMMM yyyy').format(DateTime.now());
++  String get attendanceHistoryMonth => _attendanceHistoryMonth;
+ 
+   set setIsLoading(bool value) {
+     _isLoading = value;
+     notifyListeners();
+   }
+ 
+-  String _attendanceHistoryMonth =
+-      DateFormat('MMMM yyyy').format(DateTime.now());
+-
+-  String get attendanceHistoryMonth => _attendanceHistoryMonth;
+-
+   set attendanceHistoryMonth(String value) {
+     _attendanceHistoryMonth = value;
+     notifyListeners();
+   }
+ 
++  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(region: 'europe-west1');
++
++  Future<Map<String, dynamic>> _call(String name, [Map<String, dynamic> data = const {}]) async {
++    if (orgId.isEmpty) throw StateError('Set TANDAO_ORG_ID before running attendance');
++    final result = await _functions.httpsCallable(name).call({...data, 'orgId': orgId});
++    return Map<String, dynamic>.from(result.data as Map);
++  }
++
+   Future getTodayAttendance() async {
+-    final List result = await _supabase
+-        .from(Constants.attendancetable)
+-        .select()
+-        .eq("employee_id", _supabase.auth.currentUser!.id)
+-        .eq('date', todayDate);
+-    if (result.isNotEmpty) {
+-      attendanceModel = AttendanceModel.fromJson(result.first);
+-    }
++    final result = await _call('attendanceToday');
++    final punch = result['punch'];
++    attendanceModel = punch == null ? null : AttendanceModel.fromJson(Map<String, dynamic>.from(punch as Map));
+     notifyListeners();
+   }
+ 
+   Future markAttendance(BuildContext context) async {
+-    Map? getLocation =
+-        await LocationService().initializeAndGetLocation(context);
+-    print("Location Data :");
+-    print(getLocation);
+-    if (getLocation != null) {
+-      if (attendanceModel?.checkIn == null) {
+-        await _supabase.from(Constants.attendancetable).insert({
+-          'employee_id': _supabase.auth.currentUser!.id,
+-          'date': todayDate,
+-          'check_in': DateFormat('HH:mm').format(DateTime.now()),
+-          'check_in_location': getLocation,
+-        });
+-      } else if (attendanceModel?.checkOut == null) {
+-        await _supabase
+-            .from(Constants.attendancetable)
+-            .update({
+-              'check_out': DateFormat('HH:mm').format(DateTime.now()),
+-              'check_out_location': getLocation,
+-            })
+-            .eq('employee_id', _supabase.auth.currentUser!.id)
+-            .eq('date', todayDate);
+-      } else {
+-        Utils.showSnackBar("You have already checked out today !", context);
+-      }
+-      getTodayAttendance();
+-    } else {
+-      Utils.showSnackBar("Not able to get your Location", context,
+-          color: Colors.red);
+-      getTodayAttendance();
++    final location = await LocationService().initializeAndGetLocation(context);
++    if (location == null) {
++      if (context.mounted) Utils.showSnackBar('Not able to get your Location', context, color: Colors.red);
++      await getTodayAttendance();
++      return;
++    }
++    try {
++      await _call('attendancePunch', {'location': location});
++    } catch (error) {
++      if (context.mounted) Utils.showSnackBar(error.toString(), context, color: Colors.red);
+     }
++    await getTodayAttendance();
+   }
+ 
+   Future<List<AttendanceModel>> getAttendanceHistory() async {
+-    final List data = await _supabase
+-        .from(Constants.attendancetable)
+-        .select()
+-        .eq('employee_id', _supabase.auth.currentUser!.id)
+-        .textSearch('date', "'$attendanceHistoryMonth'", config: 'english')
+-        .order('created_at', ascending: false);
+-
+-    return data
+-        .map((attendance) => AttendanceModel.fromJson(attendance))
+-        .toList();
++    final parsed = DateFormat('MMMM yyyy').parse(attendanceHistoryMonth);
++    final month = DateFormat('yyyy-MM').format(parsed);
++    final result = await _call('attendanceHistory', {'month': month});
++    return (result['punches'] as List? ?? const []).map((row) => AttendanceModel.fromJson(Map<String, dynamic>.from(row as Map))).toList();
+   }
+ }
+diff --git a/lib/services/auth_service.dart b/lib/services/auth_service.dart
+index 5e56d00..34969af 100644
+--- a/lib/services/auth_service.dart
++++ b/lib/services/auth_service.dart
+@@ -1,64 +1,55 @@
+ import 'package:employee_attendance/services/db_service.dart';
+ import 'package:employee_attendance/utils/utils.dart';
++import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
+-import 'package:supabase_flutter/supabase_flutter.dart';
+ 
+ class AuthService extends ChangeNotifier {
+-  final SupabaseClient _supabase = Supabase.instance.client;
+-  final DbService _dbService = DbService();
++  AuthService() {
++    FirebaseAuth.instance.authStateChanges().listen((_) => notifyListeners());
++  }
+ 
++  final DbService _dbService = DbService();
+   bool _isLoading = false;
+-
+   bool get isLoading => _isLoading;
++  User? get currentUser => FirebaseAuth.instance.currentUser;
+ 
+   set setIsLoading(bool value) {
+     _isLoading = value;
+     notifyListeners();
+   }
+ 
+-  Future registerEmployee(
+-      String email, String password, BuildContext context) async {
++  Future registerEmployee(String email, String password, BuildContext context) async {
+     try {
+       setIsLoading = true;
+-      if (email == "" || password == "") {
+-        throw ("All Fields are required");
+-      }
+-      final AuthResponse response =
+-          await _supabase.auth.signUp(email: email, password: password);
+-      if (response != null) {
+-        await _dbService.insertNewUser(email, response.user!.id);
+-
+-        Utils.showSnackBar("Successfully registered !", context,
+-            color: Colors.green);
+-        await loginEmployee(email, password, context);
++      if (email == '' || password == '') throw 'All Fields are required';
++      await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email.trim(), password: password);
++      await _dbService.registerProfile(email.trim());
++      if (context.mounted) {
++        Utils.showSnackBar('Successfully registered !', context, color: Colors.green);
+         Navigator.pop(context);
+       }
+-    } catch (e) {
+       setIsLoading = false;
+-      Utils.showSnackBar(e.toString(), context, color: Colors.red);
++    } catch (error) {
++      setIsLoading = false;
++      if (context.mounted) Utils.showSnackBar(error.toString(), context, color: Colors.red);
+     }
+   }
+ 
+-  Future loginEmployee(
+-      String email, String password, BuildContext context) async {
++  Future loginEmployee(String email, String password, BuildContext context) async {
+     try {
+       setIsLoading = true;
+-      if (email == "" || password == "") {
+-        throw ("All Fields are required");
+-      }
+-      final AuthResponse response = await _supabase.auth
+-          .signInWithPassword(email: email, password: password);
++      if (email == '' || password == '') throw 'All Fields are required';
++      await FirebaseAuth.instance.signInWithEmailAndPassword(email: email.trim(), password: password);
++      await _dbService.registerProfile(email.trim());
+       setIsLoading = false;
+-    } catch (e) {
++    } catch (error) {
+       setIsLoading = false;
+-      Utils.showSnackBar(e.toString(), context, color: Colors.red);
++      if (context.mounted) Utils.showSnackBar(error.toString(), context, color: Colors.red);
+     }
+   }
+ 
+   Future signOut() async {
+-    await _supabase.auth.signOut();
++    await FirebaseAuth.instance.signOut();
+     notifyListeners();
+   }
+-
+-  User? get currentUser => _supabase.auth.currentUser;
+ }
+diff --git a/lib/services/db_service.dart b/lib/services/db_service.dart
+index 210c2ff..783ce19 100644
+--- a/lib/services/db_service.dart
++++ b/lib/services/db_service.dart
+@@ -1,69 +1,45 @@
+-import 'dart:math';
+-
+-import 'package:employee_attendance/constants/constants.dart';
++import 'package:cloud_functions/cloud_functions.dart';
+ import 'package:employee_attendance/models/department_model.dart';
+ import 'package:employee_attendance/models/user_model.dart';
+ import 'package:employee_attendance/utils/utils.dart';
+ import 'package:flutter/material.dart';
+-import 'package:supabase_flutter/supabase_flutter.dart';
+ 
+ class DbService extends ChangeNotifier {
+-  final SupabaseClient _supabase = Supabase.instance.client;
++  static const orgId = String.fromEnvironment('TANDAO_ORG_ID');
+   UserModel? userModel;
+   List<DepartmentModel> allDepartments = [];
+-  int? employeeDepartment;
++  String? employeeDepartment;
++
++  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(region: 'europe-west1');
+ 
+-  String generateRandomEmployeeId() {
+-    final random = Random();
+-    const allChars = "faangFAANG0123456789";
+-    final randomString =
+-        List.generate(8, (index) => allChars[random.nextInt(allChars.length)])
+-            .join();
+-    return randomString;
++  Future<Map<String, dynamic>> _call(String name, [Map<String, dynamic> data = const {}]) async {
++    if (orgId.isEmpty) throw StateError('Set TANDAO_ORG_ID before running attendance');
++    final result = await _functions.httpsCallable(name).call({...data, 'orgId': orgId});
++    return Map<String, dynamic>.from(result.data as Map);
+   }
+ 
+-  Future insertNewUser(String email, var id) async {
+-    await _supabase.from(Constants.employeeTable).insert({
+-      'id': id,
+-      'name': '',
+-      'email': email,
+-      'employee_id': generateRandomEmployeeId(),
+-      'department': null,
+-    });
++  Future<void> registerProfile(String email) async {
++    await _call('attendanceRegister', {'name': email.split('@').first});
++    await getUserData();
+   }
+ 
+   Future<UserModel> getUserData() async {
+-    final userData = await _supabase
+-        .from(Constants.employeeTable)
+-        .select()
+-        .eq('id', _supabase.auth.currentUser!.id)
+-        .single();
+-    userModel = UserModel.fromJson(userData);
+-    // Since this function can be called multiple times, then it will reset the dartment value
+-    // That is why we are using condition to assign only at the first time
+-    employeeDepartment == null
+-        ? employeeDepartment = userModel?.department
+-        : null;
++    final data = await _call('attendanceProfile');
++    allDepartments = (data['departments'] as List? ?? const []).map((row) => DepartmentModel.fromJson(Map<String, dynamic>.from(row as Map))).toList();
++    if (data['registered'] != true) throw StateError('Complete attendance registration for this organization');
++    userModel = UserModel.fromJson(data);
++    employeeDepartment ??= userModel?.department;
++    notifyListeners();
+     return userModel!;
+   }
+ 
+   Future<void> getAllDepartments() async {
+-    final List result =
+-        await _supabase.from(Constants.departmentTable).select();
+-    allDepartments = result
+-        .map((department) => DepartmentModel.fromJson(department))
+-        .toList();
+-    notifyListeners();
++    if (userModel == null) await getUserData();
+   }
+ 
+   Future updateProfile(String name, BuildContext context) async {
+-    await _supabase.from(Constants.employeeTable).update({
+-      'name': name,
+-      'department': employeeDepartment,
+-    }).eq('id', _supabase.auth.currentUser!.id);
+-
+-    Utils.showSnackBar("Profile Updated Successfully", context,
+-        color: Colors.green);
+-    notifyListeners();
++    await _call('attendanceUpdateProfile', {'name': name, 'departmentId': employeeDepartment});
++    await getUserData();
++    if (context.mounted) Utils.showSnackBar('Profile Updated Successfully', context, color: Colors.green);
+   }
+ }
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 98b52b5..006df96 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+ version: 1.0.0+1
+ 
+ environment:
+-  sdk: '>=2.19.6 <3.0.0'
++  sdk: '>=3.3.0 <4.0.0'
+ 
+ # Dependencies specify other packages that your package needs in order to work.
+ # To automatically upgrade your package dependencies to the latest versions
+@@ -35,8 +35,11 @@ dependencies:
+   # The following adds the Cupertino Icons font to your application.
+   # Use with the CupertinoIcons class for iOS style icons.
+   cupertino_icons: ^1.0.2
+-  supabase_flutter: ^1.7.0
+-  flutter_dotenv: ^5.0.2
++  donor_firebase:
++    path: ../../packages/donor_firebase
++  firebase_auth: ^5.6.0
++  cloud_firestore: ^5.6.0
++  cloud_functions: ^5.6.0
+   provider: ^6.0.5
+   font_awesome_flutter: ^10.4.0
+   slide_to_act: ^2.0.1
+@@ -65,10 +68,6 @@ flutter:
+   # included with your application, so that you can use the icons in
+   # the material Icons class.
+   uses-material-design: true
+-
+-  # To add assets to your application, add an assets section, like this:
+-  assets:
+-    - .env
+   #   - images/a_dot_ham.jpeg
+ 
+   # An image asset can refer to one or more resolution-specific "variants", see

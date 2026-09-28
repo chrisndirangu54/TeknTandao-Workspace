@@ -1,0 +1,140 @@
+diff --git a/lib/src/features/entries/data/entries_repository.dart b/lib/src/features/entries/data/entries_repository.dart
+index cd8253b..076a89c 100644
+--- a/lib/src/features/entries/data/entries_repository.dart
++++ b/lib/src/features/entries/data/entries_repository.dart
+@@ -1,3 +1,4 @@
++import '../../../utils/time_api.dart';
+ import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:riverpod_annotation/riverpod_annotation.dart';
+@@ -13,8 +14,8 @@ class EntriesRepository {
+   final FirebaseFirestore _firestore;
+ 
+   static String entryPath(String uid, String entryId) =>
+-      'users/$uid/entries/$entryId';
+-  static String entriesPath(String uid) => 'users/$uid/entries';
++      '${entriesPath(uid)}/$entryId';
++  static String entriesPath(String uid) => TimeApi.path(uid, 'entries');
+ 
+   // create
+   Future<void> addEntry({
+@@ -24,7 +25,7 @@ class EntriesRepository {
+     required DateTime end,
+     required String comment,
+   }) =>
+-      _firestore.collection(entriesPath(uid)).add({
++      TimeApi.mutate('entries', 'save', _firestore.collection(entriesPath(uid)).doc().id, {
+         'jobId': jobId,
+         'start': start.millisecondsSinceEpoch,
+         'end': end.millisecondsSinceEpoch,
+@@ -36,11 +37,11 @@ class EntriesRepository {
+     required UserID uid,
+     required Entry entry,
+   }) =>
+-      _firestore.doc(entryPath(uid, entry.id)).update(entry.toMap());
++      TimeApi.mutate('entries', 'save', entry.id, entry.toMap());
+ 
+   // delete
+   Future<void> deleteEntry({required UserID uid, required EntryID entryId}) =>
+-      _firestore.doc(entryPath(uid, entryId)).delete();
++      TimeApi.mutate('entries', 'delete', entryId);
+ 
+   // read
+   Stream<List<Entry>> watchEntries({required UserID uid, JobID? jobId}) =>
+diff --git a/lib/src/features/jobs/data/jobs_repository.dart b/lib/src/features/jobs/data/jobs_repository.dart
+index 1de2e70..3803af1 100644
+--- a/lib/src/features/jobs/data/jobs_repository.dart
++++ b/lib/src/features/jobs/data/jobs_repository.dart
+@@ -1,4 +1,5 @@
+ import 'dart:async';
++import '../../../utils/time_api.dart';
+ 
+ import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:riverpod/riverpod.dart';
+@@ -6,7 +7,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
+ import 'package:starter_architecture_flutter_firebase/src/features/authentication/data/firebase_auth_repository.dart';
+ import 'package:starter_architecture_flutter_firebase/src/features/authentication/domain/app_user.dart';
+ import 'package:starter_architecture_flutter_firebase/src/features/entries/data/entries_repository.dart';
+-import 'package:starter_architecture_flutter_firebase/src/features/entries/domain/entry.dart';
+ import 'package:starter_architecture_flutter_firebase/src/features/jobs/domain/job.dart';
+ 
+ part 'jobs_repository.g.dart';
+@@ -15,39 +15,15 @@ class JobsRepository {
+   const JobsRepository(this._firestore);
+   final FirebaseFirestore _firestore;
+ 
+-  static String jobPath(String uid, String jobId) => 'users/$uid/jobs/$jobId';
+-  static String jobsPath(String uid) => 'users/$uid/jobs';
++  static String jobPath(String uid, String jobId) => '${jobsPath(uid)}/$jobId';
++  static String jobsPath(String uid) => TimeApi.path(uid, 'jobs');
+   static String entriesPath(String uid) => EntriesRepository.entriesPath(uid);
+ 
+-  // create
+-  Future<void> addJob(
+-          {required UserID uid,
+-          required String name,
+-          required int ratePerHour}) =>
+-      _firestore.collection(jobsPath(uid)).add({
+-        'name': name,
+-        'ratePerHour': ratePerHour,
+-      });
+-
+-  // update
+-  Future<void> updateJob({required UserID uid, required Job job}) =>
+-      _firestore.doc(jobPath(uid, job.id)).update(job.toMap());
+-
+-  // delete
+-  Future<void> deleteJob({required UserID uid, required JobID jobId}) async {
+-    // delete where entry.jobId == job.jobId
+-    final entriesRef = _firestore.collection(entriesPath(uid));
+-    final entries = await entriesRef.get();
+-    for (final snapshot in entries.docs) {
+-      final entry = Entry.fromMap(snapshot.data(), snapshot.id);
+-      if (entry.jobId == jobId) {
+-        await snapshot.reference.delete();
+-      }
+-    }
+-    // delete job
+-    final jobRef = _firestore.doc(jobPath(uid, jobId));
+-    await jobRef.delete();
+-  }
++  // Writes are authorized and validated by the shared Firebase backend.
++  Future<void> addJob({required UserID uid, required String name, required int ratePerHour}) =>
++      TimeApi.mutate('jobs', 'save', _firestore.collection(jobsPath(uid)).doc().id, {'name': name, 'ratePerHour': ratePerHour});
++  Future<void> updateJob({required UserID uid, required Job job}) => TimeApi.mutate('jobs', 'save', job.id, job.toMap());
++  Future<void> deleteJob({required UserID uid, required JobID jobId}) => TimeApi.mutate('jobs', 'delete', jobId);
+ 
+   // read
+   Stream<Job> watchJob({required UserID uid, required JobID jobId}) =>
+diff --git a/pubspec.yaml b/pubspec.yaml
+index ab80d1f..9a401b0 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -8,6 +8,7 @@ environment:
+   sdk: ">=3.6.0 <4.0.0"
+ 
+ dependencies:
++  cloud_functions: 5.3.4
+   cloud_firestore: ^5.6.6
+   cupertino_icons: ^1.0.8
+   equatable: ^2.0.7
+diff --git a/lib/src/utils/time_api.dart b/lib/src/utils/time_api.dart
+new file mode 100644
+--- /dev/null
++++ b/lib/src/utils/time_api.dart
+@@ -0,0 +1,15 @@
++import 'package:cloud_functions/cloud_functions.dart';
++
++class TimeApi {
++  static const orgId = String.fromEnvironment('TANDAO_ORG_ID');
++  static String path(String uid, String collection) {
++    if (!RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(orgId)) throw StateError('Set TANDAO_ORG_ID to use the shared time tracking module');
++    return 'organizations/$orgId/timeMembers/$uid/$collection';
++  }
++  static Future<void> mutate(String kind, String action, String id, [Map<String, dynamic>? record]) async {
++    path('validation', kind);
++    await FirebaseFunctions.instanceFor(region: 'europe-west1').httpsCallable('mutateTimeRecord').call({
++      'orgId': orgId, 'kind': kind, 'action': action, 'id': id, if (record != null) 'record': record,
++    });
++  }
++}

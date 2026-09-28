@@ -1,4 +1,5 @@
 export * from './index.js';
+export * from './time_tracking.js';
 export * from './hospital_portal.js';
 export * from './accounting_workflows.js';
 export * from './attendance.js';

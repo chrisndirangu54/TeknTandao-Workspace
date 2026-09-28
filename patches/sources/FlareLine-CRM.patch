@@ -1,0 +1,664 @@
+diff --git a/lib/pages/auth/sign_in/sign_in_page.dart b/lib/pages/auth/sign_in/sign_in_page.dart
+index 3c9e7ed..1941593 100644
+--- a/lib/pages/auth/sign_in/sign_in_page.dart
++++ b/lib/pages/auth/sign_in/sign_in_page.dart
+@@ -119,6 +119,9 @@ class SignInForm extends BlocBaseStlessWidget<SignInViewModel, SignInState> {
+         const SizedBox(
+           height: 20,
+         ),
++        TextButton(onPressed: state.busy ? null : viewModel.resetPassword, child: const Text('Reset password')),
++        if (state.busy) const LinearProgressIndicator(),
++        if (state.message != null) Text(state.message!),
+         if (state.loginStatus != null)
+           Text((state.loginStatus ?? false) ? 'Login Success' : 'Login Failed',
+               style: TextStyle(
+@@ -133,7 +136,7 @@ class SignInForm extends BlocBaseStlessWidget<SignInViewModel, SignInState> {
+           type: ButtonType.primary.type,
+           btnText: 'Sign in',
+           onTap: () {
+-            viewModel.signIn();
++            if (!state.busy) viewModel.signIn();
+           },
+         ),
+         const SizedBox(
+@@ -190,7 +193,7 @@ class SignInForm extends BlocBaseStlessWidget<SignInViewModel, SignInState> {
+             height: 25,
+           ),
+           btnText: 'Sign In With Google',
+-          onTap: () {},
++          onTap: () { if (!state.busy) viewModel.signInWithGoogle(); },
+         ),
+         const SizedBox(
+           height: 20,
+@@ -204,7 +207,7 @@ class SignInForm extends BlocBaseStlessWidget<SignInViewModel, SignInState> {
+             height: 25,
+           ),
+           btnText: 'Sign In With Github',
+-          onTap: () {},
++          onTap: () { if (!state.busy) viewModel.signInWithGithub(); },
+         ),
+         const SizedBox(
+           height: 20,
+@@ -218,7 +221,7 @@ class SignInForm extends BlocBaseStlessWidget<SignInViewModel, SignInState> {
+             height: 25,
+           ),
+           btnText: 'Sign In With Microsoft',
+-          onTap: () {},
++          onTap: () { if (!state.busy) viewModel.signInWithMicrosoft(); },
+         ),
+         const SizedBox(
+           height: 20,
+@@ -236,8 +239,7 @@ class SignInForm extends BlocBaseStlessWidget<SignInViewModel, SignInState> {
+   void blocListener(BuildContext context, SignInState state) {
+     if (state.loginStatus != null && state.loginStatus!) {
+       // SnackBarUtil.showSnack(context, 'LoginSuccess');
+-      Future.delayed(const Duration(seconds: 3),
+-          () => Navigator.of(context).pushNamed('/'));
++      if (context.mounted) Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+     }
+   }
+ }
+diff --git a/lib/pages/auth/sign_in/sign_in_state.dart b/lib/pages/auth/sign_in/sign_in_state.dart
+index 552b3cb..406f34b 100644
+--- a/lib/pages/auth/sign_in/sign_in_state.dart
++++ b/lib/pages/auth/sign_in/sign_in_state.dart
+@@ -1,17 +1,9 @@
+ import 'package:flareline_uikit/core/mvvm/bloc/bloc_base_state.dart';
+-
+ class SignInState extends BlocBaseState {
+-  final String? userName;
+-
+-  final String? password;
+-
+   final bool? loginStatus;
+-
+-  SignInState({this.userName = 'admin', this.password = '123456', this.loginStatus});
+-
++  final bool busy;
++  final String? message;
++  SignInState({this.loginStatus, this.busy = false, this.message});
+   @override
+-  // TODO: implement props
+-  List<Object?> get props => [loginStatus];
+-
+-
++  List<Object?> get props => [loginStatus, busy, message];
+ }
+diff --git a/lib/pages/auth/sign_in/sign_in_viewmodel.dart b/lib/pages/auth/sign_in/sign_in_viewmodel.dart
+index 3256d90..8990dc8 100644
+--- a/lib/pages/auth/sign_in/sign_in_viewmodel.dart
++++ b/lib/pages/auth/sign_in/sign_in_viewmodel.dart
+@@ -1,33 +1,35 @@
+-import 'package:flareline_crm/pages/auth/sign_in/sign_in_state.dart';
++import 'package:donor_firebase/donor_auth.dart';
+ import 'package:flareline_uikit/core/mvvm/bloc/bloc_base_viewmodel.dart';
+ import 'package:flutter/material.dart';
+-
++import 'sign_in_state.dart';
+ class SignInViewModel extends BlocBaseViewModel<SignInState> {
+-  late TextEditingController emailController;
+-  late TextEditingController passwordController;
+-
+-  SignInViewModel(BuildContext context) : super(context, SignInState()) {
+-    emailController = TextEditingController(text: state.userName);
+-    passwordController = TextEditingController(text: state.password);
++  final emailController = TextEditingController();
++  final passwordController = TextEditingController();
++  final DonorAuthenticator auth;
++  SignInViewModel(BuildContext context, {DonorAuthenticator? authenticator})
++    : auth = authenticator ?? FirebaseDonorAuthenticator(), super(context, SignInState());
++  Future<void> authenticate(Future<void> Function() work, {bool login = true}) async {
++    if (state.busy || isClosed) return;
++    emit(SignInState(busy: true));
++    try {
++      await work();
++      if (!isClosed) {
++        passwordController.clear();
++        emit(SignInState(loginStatus: login ? true : null, message: login ? null : 'Password reset requested. Check your email.'));
++      }
++    } catch (e) { if (!isClosed) emit(SignInState(loginStatus: false, message: e.toString())); }
+   }
+-
+-  Future<void> signInWithGoogle() async {}
+-
+-  Future<void> signInWithGithub() async {}
+-
+-  Future<void> signIn() async {
+-    if (emailController.text.trim() == 'admin' &&
+-        passwordController.text.trim() == '123456') {
+-      emit(SignInState()..loginStatus = true);
+-    } else {
+-      state.loginStatus = false;
+-    }
+-  }
+-
++  Future<void> signIn() => authenticate(() async {
++    if (emailController.text.trim().isEmpty || passwordController.text.isEmpty) throw ArgumentError('Enter email and password');
++    await auth.signIn(emailController.text.trim(), passwordController.text);
++  });
++  Future<void> signInWithGoogle() => authenticate(() => auth.signInWithProvider('google'));
++  Future<void> signInWithGithub() => authenticate(() => auth.signInWithProvider('github'));
++  Future<void> signInWithMicrosoft() => authenticate(() => auth.signInWithProvider('microsoft'));
++  Future<void> resetPassword() => authenticate(() async {
++    if (emailController.text.trim().isEmpty) throw ArgumentError('Enter your email first');
++    await auth.resetPassword(emailController.text.trim());
++  }, login: false);
+   @override
+-  void onSafeDispose() {
+-    emailController.dispose();
+-    passwordController.dispose();
+-    super.onSafeDispose();
+-  }
++  void onSafeDispose() { emailController.dispose(); passwordController.dispose(); super.onSafeDispose(); }
+ }
+diff --git a/lib/pages/auth/sign_up/sign_up_page.dart b/lib/pages/auth/sign_up/sign_up_page.dart
+index 17d7ae9..336ebf4 100644
+--- a/lib/pages/auth/sign_up/sign_up_page.dart
++++ b/lib/pages/auth/sign_up/sign_up_page.dart
+@@ -1,284 +1,27 @@
+-import 'package:flareline_crm/core/theme/crm_colors.dart';
+-import 'package:flareline_crm/pages/auth/sign_up/sign_up_state.dart';
+-import 'package:flareline_crm/pages/auth/sign_up/sign_up_viewmodel.dart';
+-import 'package:flareline_uikit/core/mvvm/bloc/bloc_base_stless_widget.dart';
+ import 'package:flutter/material.dart';
+-
+-import 'package:flutter_svg/svg.dart';
+-import 'package:flareline_uikit/components/buttons/button_widget.dart';
+-import 'package:flareline_uikit/components/card/common_card.dart';
+-import 'package:flareline_uikit/components/forms/outborder_text_form_field.dart';
+-import 'package:responsive_builder/responsive_builder.dart';
+-
++import 'package:flareline_uikit/core/mvvm/bloc/bloc_base_stless_widget.dart';
++import 'sign_up_viewmodel.dart';
++import 'sign_up_state.dart';
+ class SignUpPage extends BlocBaseStlessWidget<SignUpViewModel, SignUpState> {
++  SignUpPage({super.key});
+   @override
+-  Widget bodyWidget(
+-      BuildContext context, SignUpViewModel viewModel, SignUpState state) {
+-    return Scaffold(body: ResponsiveBuilder(
+-      builder: (context, sizingInformation) {
+-        // Check the sizing information here and return your UI
+-        if (sizingInformation.deviceScreenType == DeviceScreenType.desktop) {
+-          return Center(
+-            child: contentDesktopWidget(context, viewModel),
+-          );
+-        }
+-
+-        return contentMobileWidget(context, viewModel);
+-      },
+-    ));
+-  }
+-
++  SignUpViewModel viewModelBuilder(BuildContext context) => SignUpViewModel(context);
+   @override
+-  SignUpViewModel viewModelBuilder(BuildContext context) {
+-    return SignUpViewModel(context);
+-  }
+-
+-  Widget contentDesktopWidget(BuildContext context, SignUpViewModel viewModel) {
+-    return Column(mainAxisSize: MainAxisSize.min, children: [
+-      Row(mainAxisSize: MainAxisSize.min, children: [
+-        SizedBox(
+-          width: 500,
+-          child:
+-              SvgPicture.asset('assets/signin/signup.svg', semanticsLabel: ''),
+-        ),
+-        const SizedBox(
+-          width: 32,
+-        ),
+-        CommonCard(
+-          width: 430,
+-          child: _formWidget(context, viewModel),
+-        )
+-      ]),
+-    ]);
++  void blocListener(BuildContext context, SignUpState state) {
++    if (state.created && context.mounted) Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+   }
+-
+-  Widget contentMobileWidget(BuildContext context, SignUpViewModel viewModel) {
+-    return CommonCard(
+-      padding: const EdgeInsets.symmetric(vertical: 60),
+-      child: _formWidget(context, viewModel),
+-    );
+-  }
+-
+-  Widget _formWidget(BuildContext context, SignUpViewModel viewModel) {
+-    return Padding(
+-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+-      child: Column(
+-        crossAxisAlignment: CrossAxisAlignment.start,
+-        children: [
+-          const Text(
+-            'Create an account',
+-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+-          ),
+-          const SizedBox(
+-            height: 10,
+-          ),
+-          const Text(
+-            'Let\'s get started with your 30 day free trial',
+-            style: TextStyle(
+-              fontSize: 12,
+-            ),
+-          ),
+-          const SizedBox(
+-            height: 16,
+-          ),
+-          Row(
+-            children: [
+-              Expanded(
+-                child: OutBorderTextFormField(
+-                  hintText: 'First Name',
+-                  keyboardType: TextInputType.emailAddress,
+-                  icon: Container(
+-                    margin: const EdgeInsets.only(right: 8, left: 8),
+-                    child: SvgPicture.asset(
+-                      'assets/signin/email.svg',
+-                      width: 20,
+-                      height: 20,
+-                    ),
+-                  ),
+-                  controller: viewModel.emailController,
+-                ),
+-              ),
+-              const SizedBox(
+-                width: 10,
+-              ),
+-              Expanded(
+-                child: OutBorderTextFormField(
+-                  hintText: 'Last Name',
+-                  keyboardType: TextInputType.emailAddress,
+-                  icon: Container(
+-                    margin: const EdgeInsets.only(right: 8, left: 8),
+-                    child: SvgPicture.asset(
+-                      'assets/signin/email.svg',
+-                      width: 20,
+-                      height: 20,
+-                    ),
+-                  ),
+-                  controller: viewModel.emailController,
+-                ),
+-              )
+-            ],
+-          ),
+-          const SizedBox(
+-            height: 16,
+-          ),
+-          OutBorderTextFormField(
+-            hintText: 'enter your email',
+-            keyboardType: TextInputType.emailAddress,
+-            icon: Container(
+-              margin: const EdgeInsets.only(right: 8, left: 8),
+-              child: SvgPicture.asset(
+-                'assets/signin/email.svg',
+-                width: 20,
+-                height: 20,
+-              ),
+-            ),
+-            controller: viewModel.emailController,
+-          ),
+-          const SizedBox(
+-            height: 16,
+-          ),
+-          Row(
+-            children: [
+-              Expanded(
+-                child: OutBorderTextFormField(
+-                  obscureText: true,
+-                  hintText: 'Password',
+-                  icon: Container(
+-                    margin: const EdgeInsets.only(right: 8, left: 8),
+-                    child: SvgPicture.asset(
+-                      'assets/signin/lock.svg',
+-                      width: 20,
+-                      height: 20,
+-                    ),
+-                  ),
+-                  controller: viewModel.passwordController,
+-                ),
+-              ),
+-              const SizedBox(
+-                width: 10,
+-              ),
+-              Expanded(
+-                child: OutBorderTextFormField(
+-                  obscureText: true,
+-                  hintText: 'Confirm Password',
+-                  icon: Container(
+-                    margin: const EdgeInsets.only(right: 8, left: 8),
+-                    child: SvgPicture.asset(
+-                      'assets/signin/lock.svg',
+-                      width: 20,
+-                      height: 20,
+-                    ),
+-                  ),
+-                  controller: viewModel.passwordController,
+-                ),
+-              ),
+-            ],
+-          ),
+-          const SizedBox(
+-            height: 20,
+-          ),
+-          ButtonWidget(
+-            type: ButtonType.primary.type,
+-            btnText: 'Sign up',
+-            onTap: () {
+-              viewModel.signUp(context);
+-            },
+-          ),
+-          const SizedBox(
+-            height: 20,
+-          ),
+-          Row(
+-            mainAxisAlignment: MainAxisAlignment.center,
+-            children: [
+-              const Text('have account'),
+-              SizedBox(
+-                width: 10,
+-              ),
+-              InkWell(
+-                child: const Text(
+-                  'Sign In',
+-                  style: TextStyle(color: Colors.blue),
+-                ),
+-                onTap: () {
+-                  Navigator.of(context).popAndPushNamed('/signIn');
+-                },
+-              )
+-            ],
+-          ),
+-          const SizedBox(
+-            height: 20,
+-          ),
+-          Row(
+-            children: [
+-              const Expanded(
+-                  child: Divider(
+-                height: 1,
+-                color: CrmColors.border,
+-              )),
+-              Container(
+-                margin: const EdgeInsets.symmetric(horizontal: 20),
+-                child: const Text('Or'),
+-              ),
+-              const Expanded(
+-                  child: Divider(
+-                height: 1,
+-                color: CrmColors.border,
+-              )),
+-            ],
+-          ),
+-          const SizedBox(
+-            height: 20,
+-          ),
+-          ButtonWidget(
+-            color: Colors.white,
+-            borderColor: CrmColors.border,
+-            iconWidget: SvgPicture.asset(
+-              'assets/brand/brand-01.svg',
+-              width: 25,
+-              height: 25,
+-            ),
+-            btnText: 'Sign Up With Google',
+-            onTap: () {},
+-          ),
+-          const SizedBox(
+-            height: 20,
+-          ),
+-          ButtonWidget(
+-            color: Colors.white,
+-            borderColor: CrmColors.border,
+-            iconWidget: SvgPicture.asset(
+-              'assets/brand/brand-03.svg',
+-              width: 25,
+-              height: 25,
+-            ),
+-            btnText: 'Sign Up With Github',
+-            onTap: () {},
+-          ),
+-          const SizedBox(
+-            height: 20,
+-          ),
+-          ButtonWidget(
+-            color: Colors.white,
+-            borderColor: CrmColors.border,
+-            iconWidget: SvgPicture.asset(
+-              'assets/brand/microsoft.svg',
+-              width: 25,
+-              height: 25,
+-            ),
+-            btnText: 'Sign Up With Microsoft',
+-            onTap: () {},
+-          ),
+-          const SizedBox(
+-            height: 20,
+-          ),
+-        ],
+-      ),
+-    );
+-  }
+-
+-  bool get isPage => true;
+-
+-  bool get showTitle => false;
+-
+-  bool get isAlignCenter => true;
++  @override
++  Widget bodyWidget(BuildContext context, SignUpViewModel model, SignUpState state) => Scaffold(body: Center(child: SingleChildScrollView(
++    padding: const EdgeInsets.all(24), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 440), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
++      Text('Create account', style: Theme.of(context).textTheme.headlineSmall),
++      const Text('An account does not grant organization access. Ask your administrator to add you.'),
++      TextField(controller: model.emailController, enabled: !state.busy, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
++      TextField(controller: model.passwordController, enabled: !state.busy, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
++      TextField(controller: model.rePasswordController, enabled: !state.busy, obscureText: true, decoration: const InputDecoration(labelText: 'Confirm password')),
++      if (state.busy) const LinearProgressIndicator(),
++      if (state.error != null) Text(state.error!),
++      FilledButton(onPressed: state.busy ? null : () => model.signUp(context), child: const Text('Create account')),
++      TextButton(onPressed: state.busy ? null : () => Navigator.of(context).pushReplacementNamed('/signIn'), child: const Text('Back to sign in')),
++    ])),
++  )));
+ }
+diff --git a/lib/pages/auth/sign_up/sign_up_state.dart b/lib/pages/auth/sign_up/sign_up_state.dart
+index 1bd4138..78e5031 100644
+--- a/lib/pages/auth/sign_up/sign_up_state.dart
++++ b/lib/pages/auth/sign_up/sign_up_state.dart
+@@ -1,10 +1,9 @@
+-
+-
+ import 'package:flareline_uikit/core/mvvm/bloc/bloc_base_state.dart';
+-
+-class SignUpState extends BlocBaseState{
++class SignUpState extends BlocBaseState {
++  final bool busy;
++  final bool created;
++  final String? error;
++  SignUpState({this.busy = false, this.created = false, this.error});
+   @override
+-  // TODO: implement props
+-  List<Object?> get props => [];
+-
+-}
+\ No newline at end of file
++  List<Object?> get props => [busy, created, error];
++}
+diff --git a/lib/pages/auth/sign_up/sign_up_viewmodel.dart b/lib/pages/auth/sign_up/sign_up_viewmodel.dart
+index 4408e1d..a950290 100644
+--- a/lib/pages/auth/sign_up/sign_up_viewmodel.dart
++++ b/lib/pages/auth/sign_up/sign_up_viewmodel.dart
+@@ -1,42 +1,24 @@
+-import 'package:flareline_crm/pages/auth/sign_up/sign_up_state.dart';
++import 'package:donor_firebase/donor_auth.dart';
+ import 'package:flareline_uikit/core/mvvm/bloc/bloc_base_viewmodel.dart';
+ import 'package:flutter/material.dart';
+-import 'package:flutter/widgets.dart';
+-import 'package:get_storage/get_storage.dart';
+-
++import 'sign_up_state.dart';
+ class SignUpViewModel extends BlocBaseViewModel<SignUpState> {
+-  final box = GetStorage();
+-
+-  late TextEditingController emailController;
+-  late TextEditingController passwordController;
+-  late TextEditingController rePasswordController;
+-
+-  SignUpViewModel(BuildContext context) : super(context, SignUpState()) {
+-    emailController = TextEditingController();
+-    passwordController = TextEditingController();
+-    rePasswordController = TextEditingController();
+-  }
+-
++  final emailController = TextEditingController();
++  final passwordController = TextEditingController();
++  final rePasswordController = TextEditingController();
++  final DonorAuthenticator auth;
++  SignUpViewModel(BuildContext context, {DonorAuthenticator? authenticator})
++    : auth = authenticator ?? FirebaseDonorAuthenticator(), super(context, SignUpState());
+   Future<void> signUp(BuildContext context) async {
+-    // if (emailController.text.isEmpty ||
+-    //     passwordController.text.isEmpty ||
+-    //     rePasswordController.text != passwordController.text) {
+-    //   SnackBarUtil.showSnack(context, 'Please enter your info');
+-    //   return;
+-    // }
+-    // if (passwordController.text.trim().length < 6) {
+-    //   SnackBarUtil.showSnack(context, 'Please enter 6+ Characters password');
+-    //   return;
+-    // }
+-
+-    Navigator.of(context).popAndPushNamed('/signUp');
++    if (state.busy || isClosed) return;
++    emit(SignUpState(busy: true));
++    try {
++      if (emailController.text.trim().isEmpty || passwordController.text.isEmpty) throw ArgumentError('Enter email and password');
++      if (passwordController.text != rePasswordController.text) throw ArgumentError('Passwords do not match');
++      await auth.register(emailController.text.trim(), passwordController.text);
++      if (!isClosed) { passwordController.clear(); rePasswordController.clear(); emit(SignUpState(created: true)); }
++    } catch (e) { if (!isClosed) emit(SignUpState(error: e.toString())); }
+   }
+-
+   @override
+-  void onSafeDispose() {
+-    emailController.dispose();
+-    passwordController.dispose();
+-    rePasswordController.dispose();
+-    super.onSafeDispose();
+-  }
++  void onSafeDispose() { emailController.dispose(); passwordController.dispose(); rePasswordController.dispose(); super.onSafeDispose(); }
+ }
+diff --git a/lib/pages/crm_layout.dart b/lib/pages/crm_layout.dart
+index 2eae37d..7441deb 100644
+--- a/lib/pages/crm_layout.dart
++++ b/lib/pages/crm_layout.dart
+@@ -2,6 +2,7 @@
+ import 'package:flareline_uikit/components/toolbar/toolbar.dart';
+ import 'package:flareline_uikit/widget/flareline_layout.dart';
+ import 'package:flutter/material.dart';
++import 'package:donor_firebase/donor_auth.dart';
+ 
+ abstract class CrmLayout extends FlarelineLayoutWidget {
+   const CrmLayout({super.key});
+@@ -63,8 +64,13 @@ class CrmToolBarWidget extends ToolBarWidget {
+   }
+ 
+   @override
+-  Future<void> onLogoutClick(BuildContext context) {
+-    return Future.value(false);
++  Future<void> onLogoutClick(BuildContext context) async {
++    try {
++      await FirebaseDonorAuthenticator().signOut();
++      if (context.mounted) Navigator.of(context).pushNamedAndRemoveUntil('/signIn', (_) => false);
++    } catch (error) {
++      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not sign out: $error')));
++    }
+   }
+ 
+   @override
+diff --git a/test/firebase_auth_flow_test.dart b/test/firebase_auth_flow_test.dart
+new file mode 100644
+--- /dev/null
++++ b/test/firebase_auth_flow_test.dart
+@@ -0,0 +1,81 @@
++import 'dart:async';
++import 'package:donor_firebase/donor_auth.dart';
++import 'package:flutter/material.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:flareline_crm/pages/auth/sign_in/sign_in_viewmodel.dart';
++import 'package:flareline_crm/pages/auth/sign_up/sign_up_viewmodel.dart';
++
++class FakeAuth implements DonorAuthenticator {
++  int attempts = 0;
++  String? password;
++  bool fail = false;
++  Completer<void>? pending;
++  @override
++  Future<void> signIn(String email, String value) async {
++    attempts++;
++    password = value;
++    if (fail) throw StateError('Invalid credentials');
++    if (pending != null) await pending!.future;
++  }
++  @override
++  Future<void> register(String email, String value) => signIn(email, value);
++  @override
++  Future<void> resetPassword(String email) async { attempts++; }
++  @override
++  Future<void> signInWithProvider(String provider) async { attempts++; }
++}
++
++void main() {
++  late BuildContext context;
++  Future<void> mount(WidgetTester tester) => tester.pumpWidget(MaterialApp(home: Builder(builder: (value) { context = value; return const SizedBox(); })));
++
++  testWidgets('login has no demo credentials and reports Firebase failure', (tester) async {
++    await mount(tester);
++    final auth = FakeAuth()..fail = true;
++    final model = SignInViewModel(context, authenticator: auth);
++    expect(model.emailController.text, isEmpty);
++    expect(model.passwordController.text, isEmpty);
++    model.emailController.text = 'person@example.test';
++    model.passwordController.text = ' correct spaces ';
++    await model.signIn();
++    expect(auth.password, ' correct spaces ');
++    expect(model.state.loginStatus, false);
++    expect(model.state.busy, false);
++    expect(model.state.message, contains('Invalid credentials'));
++    await model.close();
++  });
++
++  testWidgets('duplicate submits are ignored until Firebase completes', (tester) async {
++    await mount(tester);
++    final auth = FakeAuth()..pending = Completer<void>();
++    final model = SignInViewModel(context, authenticator: auth);
++    model.emailController.text = 'person@example.test';
++    model.passwordController.text = 'password';
++    final first = model.signIn();
++    await model.signIn();
++    expect(auth.attempts, 1);
++    expect(model.state.loginStatus, isNull);
++    auth.pending!.complete();
++    await first;
++    expect(model.state.loginStatus, true);
++    expect(model.passwordController.text, isEmpty);
++    await model.close();
++  });
++
++  testWidgets('signup rejects mismatched confirmation before creating an account', (tester) async {
++    await mount(tester);
++    final auth = FakeAuth();
++    final model = SignUpViewModel(context, authenticator: auth);
++    model.emailController.text = 'person@example.test';
++    model.passwordController.text = 'password';
++    model.rePasswordController.text = 'different';
++    await model.signUp(context);
++    expect(auth.attempts, 0);
++    expect(model.state.created, false);
++    model.rePasswordController.text = 'password';
++    await model.signUp(context);
++    expect(auth.attempts, 1);
++    expect(model.state.created, true);
++    await model.close();
++  });
++}

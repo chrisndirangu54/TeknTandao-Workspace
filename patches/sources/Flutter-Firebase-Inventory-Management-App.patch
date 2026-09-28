@@ -1,0 +1,40 @@
+diff --git a/lib/NotificationScreen.dart b/lib/NotificationScreen.dart
+index e28c336..90b9119 100644
+--- a/lib/NotificationScreen.dart
++++ b/lib/NotificationScreen.dart
+@@ -112,9 +112,7 @@ class _NotificationPageState extends State<NotificationPage> {
+                         ),
+                         SlidableAction(
+                           onPressed: (context) {
+-                            setState(() {
+-                              notifications.removeAt(index);
+-                            });
++                            _clearNotification(index);
+                           },
+                           backgroundColor: const Color(0xffb6b3be1),
+                           icon: Icons.delete,
+diff --git a/lib/ReportPage.dart b/lib/ReportPage.dart
+index 4be5fc3..eede141 100644
+--- a/lib/ReportPage.dart
++++ b/lib/ReportPage.dart
+@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
+ 
+ class ReportPage extends StatelessWidget {
+   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+-  User? user = FirebaseAuth.instance.currentUser;
++  final User? user = FirebaseAuth.instance.currentUser;
+ 
+   final List<Product> topSellingProducts = [
+     Product('Product D', 15, "assets/images/shoe1.jpg"),
+diff --git a/lib/Services/database.dart b/lib/Services/database.dart
+index 368aff1..6739450 100644
+--- a/lib/Services/database.dart
++++ b/lib/Services/database.dart
+@@ -11,7 +11,6 @@ class FirestoreService {
+   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+   User? user = FirebaseAuth.instance.currentUser;
+ 
+-  Future<void> _CheckUser() async {}
+ 
+   Future<List<Product>> getProducts() async {
+     try {

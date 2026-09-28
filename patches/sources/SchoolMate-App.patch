@@ -1,0 +1,162 @@
+diff --git a/lib/main.dart b/lib/main.dart
+index 3c8e9c6..8ed3def 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -137,7 +137,7 @@ class _MyAppState extends State<MyApp> {
+         debugShowCheckedModeBanner: false,
+         theme: ThemeData(
+           fontFamily: 'RedHatDisplay-Medium',
+-          backgroundColor: backgroundColor,
++          scaffoldBackgroundColor: backgroundColor,
+         ),
+         builder: EasyLoading.init(),
+       ),
+diff --git a/lib/student/view/Adjuncts/Component/filtter/filtterButton.dart b/lib/student/view/Adjuncts/Component/filtter/filtterButton.dart
+index 8464c55..a0b1a19 100644
+--- a/lib/student/view/Adjuncts/Component/filtter/filtterButton.dart
++++ b/lib/student/view/Adjuncts/Component/filtter/filtterButton.dart
+@@ -168,7 +168,7 @@ class ApplyFiltterButton extends StatelessWidget {
+     return Padding(
+       padding: EdgeInsets.fromLTRB(36, 0, 36, 36),
+       child: ElevatedButton(
+-          style: ElevatedButton.styleFrom(primary: primaryColor),
++          style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+           onPressed: () {
+             _controller.getFiltredData();
+             Navigator.pop(context);
+diff --git a/lib/student/view/TasksScreen/TasksCard.dart b/lib/student/view/TasksScreen/TasksCard.dart
+index 7981aea..c7f193d 100644
+--- a/lib/student/view/TasksScreen/TasksCard.dart
++++ b/lib/student/view/TasksScreen/TasksCard.dart
+@@ -207,7 +207,7 @@ class TasksCard extends StatelessWidget {
+                                       ),
+                                     ),
+                                     actions: [
+-                                      FlatButton(
++                                      MaterialButton(elevation: 0, 
+                                         child: Text(
+                                           "Dismiss",
+                                           style: TextStyle(
+@@ -220,7 +220,7 @@ class TasksCard extends StatelessWidget {
+                                           Navigator.of(context).pop();
+                                         },
+                                       ),
+-                                      FlatButton(
++                                      MaterialButton(elevation: 0, 
+                                         color: Colors.redAccent,
+                                         child: Text("Upload",
+                                             style: TextStyle(
+diff --git a/lib/student/view/chatsearch/chat_search.dart b/lib/student/view/chatsearch/chat_search.dart
+index 013b8f5..d198914 100644
+--- a/lib/student/view/chatsearch/chat_search.dart
++++ b/lib/student/view/chatsearch/chat_search.dart
+@@ -1,4 +1,4 @@
+-import 'package:flutter/material.dart';
++import 'package:flutter/material.dart' hide SearchController;
+ import 'package:get/get.dart';
+ import 'package:school_management_system/student/controllers/SearchController.dart';
+ import 'package:school_management_system/student/models/user.dart';
+diff --git a/lib/teacher/view/SProfile/SProfileScreen.dart b/lib/teacher/view/SProfile/SProfileScreen.dart
+index c6a52e4..c68c3a4 100644
+--- a/lib/teacher/view/SProfile/SProfileScreen.dart
++++ b/lib/teacher/view/SProfile/SProfileScreen.dart
+@@ -358,7 +358,7 @@ class SProfileScreen extends StatelessWidget {
+                                 alignment: Alignment.centerRight,
+                                 height: 50.0,
+                                 margin: EdgeInsets.all(10),
+-                                child: RaisedButton(
++                                child: MaterialButton(elevation: 2, 
+                                   onPressed: () {
+                                     Get.defaultDialog(
+                                       textConfirm: 'Add',
+diff --git a/lib/teacher/view/TaskScreen/task_screen.dart b/lib/teacher/view/TaskScreen/task_screen.dart
+index 1be6045..69d90c3 100644
+--- a/lib/teacher/view/TaskScreen/task_screen.dart
++++ b/lib/teacher/view/TaskScreen/task_screen.dart
+@@ -23,7 +23,7 @@ class TaskScreen extends StatelessWidget {
+               children: [
+                 Container(
+                   padding: EdgeInsets.only(top: 40.0),
+-                  child: RaisedButton(
++                  child: MaterialButton(elevation: 2, 
+                     color: Colors.white,
+                       padding: EdgeInsets.fromLTRB(70, 10, 70, 10),
+                    onPressed: () {  },
+diff --git a/lib/teacher/view/tasks/TeacherTasksCard.dart b/lib/teacher/view/tasks/TeacherTasksCard.dart
+index 2effc99..0734170 100644
+--- a/lib/teacher/view/tasks/TeacherTasksCard.dart
++++ b/lib/teacher/view/tasks/TeacherTasksCard.dart
+@@ -107,7 +107,7 @@ class TeacherTasksCard extends StatelessWidget {
+                                 content: Text(
+                                     "Are you sure you want to delete the task?"),
+                                 actions: [
+-                                  FlatButton(
++                                  MaterialButton(elevation: 0, 
+                                     child: Text(
+                                       "Dismiss",
+                                       style: TextStyle(
+@@ -120,7 +120,7 @@ class TeacherTasksCard extends StatelessWidget {
+                                       Navigator.of(context).pop();
+                                     },
+                                   ),
+-                                  FlatButton(
++                                  MaterialButton(elevation: 0, 
+                                     color: Colors.redAccent,
+                                     child: Text("Confirm",
+                                         style: TextStyle(
+diff --git a/lib/teacher/view/tasks/TeacherTasksPage.dart b/lib/teacher/view/tasks/TeacherTasksPage.dart
+index 2733815..aa4fab3 100644
+--- a/lib/teacher/view/tasks/TeacherTasksPage.dart
++++ b/lib/teacher/view/tasks/TeacherTasksPage.dart
+@@ -295,7 +295,7 @@ class BottomSheetButton extends StatelessWidget {
+                                           ),
+                                           textButtonTheme: TextButtonThemeData(
+                                             style: TextButton.styleFrom(
+-                                              primary:
++                                              foregroundColor:
+                                                   primaryColor, // button text color
+                                             ),
+                                           ),
+@@ -577,7 +577,7 @@ class AddButton extends StatelessWidget {
+     return Padding(
+       padding: EdgeInsets.fromLTRB(36, 0, 36, 36),
+       child: ElevatedButton(
+-          style: ElevatedButton.styleFrom(primary: primaryColor),
++          style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+           onPressed: onpress,
+           child: Center(
+             child: Text(
+diff --git a/lib/teacher/view/tasks/studentsOfTask.dart b/lib/teacher/view/tasks/studentsOfTask.dart
+index 5e12b1b..b626751 100644
+--- a/lib/teacher/view/tasks/studentsOfTask.dart
++++ b/lib/teacher/view/tasks/studentsOfTask.dart
+@@ -530,7 +530,7 @@ class StudenOfTaskCard extends StatelessWidget {
+                                         fontSize: 20,
+                                         fontFamily: RedHatDisplay.medium,
+                                       ),
+-                                      confirm: RaisedButton(
++                                      confirm: MaterialButton(elevation: 2, 
+                                         onPressed: () async {
+                                           print('is pressd');
+                                           uncontroller.indexForStd.value =
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 3d3304b..0f0d71f 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -3,7 +3,7 @@ description: A new Flutter project.
+ publish_to: none
+ version: 1.0.0+1
+ environment:
+-  sdk: '>=2.16.1 <3.0.0'
++  sdk: '>=3.3.0 <4.0.0'
+ dependencies:
+   cloud_firestore: ^3.3.0
+   cupertino_icons: ^1.0.2
+@@ -40,6 +40,7 @@ dependencies:
+ dev_dependencies:
+   flutter_test:
+     sdk: flutter
++  flutter_lints: 3.0.0
+ 
+ flutter_icons:
+   android: "launcher_icon"
