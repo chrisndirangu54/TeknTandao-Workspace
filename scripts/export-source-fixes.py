@@ -1,16 +1,21 @@
 """Keep donor repairs reviewable without vendoring whole upstream repositories."""
 import difflib
+import json
 from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT/'patches/sources'
 OUT.mkdir(parents=True, exist_ok=True)
+RETIRED = json.loads((OUT/'retired-files.json').read_text(encoding='utf-8')) if (OUT/'retired-files.json').exists() else {}
 for folder in (ROOT/'sources').iterdir():
     if not (folder/'pubspec.yaml').exists(): continue
     paths = ['pubspec.yaml','lib','test','.vscode/settings.json']
     if folder.name == 'TallyAssist': paths += ['pubspec.lock', '.gitignore', 'android/build.gradle', 'android/settings.gradle', 'android/app/build.gradle', 'android/app/src/main/AndroidManifest.xml', 'android/app/src/main/kotlin/com/example/tassist/MainActivity.kt', 'android/gradle/wrapper/gradle-wrapper.properties']
     if folder.name == 'Hospital-Management-System-Mobile-App': paths += ['README.md', 'web/index.html', 'web/manifest.json', 'analysis_options.yaml']
+    # Retired files may contain upstream credentials. Record their path/blob ID,
+    # never their deleted contents, in the companion retirement manifest.
+    paths += [':(exclude)' + entry['path'] for entry in RETIRED.get(folder.name, [])]
     result = subprocess.run(['git','-C',str(folder),'diff','--',*paths], capture_output=True, text=True, encoding='utf-8', errors='replace', check=True)
     patch = result.stdout
     untracked = subprocess.run(['git','-C',str(folder),'ls-files','--others','--exclude-standard','--',*paths], capture_output=True, text=True, encoding='utf-8', check=True).stdout.splitlines()
