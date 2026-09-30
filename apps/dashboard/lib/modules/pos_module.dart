@@ -60,7 +60,7 @@ class _PosModuleScreenState extends State<PosModuleScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Sale Processed! Receipt printed, stock deducted, eTIMS submitted & Journal posted.'),
+            content: Text('Sale recorded in preview. A balanced journal was posted. eTIMS was not submitted.'),
             backgroundColor: Color(0xFF10B981),
           ),
         );

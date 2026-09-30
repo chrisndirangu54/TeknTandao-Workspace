@@ -54,7 +54,7 @@ class _AccountingModuleScreenState extends State<AccountingModuleScreen> {
             },
           ),
           const SizedBox(height: 8),
-          const Text('Reversal cancels an unpaid invoice and keeps a linked contra entry. A credit note stays open until it is netted against another open balance for the same customer or patient. This is not a statutory tax or payroll calculation.'),
+          const Text('A reversal cancels an unpaid invoice. A credit note stays open until it is netted against another open balance for the same customer or patient. Statutory payroll is calculated on the People screen and posted here. This is not a KRA return.'),
           const SizedBox(height: 12),
           if (busy) const LinearProgressIndicator(),
           if (error != null) Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),

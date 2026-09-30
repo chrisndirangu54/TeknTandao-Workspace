@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
+import 'kenya_ledger.dart';
+
 class CountryAdapter {
   final String code;
   final String name;
@@ -457,7 +459,7 @@ const List<SuiteModule> modules = [
   SuiteModule(
     id: 'etims',
     name: 'Kenya KRA eTIMS',
-    description: 'Official OSCU/VSCU Fiscalization, QR Generation & Compliance Audit',
+    description: 'Placeholder for KRA OSCU fiscalization. Submissions stay blocked until the connector is certified.',
     icon: Icons.verified_user_rounded,
     color: Color(0xFF059669),
     category: 'Compliance',
@@ -477,7 +479,7 @@ const List<SuiteModule> modules = [
     dependencies: [
       ModuleDependency(
         targetModuleId: 'payroll',
-        relationDescription: 'Pushes verified attendance hours & leave days to monthly payroll.',
+        relationDescription: 'Shares the employee directory. Attendance punches are not converted into pay.',
       ),
     ],
     publishedEvents: ['employee.clock_in', 'leave.approved'],
@@ -485,7 +487,7 @@ const List<SuiteModule> modules = [
   SuiteModule(
     id: 'payroll',
     name: 'Statutory Payroll Hub',
-    description: 'PAYE, NSSF, SHA / NHIF, Housing Levy Tax Returns & Net Pay Disbursal',
+    description: 'PAYE, NSSF, SHIF and housing levy on the February 2026 rate card, posted to Books. This does not file a KRA return.',
     icon: Icons.request_quote_rounded,
     color: Color(0xFF16A34A),
     category: 'Human Resources',
@@ -497,7 +499,7 @@ const List<SuiteModule> modules = [
       ),
       ModuleDependency(
         targetModuleId: 'payments',
-        relationDescription: 'Disburses staff salaries via M-Pesa B2C batch disbursement.',
+        relationDescription: 'Net pay stays a ledger liability. Salary is not sent through M-Pesa.',
       ),
     ],
     publishedEvents: ['payroll.processed', 'salary.disbursed'],
@@ -1038,8 +1040,12 @@ class DemoSuiteStore extends SuiteStore {
             records['invoices']!.add({
               ...sale,
               'status': 'draft',
-              'taxStatus': 'requires_tax_configuration',
+              'taxStatus': 'blocked_configuration',
+              'currency': 'KES',
             });
+            if (total > 0) {
+              _demoPostJournal(records, 'invoice_$requestId', invoiceJournal(total), 'sale', requestId);
+            }
           }
           if (installed.contains('crm')) {
             records['tasks']!.add({
@@ -1054,80 +1060,105 @@ class DemoSuiteStore extends SuiteStore {
           final customerName = data['customer'] ?? 'Walk-in Customer';
           final items = data['items'] ?? 'General Products';
           final total = ((data['total'] as num?) ?? 0).toInt();
-          final payMethod = data['paymentMethod'] ?? 'M-Pesa STK';
-          final mpesaReceipt = payMethod.contains('M-Pesa') ? 'QK${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}X' : 'N/A';
-          final etimsCode = 'KRA-OSCU-2026-${(100000 + records['sales']!.length + 1)}';
+          final payMethod = '${data['paymentMethod'] ?? 'M-Pesa STK'}';
+          final provider = payMethod == 'Paystack'
+              ? 'paystack'
+              : payMethod.contains('M-Pesa')
+                  ? 'mpesa'
+                  : null;
+          final settled = provider != null;
 
-          final saleRecord = {
+          records['sales']!.add({
             'id': requestId,
             'customer': customerName,
             'items': items,
             'total': total,
             'paymentMethod': payMethod,
-            'mpesaReceipt': mpesaReceipt,
-            'etimsStatus': 'VERIFIED',
-            'etimsControlCode': etimsCode,
+            'paymentState': settled ? 'paid' : 'unpaid',
+            'etimsStatus': 'blocked_configuration',
             'date': '2026-09-14 12:00',
-          };
-          records['sales']!.add(saleRecord);
+          });
 
           records['invoices']!.add({
             'id': 'inv_$requestId',
+            'name': customerName,
             'customer': customerName,
+            'total': total,
             'amount': total,
-            'status': 'PAID',
+            'currency': 'KES',
+            'paymentState': settled ? 'paid' : 'unpaid',
+            'status': settled ? 'paid' : 'unpaid',
             'dueDate': '2026-09-14',
-            'etimsStatus': 'VERIFIED',
-            'etimsQrUrl': 'https://etims.kra.go.ke/verify/$etimsCode',
+            'etimsStatus': 'blocked_configuration',
           });
+
+          if (total > 0) {
+            _demoPostJournal(records, 'invoice_$requestId', invoiceJournal(total), 'sale', requestId);
+            if (provider != null) {
+              _demoPostJournal(records, 'payment_$requestId', paymentJournal(total, provider), 'pos.preview', requestId);
+            }
+          }
 
           records['etims_logs']!.add({
             'id': 'et_$requestId',
             'invoiceNo': 'INV-2026-${records['sales']!.length}',
             'taxpayerPin': 'P051928471Z',
-            'controlCode': etimsCode,
-            'vatAmount': (total * 0.16 / 1.16).round(),
-            'status': 'VERIFIED',
+            'controlCode': 'not issued',
+            'vatAmount': 0,
+            'status': 'blocked_configuration',
             'timestamp': '2026-09-14 12:00:00',
           });
 
-          records['payments']!.add({
-            'id': 'pay_$requestId',
-            'provider': payMethod,
-            'type': payMethod.contains('M-Pesa') ? 'STK Push' : 'Cash',
-            'phone': '254700000000',
-            'total': total,
-            'state': 'SUCCESS',
-            'receipt': mpesaReceipt,
-          });
+          if (settled) {
+            records['payments']!.add({
+              'id': 'pay_$requestId',
+              'provider': provider == 'mpesa' ? 'M-Pesa preview' : 'Paystack preview',
+              'type': 'Preview checkout',
+              'phone': data['phone'] ?? '—',
+              'total': total,
+              'state': 'preview',
+              'receipt': 'preview only',
+            });
+          }
         }
         break;
       case 'triggerMpesaStk':
         final phone = data['phone'] ?? '254712345678';
         final amount = data['amount'] ?? 100000;
-        final receipt = 'STK${DateTime.now().millisecondsSinceEpoch.toString().substring(4)}X';
         records['payments']!.add({
           'id': 'pay_stk_${DateTime.now().microsecondsSinceEpoch}',
-          'provider': 'M-Pesa Daraja 2.0',
-          'type': 'STK Push',
+          'provider': 'M-Pesa preview',
+          'type': 'STK preview',
           'phone': phone,
           'total': amount,
-          'state': 'SUCCESS',
-          'receipt': receipt,
+          'state': 'preview',
+          'receipt': 'preview only',
         });
         return {
-          'status': 'SUCCESS',
-          'message': 'STK Push delivered to $phone. Payment confirmed with receipt $receipt.',
-          'receipt': receipt,
+          'status': 'preview',
+          'message': 'Preview only. No STK request was sent to $phone.',
+          'receipt': 'preview only',
         };
       case 'reverseInvoice':
         final reversed = _demoReverseInvoice(records['invoices']!, data);
+        final reversal = _demoFind(records['invoices']!, reversed['id'])!;
+        _demoPostJournal(records, 'reversal_${reversed['id']}', creditJournal(reversal['total'] as int), 'reversal', reversed['id'] as String);
         notifyListeners();
         return reversed;
       case 'issueCreditNote':
         final credit = _demoCreditNote(records, data);
+        final note = _demoFind(records['invoices']!, credit['id'])!;
+        _demoPostJournal(records, 'credit_${credit['id']}', creditJournal(note['total'] as int), 'credit', credit['id'] as String);
         notifyListeners();
         return credit;
+      case 'runStatutoryPayroll':
+        final slip = _demoStatutoryPayroll(records, data);
+        notifyListeners();
+        return slip;
+      case 'getTrialBalance':
+        final journals = List<Map<String, dynamic>>.from(records['journals'] ?? const []);
+        final page = journals.length > 500 ? journals.sublist(journals.length - 500) : journals;
+        return {...trialBalance(page), 'truncated': journals.length >= 500};
       case 'netInvoices':
         final netted = _demoNetInvoices(records, data);
         notifyListeners();
@@ -1146,7 +1177,7 @@ class DemoSuiteStore extends SuiteStore {
 1. **Revenue & Cash Flow Performance:** Total gross business volume across POS & Invoicing is **${kes(totalSales + totalInvoices)}**. Direct collected POS cash/M-Pesa volume stands at **${kes(totalSales)}**.
 2. **Accounts Receivable Alert:** You have **$overdueCount overdue invoices** totaling **${kes(12000000)}** (primarily Kiprono Farms SACCO). Recommended Action: Trigger automated WhatsApp payment reminder via CRM workflow.
 3. **Inventory Supply Risk:** **$lowStockCount SKU items** are below threshold. Recommended Action: Auto-generate Purchase Order to supplier.
-4. **KRA eTIMS Tax Compliance Rate:** **100% fiscalization compliance**. All sales invoices have valid OSCU signatures registered with KRA PIN P051928471Z.
+4. **KRA eTIMS:** Submissions stay blocked until an OSCU credential is configured. Preview sales do not receive a control code.
             ''',
             'mode': 'ai_copilot',
           };
@@ -1165,6 +1196,57 @@ class DemoSuiteStore extends SuiteStore {
 }
 
 String kes(num minor) => 'KES ${(minor / 100).toStringAsFixed(2)}';
+
+void _demoPostJournal(Map<String, List<Map<String, dynamic>>> records, String id, Map<String, dynamic> journal, String source, String sourceId) {
+  final journals = records.putIfAbsent('journals', () => []);
+  if (journals.any((row) => row['id'] == id)) return;
+  journals.add({...journal, 'id': id, 'source': source, 'sourceId': sourceId});
+}
+
+Map<String, dynamic> _payslipResult(Map<String, dynamic> slip, {bool alreadyPosted = false}) => {
+  'id': slip['id'],
+  'rateCard': slip['rateCard'],
+  'netMinor': slip['netMinor'],
+  'payeMinor': slip['payeMinor'],
+  'nssfEmployeeMinor': slip['nssfEmployeeMinor'],
+  'shifMinor': slip['shifMinor'],
+  'housingEmployeeMinor': slip['housingEmployeeMinor'],
+  'alreadyPosted': alreadyPosted,
+};
+
+Map<String, dynamic> _demoStatutoryPayroll(Map<String, List<Map<String, dynamic>>> records, Map<String, dynamic> data) {
+  final installed = (records['apps'] ?? []).map((app) => app['id']).toSet();
+  if (!installed.contains('payroll') || !installed.contains('accounting')) {
+    throw StateError('Install Payroll and Books before posting a payslip');
+  }
+  final employeeId = data['employeeId'];
+  if (employeeId is! String || !RegExp(r'^[A-Za-z0-9_-]{1,100}$').hasMatch(employeeId)) {
+    throw StateError('Invalid identifier');
+  }
+  final period = data['period'];
+  if (period is! String || !RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(period)) {
+    throw StateError('Period must be YYYY-MM');
+  }
+  final gross = data['grossMinor'];
+  if (gross is! int) throw StateError('Gross pay must be positive whole shillings');
+  final employee = _demoFind(records['employees'] ?? [], employeeId);
+  if (employee == null) throw StateError('Select an existing employee');
+  final slips = records.putIfAbsent('payrollPayslips', () => []);
+  final id = 'pay_${employeeId}_$period';
+  final prior = _demoFind(slips, id);
+  if (prior != null) return _payslipResult(prior, alreadyPosted: true);
+  final calculated = statutoryPayroll(gross);
+  final slip = <String, dynamic>{
+    ...calculated,
+    'id': id,
+    'employeeId': employeeId,
+    'period': period,
+    'employeeName': employee['name'] ?? employeeId,
+  };
+  slips.add(slip);
+  _demoPostJournal(records, id, payrollJournal({...calculated, 'period': period}), 'payroll', id);
+  return _payslipResult(slip);
+}
 
 int _demoOpen(Map<String, dynamic> invoice) {
   final state = invoice['paymentState'];

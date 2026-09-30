@@ -62,10 +62,9 @@ class DocumentsModuleScreen extends StatelessWidget {
             StreamBuilder<List<Map<String, dynamic>>>(
               stream: store.watch('documents'),
               builder: (context, snapshot) {
-                final list = snapshot.data ?? [
-                  {'title': 'Vendor Service Agreement 2026.pdf', 'category': 'Legal & Contracts', 'signer': 'ceo@tekntandao.co.ke', 'security': 'CONFIDENTIAL', 'status': 'SIGNED'},
-                  {'title': 'KRA eTIMS Tax Compliance Certificate.pdf', 'category': 'Tax & Regulatory', 'signer': 'N/A', 'security': 'PUBLIC', 'status': 'VERIFIED'},
-                ];
+                if (!snapshot.hasData) return const CircularProgressIndicator();
+                final list = snapshot.data!;
+                if (list.isEmpty) return const Text('No documents yet.');
                 return Card(
                   child: ListView.separated(
                     shrinkWrap: true,

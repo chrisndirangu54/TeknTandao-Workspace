@@ -14,7 +14,7 @@ class EtimsModuleScreen extends StatelessWidget {
           children: [
             Icon(Icons.verified_user_rounded, color: Color(0xFF059669)),
             SizedBox(width: 10),
-            Text('Kenya KRA eTIMS Tax Fiscalization Engine'),
+            Text('Kenya KRA eTIMS'),
           ],
         ),
       ),
@@ -27,20 +27,20 @@ class EtimsModuleScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF064E3B),
+                color: const Color(0xFF78350F),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.verified_rounded, color: Color(0xFF34D399), size: 36),
+                  Icon(Icons.gpp_maybe_rounded, color: Color(0xFFFBBF24), size: 36),
                   SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('KRA OSCU/VSCU Connector Active', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text('eTIMS is not certified', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
                         SizedBox(height: 4),
-                        Text('Taxpayer PIN: P051928471Z · Status: Live OSCU Certified Server (europe-west1)', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text('Submissions stay blocked until a KRA OSCU credential is configured. Preview sales do not receive a control code.', style: TextStyle(color: Colors.white70, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -71,8 +71,8 @@ class EtimsModuleScreen extends StatelessWidget {
                           backgroundColor: const Color(0xFF059669).withValues(alpha: 0.1),
                           child: const Icon(Icons.qr_code_rounded, color: Color(0xFF059669)),
                         ),
-                        title: Text('Control Code: ${l['controlCode']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Invoice: ${l['invoiceNo']} · VAT Collected: ${kes(l['vatAmount'])} · ${l['timestamp']}'),
+                        title: Text(isVerified ? 'Control Code: ${l['controlCode']}' : 'Not submitted · ${l['controlCode']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(isVerified ? 'Invoice: ${l['invoiceNo']} · VAT Collected: ${kes(l['vatAmount'])} · ${l['timestamp']}' : 'Invoice: ${l['invoiceNo']} · No KRA submission · ${l['timestamp']}'),
                         trailing: Chip(
                           avatar: Icon(isVerified ? Icons.check_circle : Icons.sync, size: 14, color: isVerified ? Colors.white : Colors.black),
                           label: Text(l['status'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
