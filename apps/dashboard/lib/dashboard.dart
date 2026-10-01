@@ -33,7 +33,9 @@ import 'modules/generic_module_screen.dart';
 
 class Dashboard extends StatefulWidget {
   final SuiteStore store;
-  const Dashboard({super.key, required this.store});
+  final String? initialModuleId;
+
+  const Dashboard({super.key, required this.store, this.initialModuleId});
 
   @override
   State<Dashboard> createState() => _DashboardState();
@@ -50,6 +52,14 @@ class _DashboardState extends State<Dashboard> {
   void initState() {
     super.initState();
     store.addListener(_onStoreChanged);
+    final moduleId = widget.initialModuleId;
+    if (moduleId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final module = workspaceModuleById[moduleId];
+        if (module != null) _navigateToModule(module);
+      });
+    }
   }
 
   @override

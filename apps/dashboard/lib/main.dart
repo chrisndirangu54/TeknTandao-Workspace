@@ -76,7 +76,10 @@ class SuiteApp extends StatelessWidget {
       ),
     ),
     home: preview
-        ? Dashboard(store: DemoSuiteStore())
+        ? Dashboard(
+            store: DemoSuiteStore(),
+            initialModuleId: Uri.base.queryParameters['module'],
+          )
         : const RuntimeEntryGate(),
   );
 }
@@ -407,7 +410,10 @@ class _SignInState extends State<SignIn> {
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => Dashboard(store: CostAwareFirebaseSuiteStore(orgId)),
+          builder: (_) => Dashboard(
+            store: CostAwareFirebaseSuiteStore(orgId),
+            initialModuleId: Uri.base.queryParameters['module'],
+          ),
         ),
       );
     }
