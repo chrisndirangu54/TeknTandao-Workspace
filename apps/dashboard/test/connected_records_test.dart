@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tandao_suite/modules/connected_records.dart';
-import 'package:tandao_suite/suite.dart';
+import 'package:tekntandao_workspace/modules/connected_records.dart';
+import 'package:tekntandao_workspace/suite.dart';
 
 void main() {
   testWidgets('clinical records display only the selected module and type', (tester) async {

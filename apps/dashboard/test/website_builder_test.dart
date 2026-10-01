@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tandao_suite/modules/website_builder_runtime.dart';
+import 'package:tekntandao_workspace/modules/website_builder_runtime.dart';
 
 Map<String, dynamic> sampleSite() => {
       'title': 'Runtime Site',

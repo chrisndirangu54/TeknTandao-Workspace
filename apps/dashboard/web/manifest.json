@@ -1,11 +1,11 @@
 {
-    "name": "tandao_suite",
-    "short_name": "tandao_suite",
+    "name": "TeknTandao Workspace",
+    "short_name": "TeknTandao Workspace",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "TeknTandao Workspace business operations platform.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

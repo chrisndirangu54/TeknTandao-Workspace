@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tandao_suite/dashboard.dart';
-import 'package:tandao_suite/modules/hr_module.dart';
-import 'package:tandao_suite/suite.dart';
+import 'package:tekntandao_workspace/dashboard.dart';
+import 'package:tekntandao_workspace/modules/hr_module.dart';
+import 'package:tekntandao_workspace/suite.dart';
 
 void main() {
   test(

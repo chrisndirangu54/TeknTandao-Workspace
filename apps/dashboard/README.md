@@ -1,6 +1,6 @@
-# tandao_suite
+# TeknTandao Workspace
 
-A new Flutter project.
+Flutter dashboard for the TeknTandao Workspace business operations platform.
 
 ## Getting Started
 

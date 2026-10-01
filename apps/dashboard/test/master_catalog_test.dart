@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tandao_suite/master_catalog.dart';
-import 'package:tandao_suite/workspace_modules.dart';
+import 'package:tekntandao_workspace/master_catalog.dart';
+import 'package:tekntandao_workspace/workspace_modules.dart';
 
 void main() {
   test('master catalogue exposes all categories and hundreds of apps', () {

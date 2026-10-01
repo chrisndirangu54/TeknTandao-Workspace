@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tandao_suite/modules/platform_control_center.dart';
+import 'package:tekntandao_workspace/modules/platform_control_center.dart';
 
 void main() {
   test('strategic platform modules route to the shared control center', () {

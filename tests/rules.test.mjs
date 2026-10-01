@@ -3,7 +3,7 @@ import {before, after, test} from 'node:test';
 import {createRequire} from 'node:module';
 const require = createRequire(import.meta.url);
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
-const {doc, setDoc, getDoc, Timestamp} = require('firebase/firestore');
+const {doc, setDoc, getDoc, Timestamp, serverTimestamp, writeBatch} = require('firebase/firestore');
 let env;
 test('time tracking reads require an active subscription and the matching member UID', async () => {
   await env.withSecurityRulesDisabled(async context => {
@@ -90,6 +90,56 @@ test('tenant isolation and authentication', async () => {
   await assertSucceeds(getDoc(doc(env.authenticatedContext('a').firestore(), 'organizations/a/contacts/customer')));
   await assertFails(getDoc(doc(env.authenticatedContext('b').firestore(), 'organizations/a/contacts/customer')));
   await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'organizations/a/contacts/customer')));
+});
+
+test('users can atomically create only their own owner workspace and private profile', async () => {
+  const uid = 'self-created-owner';
+  const db = env.authenticatedContext(uid).firestore();
+  const batch = writeBatch(db);
+  batch.set(doc(db, `organizations/${uid}`), {
+    name: 'New Workspace',
+    createdAt: serverTimestamp(),
+    owner: uid,
+    currency: 'KES'
+  });
+  batch.set(doc(db, `organizations/${uid}/members/${uid}`), {role: 'owner', apps: []});
+  batch.set(doc(db, `users/${uid}`), {
+    orgId: uid,
+    displayName: 'New Owner',
+    phoneNumber: '+254 712 345 678',
+    email: 'owner@example.com',
+    photoURL: '',
+    updatedAt: serverTimestamp()
+  });
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(getDoc(doc(db, `organizations/${uid}`)));
+  await assertSucceeds(getDoc(doc(db, `users/${uid}`)));
+  await assertFails(getDoc(doc(env.authenticatedContext('other-user').firestore(), `users/${uid}`)));
+  await assertFails(setDoc(
+    doc(env.authenticatedContext('other-user').firestore(), `organizations/${uid}/members/other-user`),
+    {role: 'owner', apps: []}
+  ));
+});
+
+test('users cannot create a workspace or profile for another UID', async () => {
+  const db = env.authenticatedContext('attacker').firestore();
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'organizations/victim'), {
+    name: 'Forged Workspace',
+    createdAt: serverTimestamp(),
+    owner: 'victim',
+    currency: 'KES'
+  });
+  batch.set(doc(db, 'organizations/victim/members/attacker'), {role: 'owner', apps: []});
+  batch.set(doc(db, 'users/attacker'), {
+    orgId: 'victim',
+    displayName: 'Attacker',
+    phoneNumber: '+254 712 345 678',
+    email: 'attacker@example.com',
+    photoURL: '',
+    updatedAt: serverTimestamp()
+  });
+  await assertFails(batch.commit());
 });
 
 test('app permission and expiry protect sensitive records even from another app user', async () => {

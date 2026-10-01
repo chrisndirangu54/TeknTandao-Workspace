@@ -21,8 +21,31 @@ service cloud.firestore {
         'attendance', 'time'
       ];
     }
+    function validUserProfile(uid) {
+      return request.auth != null && request.auth.uid == uid &&
+        request.resource.data.keys().hasOnly([
+          'displayName', 'phoneNumber', 'email', 'photoURL', 'orgId', 'updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'displayName', 'phoneNumber', 'email', 'photoURL', 'updatedAt'
+        ]) &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() >= 2 &&
+        request.resource.data.displayName.size() <= 120 &&
+        request.resource.data.phoneNumber is string &&
+        request.resource.data.phoneNumber.matches('^[0-9+(). -]{7,24}$') &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 254 &&
+        request.resource.data.photoURL is string &&
+        request.resource.data.photoURL.size() <= 2048 &&
+        request.resource.data.updatedAt == request.time &&
+        (!('orgId' in request.resource.data) || request.resource.data.orgId == uid);
+    }
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if validUserProfile(uid);
+      allow update: if validUserProfile(uid) &&
+        (!('orgId' in resource.data) || request.resource.data.orgId == resource.data.orgId);
     }
 
     // Published runtime snapshots are public single-document reads only. Domain
@@ -39,7 +62,27 @@ service cloud.firestore {
 
     match /organizations/{org} {
       allow read: if member(org);
-      match /members/{uid} { allow read: if member(org) && request.auth.uid == uid; }
+      allow get: if request.auth != null && request.auth.uid == org;
+      allow create: if request.auth != null && request.auth.uid == org &&
+        request.resource.data.keys().hasOnly(['name', 'createdAt', 'owner', 'currency']) &&
+        request.resource.data.keys().hasAll(['name', 'createdAt', 'owner', 'currency']) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() >= 1 &&
+        request.resource.data.name.size() <= 120 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.owner == request.auth.uid &&
+        request.resource.data.currency == 'KES';
+      match /members/{uid} {
+        allow read: if member(org) && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == org &&
+          uid == request.auth.uid &&
+          request.resource.data.keys().hasOnly(['role', 'apps']) &&
+          request.resource.data.keys().hasAll(['role', 'apps']) &&
+          request.resource.data.role == 'owner' &&
+          request.resource.data.apps is list &&
+          request.resource.data.apps.size() == 0 &&
+          getAfter(/databases/$(database)/documents/organizations/$(org)).data.owner == request.auth.uid;
+      }
       match /apps/{app} { allow read: if member(org); }
       match /modules/{app}/records/{id} { allow read: if access(org, app); }
       match /contacts/{id} { allow read: if access(org, 'crm') || access(org, 'pos'); }

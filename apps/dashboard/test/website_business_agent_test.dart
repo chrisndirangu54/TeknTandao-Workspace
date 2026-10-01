@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tandao_suite/modules/website_business_agent_screen.dart';
-import 'package:tandao_suite/suite.dart';
+import 'package:tekntandao_workspace/modules/website_business_agent_screen.dart';
+import 'package:tekntandao_workspace/suite.dart';
 
 void main() {
   testWidgets('governed AI Business Operator surface renders deterministically', (

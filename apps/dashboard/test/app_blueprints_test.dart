@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tandao_suite/app_blueprints.dart';
-import 'package:tandao_suite/workspace_modules.dart';
+import 'package:tekntandao_workspace/app_blueprints.dart';
+import 'package:tekntandao_workspace/workspace_modules.dart';
 
 void main() {
   test('every installable app resolves to an operational blueprint', () {
