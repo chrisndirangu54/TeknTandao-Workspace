@@ -7,6 +7,10 @@ service cloud.firestore {
     function owner(org) {
       return member(org) && get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data.role == 'owner';
     }
+    function validWorkspaceId(org) {
+      return request.auth != null &&
+        (org == request.auth.uid || org.matches('^[A-Za-z0-9]{20}$'));
+    }
     function access(org, app) {
       let m = get(/databases/$(database)/documents/organizations/$(org)/members/$(request.auth.uid)).data;
       let a = get(/databases/$(database)/documents/organizations/$(org)/apps/$(app)).data;
@@ -39,13 +43,39 @@ service cloud.firestore {
         request.resource.data.photoURL is string &&
         request.resource.data.photoURL.size() <= 2048 &&
         request.resource.data.updatedAt == request.time &&
-        (!('orgId' in request.resource.data) || request.resource.data.orgId == uid);
+        (!('orgId' in request.resource.data) ||
+          (request.resource.data.orgId is string &&
+           existsAfter(/databases/$(database)/documents/organizations/$(request.resource.data.orgId)/members/$(uid))));
     }
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if validUserProfile(uid);
-      allow update: if validUserProfile(uid) &&
-        (!('orgId' in resource.data) || request.resource.data.orgId == resource.data.orgId);
+      allow update: if validUserProfile(uid);
+
+      match /workspaces/{org} {
+        function validWorkspaceMirror() {
+          return request.auth != null && request.auth.uid == uid &&
+            request.resource.data.keys().hasOnly([
+              'workspaceId', 'name', 'role', 'joinedAt'
+            ]) &&
+            request.resource.data.keys().hasAll([
+              'workspaceId', 'name', 'role', 'joinedAt'
+            ]) &&
+            request.resource.data.workspaceId == org &&
+            request.resource.data.name is string &&
+            request.resource.data.name.size() >= 1 &&
+            request.resource.data.name.size() <= 120 &&
+            request.resource.data.role in ['owner', 'member'] &&
+            request.resource.data.joinedAt is timestamp &&
+            existsAfter(/databases/$(database)/documents/organizations/$(org)/members/$(uid)) &&
+            getAfter(/databases/$(database)/documents/organizations/$(org)/members/$(uid)).data.role == request.resource.data.role &&
+            getAfter(/databases/$(database)/documents/organizations/$(org)).data.name == request.resource.data.name;
+        }
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create: if validWorkspaceMirror() && request.resource.data.joinedAt == request.time;
+        allow update: if validWorkspaceMirror() &&
+          request.resource.data.joinedAt == resource.data.joinedAt;
+      }
     }
 
     // Published runtime snapshots are public single-document reads only. Domain
@@ -60,10 +90,216 @@ service cloud.firestore {
     match /websitePlugins/{pluginId} { allow read: if false; }
     match /websiteFormRateLimits/{id} { allow read: if false; }
 
+    match /talentProfiles/{candidateUid} {
+      function validProfile() {
+        return request.auth != null && request.auth.uid == candidateUid &&
+          request.resource.data.keys().hasOnly([
+            'displayAlias', 'skills', 'targetRoles', 'location', 'experienceYears',
+            'bio', 'isPublic', 'consentAt', 'updatedAt'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'displayAlias', 'skills', 'targetRoles', 'location', 'experienceYears',
+            'bio', 'isPublic', 'updatedAt'
+          ]) &&
+          request.resource.data.displayAlias is string &&
+          request.resource.data.displayAlias.size() >= 2 &&
+          request.resource.data.displayAlias.size() <= 80 &&
+          request.resource.data.skills is list &&
+          request.resource.data.skills.size() <= 30 &&
+          request.resource.data.targetRoles is list &&
+          request.resource.data.targetRoles.size() <= 30 &&
+          request.resource.data.location is string &&
+          request.resource.data.location.size() <= 120 &&
+          request.resource.data.experienceYears is int &&
+          request.resource.data.experienceYears >= 0 &&
+          request.resource.data.experienceYears <= 60 &&
+          request.resource.data.bio is string &&
+          request.resource.data.bio.size() <= 500 &&
+          request.resource.data.isPublic is bool &&
+          request.resource.data.updatedAt == request.time &&
+          (!request.resource.data.isPublic ||
+            ('consentAt' in request.resource.data && request.resource.data.consentAt is timestamp));
+      }
+      allow get: if request.auth != null &&
+        (request.auth.uid == candidateUid || resource.data.isPublic == true);
+      allow list: if request.auth != null && resource.data.isPublic == true;
+      allow create: if validProfile();
+      allow update: if validProfile() &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['candidateUid']);
+      allow delete: if request.auth != null && request.auth.uid == candidateUid;
+    }
+
+    match /talentJobPostings/{jobId} {
+      function validPosting() {
+        return request.resource.data.keys().hasOnly([
+          'employerOrgId', 'employerName', 'createdBy', 'title', 'department',
+          'requiredSkills', 'location', 'experienceYears', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'employerOrgId', 'employerName', 'createdBy', 'title', 'department',
+          'requiredSkills', 'location', 'experienceYears', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.employerOrgId is string &&
+        request.resource.data.employerName is string &&
+        request.resource.data.employerName.size() <= 120 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() >= 2 &&
+        request.resource.data.title.size() <= 120 &&
+        request.resource.data.department is string &&
+        request.resource.data.department.size() <= 100 &&
+        request.resource.data.requiredSkills is list &&
+        request.resource.data.requiredSkills.size() > 0 &&
+        request.resource.data.requiredSkills.size() <= 30 &&
+        request.resource.data.location is string &&
+        request.resource.data.location.size() <= 120 &&
+        request.resource.data.experienceYears is int &&
+        request.resource.data.experienceYears >= 0 &&
+        request.resource.data.experienceYears <= 60 &&
+        request.resource.data.status in ['OPEN', 'CLOSED'] &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt == request.time;
+      }
+      allow get, list: if request.auth != null &&
+        (resource.data.status == 'OPEN' || owner(resource.data.employerOrgId));
+      allow create: if request.auth != null &&
+        owner(request.resource.data.employerOrgId) &&
+        request.resource.data.status == 'OPEN' &&
+        request.resource.data.createdAt == request.time && validPosting();
+      allow update: if request.auth != null &&
+        owner(resource.data.employerOrgId) &&
+        request.resource.data.employerOrgId == resource.data.employerOrgId &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        validPosting();
+      allow delete: if request.auth != null && owner(resource.data.employerOrgId);
+    }
+
+    match /talentContactRequests/{requestId} {
+      allow get, list: if request.auth != null &&
+        (resource.data.candidateUid == request.auth.uid || owner(resource.data.employerOrgId));
+      allow create: if request.auth != null &&
+        request.resource.data.keys().hasOnly([
+          'candidateUid', 'candidateAlias', 'employerOrgId', 'employerName',
+          'employerOwnerUid', 'roleId', 'roleTitle', 'matchScore', 'matchedSkills',
+          'missingSkills', 'type', 'status', 'createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'candidateUid', 'candidateAlias', 'employerOrgId', 'employerName',
+          'employerOwnerUid', 'roleId', 'roleTitle', 'matchScore', 'matchedSkills',
+          'missingSkills', 'type', 'status', 'createdAt'
+        ]) &&
+        owner(request.resource.data.employerOrgId) &&
+        request.resource.data.employerOwnerUid == request.auth.uid &&
+        request.resource.data.candidateUid is string &&
+        get(/databases/$(database)/documents/talentProfiles/$(request.resource.data.candidateUid)).data.isPublic == true &&
+        request.resource.data.candidateAlias == get(/databases/$(database)/documents/talentProfiles/$(request.resource.data.candidateUid)).data.displayAlias &&
+        get(/databases/$(database)/documents/talentJobPostings/$(request.resource.data.roleId)).data.employerOrgId == request.resource.data.employerOrgId &&
+        get(/databases/$(database)/documents/talentJobPostings/$(request.resource.data.roleId)).data.status == 'OPEN' &&
+        request.resource.data.roleTitle == get(/databases/$(database)/documents/talentJobPostings/$(request.resource.data.roleId)).data.title &&
+        request.resource.data.matchScore is int &&
+        request.resource.data.matchScore >= 0 &&
+        request.resource.data.matchScore <= 100 &&
+        request.resource.data.matchedSkills is list &&
+        request.resource.data.matchedSkills.size() <= 20 &&
+        request.resource.data.missingSkills is list &&
+        request.resource.data.missingSkills.size() <= 20 &&
+        request.resource.data.type == 'EMPLOYER_INVITE' &&
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.createdAt == request.time;
+      allow update: if request.auth != null &&
+        resource.data.candidateUid == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'sharedEmail', 'updatedAt'
+        ]) &&
+        request.resource.data.status in ['ACCEPTED', 'DECLINED'] &&
+        request.resource.data.updatedAt == request.time &&
+        (!('sharedEmail' in request.resource.data) ||
+          (request.resource.data.status == 'ACCEPTED' &&
+           request.resource.data.sharedEmail is string &&
+           request.resource.data.sharedEmail.size() <= 254));
+      allow delete: if false;
+    }
+
+    match /marketplaceSupplierListings/{supplierOrgId} {
+      function validSupplierListing() {
+        return request.resource.data.keys().hasOnly([
+          'supplierOrgId', 'organizationName', 'categories', 'products',
+          'equipment', 'services', 'regions', 'capacity', 'published',
+          'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'supplierOrgId', 'organizationName', 'categories', 'products',
+          'equipment', 'services', 'regions', 'capacity', 'published',
+          'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.supplierOrgId == supplierOrgId &&
+        request.resource.data.organizationName is string &&
+        request.resource.data.organizationName.size() <= 120 &&
+        request.resource.data.categories is list && request.resource.data.categories.size() <= 40 &&
+        request.resource.data.products is list && request.resource.data.products.size() <= 40 &&
+        request.resource.data.equipment is list && request.resource.data.equipment.size() <= 40 &&
+        request.resource.data.services is list && request.resource.data.services.size() <= 40 &&
+        request.resource.data.regions is list && request.resource.data.regions.size() <= 40 &&
+        request.resource.data.capacity is int &&
+        request.resource.data.capacity >= 0 && request.resource.data.capacity <= 1000000 &&
+        request.resource.data.published is bool &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt == request.time;
+      }
+      allow get, list: if request.auth != null &&
+        (resource.data.published == true || owner(supplierOrgId));
+      allow create: if request.auth != null && owner(supplierOrgId) &&
+        request.resource.data.createdAt == request.time && validSupplierListing();
+      allow update: if request.auth != null && owner(supplierOrgId) &&
+        request.resource.data.createdAt == resource.data.createdAt && validSupplierListing();
+      allow delete: if request.auth != null && owner(supplierOrgId);
+    }
+
+    match /marketplaceQuoteRequests/{requestId} {
+      allow get, list: if request.auth != null &&
+        (owner(resource.data.buyerOrgId) || owner(resource.data.supplierOrgId));
+      allow create: if request.auth != null &&
+        request.resource.data.keys().hasOnly([
+          'buyerOrgId', 'supplierOrgId', 'supplierName', 'createdBy', 'gapKind',
+          'gapTitle', 'gapDetail', 'location', 'quantity', 'matchScore',
+          'matchReasons', 'status', 'createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'buyerOrgId', 'supplierOrgId', 'supplierName', 'createdBy', 'gapKind',
+          'gapTitle', 'gapDetail', 'location', 'quantity', 'matchScore',
+          'matchReasons', 'status', 'createdAt'
+        ]) &&
+        owner(request.resource.data.buyerOrgId) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.supplierOrgId is string &&
+        get(/databases/$(database)/documents/marketplaceSupplierListings/$(request.resource.data.supplierOrgId)).data.published == true &&
+        request.resource.data.supplierName == get(/databases/$(database)/documents/marketplaceSupplierListings/$(request.resource.data.supplierOrgId)).data.organizationName &&
+        request.resource.data.gapKind is string &&
+        request.resource.data.gapTitle is string && request.resource.data.gapTitle.size() <= 120 &&
+        request.resource.data.gapDetail is string && request.resource.data.gapDetail.size() <= 300 &&
+        request.resource.data.location is string && request.resource.data.location.size() <= 120 &&
+        request.resource.data.quantity is int && request.resource.data.quantity > 0 &&
+        request.resource.data.matchScore is int && request.resource.data.matchScore >= 0 && request.resource.data.matchScore <= 100 &&
+        request.resource.data.matchReasons is list && request.resource.data.matchReasons.size() <= 10 &&
+        request.resource.data.status == 'OPEN' &&
+        request.resource.data.createdAt == request.time;
+      allow update: if request.auth != null && owner(resource.data.supplierOrgId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'supplierResponse', 'updatedAt'
+        ]) &&
+        request.resource.data.status in ['ACKNOWLEDGED', 'DECLINED'] &&
+        request.resource.data.updatedAt == request.time &&
+        (!('supplierResponse' in request.resource.data) ||
+          (request.resource.data.supplierResponse is string &&
+           request.resource.data.supplierResponse.size() <= 500));
+      allow delete: if false;
+    }
+
     match /organizations/{org} {
       allow read: if member(org);
       allow get: if request.auth != null && request.auth.uid == org;
-      allow create: if request.auth != null && request.auth.uid == org &&
+      allow create: if validWorkspaceId(org) &&
         request.resource.data.keys().hasOnly(['name', 'createdAt', 'owner', 'currency']) &&
         request.resource.data.keys().hasAll(['name', 'createdAt', 'owner', 'currency']) &&
         request.resource.data.name is string &&
@@ -72,16 +308,52 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time &&
         request.resource.data.owner == request.auth.uid &&
         request.resource.data.currency == 'KES';
+      match /workspaceInvites/{inviteId} {
+        allow get: if request.auth != null &&
+          inviteId.matches('^[A-Za-z0-9_-]{32}$') &&
+          resource.data.active == true &&
+          resource.data.expiresAt > request.time;
+        allow list: if false;
+        allow create: if owner(org) &&
+          inviteId.matches('^[A-Za-z0-9_-]{32}$') &&
+          request.resource.data.keys().hasOnly([
+            'active', 'workspaceId', 'workspaceName', 'createdBy', 'createdAt', 'expiresAt'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'active', 'workspaceId', 'workspaceName', 'createdBy', 'createdAt', 'expiresAt'
+          ]) &&
+          request.resource.data.active == true &&
+          request.resource.data.workspaceId == org &&
+          request.resource.data.workspaceName == get(/databases/$(database)/documents/organizations/$(org)).data.name &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.createdAt == request.time &&
+          request.resource.data.expiresAt is timestamp &&
+          request.resource.data.expiresAt > request.time &&
+          request.resource.data.expiresAt <= request.time + duration.value(31, 'd');
+        allow update: if owner(org) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active']) &&
+          request.resource.data.active == false;
+        allow delete: if owner(org);
+      }
       match /members/{uid} {
-        allow read: if member(org) && request.auth.uid == uid;
-        allow create: if request.auth != null && request.auth.uid == org &&
-          uid == request.auth.uid &&
-          request.resource.data.keys().hasOnly(['role', 'apps']) &&
-          request.resource.data.keys().hasAll(['role', 'apps']) &&
-          request.resource.data.role == 'owner' &&
+        allow get: if request.auth != null && request.auth.uid == uid;
+        allow list: if false;
+        allow create: if request.auth != null && request.auth.uid == uid &&
           request.resource.data.apps is list &&
           request.resource.data.apps.size() == 0 &&
-          getAfter(/databases/$(database)/documents/organizations/$(org)).data.owner == request.auth.uid;
+          (
+            (validWorkspaceId(org) &&
+              request.resource.data.keys().hasOnly(['role', 'apps']) &&
+              request.resource.data.role == 'owner' &&
+              getAfter(/databases/$(database)/documents/organizations/$(org)).data.owner == request.auth.uid) ||
+            (request.resource.data.keys().hasOnly(['role', 'apps', 'inviteId']) &&
+              request.resource.data.role == 'member' &&
+              request.resource.data.inviteId is string &&
+              request.resource.data.inviteId.matches('^[A-Za-z0-9_-]{32}$') &&
+              exists(/databases/$(database)/documents/organizations/$(org)/workspaceInvites/$(request.resource.data.inviteId)) &&
+              get(/databases/$(database)/documents/organizations/$(org)/workspaceInvites/$(request.resource.data.inviteId)).data.active == true &&
+              get(/databases/$(database)/documents/organizations/$(org)/workspaceInvites/$(request.resource.data.inviteId)).data.expiresAt > request.time)
+          );
       }
       match /apps/{app} { allow read: if member(org); }
       match /modules/{app}/records/{id} { allow read: if access(org, app); }

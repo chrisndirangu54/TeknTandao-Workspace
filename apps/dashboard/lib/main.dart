@@ -8,10 +8,11 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'cost_aware_store.dart';
 import 'dashboard.dart';
 import 'modules/website_builder_runtime.dart';
 import 'suite.dart';
+import 'workspace_hub.dart';
+import 'workspace_memberships.dart';
 
 const useEmulators = bool.fromEnvironment('USE_EMULATORS', defaultValue: false);
 const preview = bool.fromEnvironment('PREVIEW', defaultValue: false);
@@ -101,6 +102,12 @@ class _RuntimeEntryGateState extends State<RuntimeEntryGate> {
   }
 
   Future<void> _resolve() async {
+    final query = Uri.base.queryParameters;
+    if (query['workspace']?.isNotEmpty == true &&
+        query['invite']?.isNotEmpty == true) {
+      if (mounted) setState(() => _resolved = const SignIn());
+      return;
+    }
     if (useEmulators || Uri.base.host.isEmpty || Uri.base.host == 'localhost') {
       if (mounted) setState(() => _resolved = const SignIn());
       return;
@@ -260,7 +267,29 @@ class _SignInState extends State<SignIn> {
       organization = TextEditingController(),
       workspaceId = TextEditingController();
   bool busy = false, register = false;
+  bool _continuing = false;
   String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    workspaceId.text = Uri.base.queryParameters['workspace']?.trim() ?? '';
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (!mounted || user == null || _continuing) return;
+      setState(() {
+        busy = true;
+        error = null;
+      });
+      try {
+        await _continueWithUser(user);
+      } catch (e) {
+        if (mounted) setState(() => error = e.toString());
+      } finally {
+        if (mounted) setState(() => busy = false);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -335,61 +364,10 @@ class _SignInState extends State<SignIn> {
     }
   }
 
-  Future<String> _resolveWorkspace(User user) async {
-    final db = FirebaseFirestore.instance;
-    final requestedId = workspaceId.text.trim();
-    if (requestedId.isNotEmpty) {
-      try {
-        final membership = await db
-            .doc('organizations/$requestedId/members/${user.uid}')
-            .get();
-        if (!membership.exists) {
-          throw StateError('You are not a member of that workspace.');
-        }
-        final workspace = await db.doc('organizations/$requestedId').get();
-        if (!workspace.exists) {
-          throw StateError('That workspace could not be found.');
-        }
-      } on FirebaseException catch (error) {
-        if (error.code == 'permission-denied') {
-          throw StateError('You are not a member of that workspace.');
-        }
-        rethrow;
-      }
-      return requestedId;
-    }
-
-    final workspaceRef = db.collection('organizations').doc(user.uid);
-    final memberRef = workspaceRef.collection('members').doc(user.uid);
-    final userRef = db.collection('users').doc(user.uid);
-    final workspaceName = organization.text.trim().isEmpty
-        ? 'My organization'
-        : organization.text.trim();
-    await db.runTransaction((transaction) async {
-      final workspace = await transaction.get(workspaceRef);
-      if (workspace.exists) {
-        final membership = await transaction.get(memberRef);
-        if (!membership.exists || membership.data()?['role'] != 'owner') {
-          throw StateError('Your account cannot access its default workspace.');
-        }
-      } else {
-        transaction.set(workspaceRef, {
-          'name': workspaceName,
-          'createdAt': FieldValue.serverTimestamp(),
-          'owner': user.uid,
-          'currency': 'KES',
-        });
-        transaction.set(memberRef, {'role': 'owner', 'apps': <String>[]});
-      }
-      transaction.set(userRef, {
-        'orgId': user.uid,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    });
-    return user.uid;
-  }
-
   Future<void> _continueWithUser(User user) async {
+    if (_continuing) return;
+    _continuing = true;
+    try {
     final userRef = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid);
@@ -406,16 +384,45 @@ class _SignInState extends State<SignIn> {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    final orgId = await _resolveWorkspace(user);
+    final service = WorkspaceMembershipService();
+    final query = Uri.base.queryParameters;
+    final inviteWorkspaceId = query['workspace']?.trim();
+    final inviteToken = query['invite']?.trim();
+    late final String activeWorkspaceId;
+    if (inviteWorkspaceId != null &&
+        inviteWorkspaceId.isNotEmpty &&
+        inviteToken != null &&
+        inviteToken.isNotEmpty) {
+      await service.joinWithInvite(
+        user: user,
+        workspaceId: inviteWorkspaceId,
+        token: inviteToken,
+      );
+      activeWorkspaceId = inviteWorkspaceId;
+    } else if (workspaceId.text.trim().isNotEmpty) {
+      activeWorkspaceId = workspaceId.text.trim();
+      await service.select(user.uid, activeWorkspaceId);
+    } else {
+      activeWorkspaceId = await service.ensureInitialWorkspace(
+        user,
+        previousWorkspaceId: profile['orgId']?.toString(),
+        defaultName: organization.text.trim(),
+      );
+    }
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => Dashboard(
-            store: CostAwareFirebaseSuiteStore(orgId),
+          builder: (_) => WorkspaceHub(
+            user: user,
+            initialWorkspaceId: activeWorkspaceId,
             initialModuleId: Uri.base.queryParameters['module'],
+            service: service,
           ),
         ),
       );
+    }
+    } finally {
+      _continuing = false;
     }
   }
 
@@ -553,7 +560,7 @@ class _SignInState extends State<SignIn> {
                       decoration: const InputDecoration(
                         labelText: 'Shared workspace ID (optional)',
                         helperText:
-                            'Use the ID provided by your workspace owner.',
+                            'Select an existing membership here; use an owner invite link to join.',
                       ),
                     ),
                     if (error != null)

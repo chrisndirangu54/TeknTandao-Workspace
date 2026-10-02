@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
+import 'talent_marketplace.dart';
 
 class HrModuleScreen extends StatefulWidget {
   final SuiteStore store;
@@ -74,7 +75,9 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
-    return Scaffold(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
       appBar: AppBar(
         title: const Row(
           children: [
@@ -83,8 +86,25 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
             Text('People & Attendance System'),
           ],
         ),
+        bottom: const TabBar(
+          tabs: [
+            Tab(icon: Icon(Icons.groups_rounded), text: 'People'),
+            Tab(icon: Icon(Icons.psychology_alt_rounded), text: 'Talent insights'),
+          ],
+        ),
       ),
-      body: SingleChildScrollView(
+      body: TabBarView(
+        children: [
+          _peopleTab(context, store),
+          HiringInsightsPanel(store: store),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _peopleTab(BuildContext context, SuiteStore store) {
+    return SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,7 +124,7 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
-                    final details = await recordForm(context, 'Add New Staff Member', ['Full Name', 'Job Role', 'Department', 'Branch']);
+                    final details = await recordForm(context, 'Add New Staff Member', ['Full Name', 'Job Role', 'Department', 'Branch', 'Skills (comma separated)']);
                     if (details != null && details[0].isNotEmpty) {
                       await store.call('saveRecord', {
                         'appId': 'hr',
@@ -113,6 +133,7 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
                           'role': details[1],
                           'department': details[2],
                           'branch': details[3],
+                          'skills': details[4],
                           'status': 'CLOCKED_IN',
                           'clockTime': '08:00 AM',
                         }
@@ -188,7 +209,6 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }

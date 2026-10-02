@@ -1,9 +1,10 @@
 import {readFileSync} from 'node:fs';
+import {strict as assert} from 'node:assert';
 import {before, after, test} from 'node:test';
 import {createRequire} from 'node:module';
 const require = createRequire(import.meta.url);
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
-const {doc, setDoc, getDoc, Timestamp, serverTimestamp, writeBatch} = require('firebase/firestore');
+const {collection, doc, setDoc, getDoc, getDocs, Timestamp, serverTimestamp, writeBatch} = require('firebase/firestore');
 let env;
 test('time tracking reads require an active subscription and the matching member UID', async () => {
   await env.withSecurityRulesDisabled(async context => {
@@ -140,6 +141,247 @@ test('users cannot create a workspace or profile for another UID', async () => {
     updatedAt: serverTimestamp()
   });
   await assertFails(batch.commit());
+});
+
+test('workspace owners can invite a user into multiple workspaces without exposing membership lists', async () => {
+  const firstOrg = 'workspace-alpha';
+  const secondOrg = 'workspace-bravo';
+  const firstOwner = 'owner-alpha';
+  const secondOwner = 'owner-bravo';
+  const invitee = 'multi-workspace-user';
+  const firstToken = 'A'.repeat(32);
+  const secondToken = 'B'.repeat(32);
+  const expiresAt = Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db, `organizations/${firstOrg}`), {
+      name: 'Alpha Workspace', owner: firstOwner, currency: 'KES'
+    });
+    await setDoc(doc(db, `organizations/${firstOrg}/members/${firstOwner}`), {
+      role: 'owner', apps: []
+    });
+    await setDoc(doc(db, `organizations/${secondOrg}`), {
+      name: 'Bravo Workspace', owner: secondOwner, currency: 'KES'
+    });
+    await setDoc(doc(db, `organizations/${secondOrg}/members/${secondOwner}`), {
+      role: 'owner', apps: []
+    });
+  });
+
+  for (const [org, owner, token, name] of [
+    [firstOrg, firstOwner, firstToken, 'Alpha Workspace'],
+    [secondOrg, secondOwner, secondToken, 'Bravo Workspace']
+  ]) {
+    await assertSucceeds(setDoc(
+      doc(env.authenticatedContext(owner).firestore(), `organizations/${org}/workspaceInvites/${token}`),
+      {
+        active: true,
+        workspaceId: org,
+        workspaceName: name,
+        createdBy: owner,
+        createdAt: serverTimestamp(),
+        expiresAt
+      }
+    ));
+  }
+
+  await assertFails(setDoc(
+    doc(env.authenticatedContext('non-owner').firestore(), `organizations/${firstOrg}/workspaceInvites/${'C'.repeat(32)}`),
+    {
+      active: true,
+      workspaceId: firstOrg,
+      workspaceName: 'Alpha Workspace',
+      createdBy: 'non-owner',
+      createdAt: serverTimestamp(),
+      expiresAt
+    }
+  ));
+
+  const joinWorkspace = async (org, token, name, createProfile) => {
+    const db = env.authenticatedContext(invitee).firestore();
+    const batch = writeBatch(db);
+    batch.set(doc(db, `organizations/${org}/members/${invitee}`), {
+      role: 'member', apps: [], inviteId: token
+    });
+    batch.set(doc(db, `users/${invitee}/workspaces/${org}`), {
+      workspaceId: org, name, role: 'member', joinedAt: serverTimestamp()
+    });
+    batch.set(doc(db, `users/${invitee}`), {
+      ...(createProfile ? {
+        displayName: 'Workspace Member',
+        phoneNumber: '+254 712 345 678',
+        email: 'member@example.com',
+        photoURL: ''
+      } : {}),
+      orgId: org,
+      updatedAt: serverTimestamp()
+    }, {merge: true});
+    await assertSucceeds(batch.commit());
+  };
+
+  await joinWorkspace(firstOrg, firstToken, 'Alpha Workspace', true);
+  await joinWorkspace(secondOrg, secondToken, 'Bravo Workspace', false);
+
+  const own = env.authenticatedContext(invitee).firestore();
+  const workspaces = await getDocs(collection(own, `users/${invitee}/workspaces`));
+  assert.equal(workspaces.size, 2);
+  assert.deepEqual(
+    workspaces.docs.map(snapshot => snapshot.data().name).sort(),
+    ['Alpha Workspace', 'Bravo Workspace']
+  );
+  await assertSucceeds(getDoc(doc(own, `organizations/${firstOrg}`)));
+  await assertSucceeds(getDoc(doc(own, `organizations/${secondOrg}`)));
+  await assertFails(getDocs(collection(
+    env.authenticatedContext('other-user').firestore(),
+    `users/${invitee}/workspaces`
+  )));
+  await assertFails(getDoc(doc(
+    env.unauthenticatedContext().firestore(),
+    `organizations/${firstOrg}/workspaceInvites/${firstToken}`
+  )));
+});
+
+test('talent profiles are opt-in, contact requests require an open role, and only candidates respond', async () => {
+  const employerUid = 'talent-employer-owner';
+  const candidateUid = 'talent-candidate-uid';
+  const employerOrg = 'talent-employer-org';
+  const roleId = 'network-role';
+  const requestId = 'candidate-introduction';
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db, `organizations/${employerOrg}`), {name: 'Network Employer', owner: employerUid});
+    await setDoc(doc(db, `organizations/${employerOrg}/members/${employerUid}`), {role: 'owner', apps: []});
+  });
+
+  const candidateDb = env.authenticatedContext(candidateUid).firestore();
+  await assertSucceeds(setDoc(doc(candidateDb, `talentProfiles/${candidateUid}`), {
+    displayAlias: 'Network Pro',
+    skills: ['networking', 'linux'],
+    targetRoles: ['Network Technician'],
+    location: 'Nairobi',
+    experienceYears: 4,
+    bio: 'Infrastructure operations',
+    isPublic: true,
+    consentAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+  await assertSucceeds(getDoc(doc(env.authenticatedContext(employerUid).firestore(), `talentProfiles/${candidateUid}`)));
+  await assertFails(setDoc(doc(candidateDb, 'talentProfiles/no-consent'), {
+    displayAlias: 'Private Candidate',
+    skills: ['support'],
+    targetRoles: ['Analyst'],
+    location: 'Nairobi',
+    experienceYears: 1,
+    bio: '',
+    isPublic: true,
+    updatedAt: serverTimestamp()
+  }));
+
+  const employerDb = env.authenticatedContext(employerUid).firestore();
+  await assertSucceeds(setDoc(doc(employerDb, `talentJobPostings/${roleId}`), {
+    employerOrgId: employerOrg,
+    employerName: 'Network Employer',
+    createdBy: employerUid,
+    title: 'Network Support Technician',
+    department: 'IT',
+    requiredSkills: ['networking', 'linux'],
+    location: 'Nairobi',
+    experienceYears: 2,
+    status: 'OPEN',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+  await assertSucceeds(setDoc(doc(employerDb, `talentContactRequests/${requestId}`), {
+    candidateUid,
+    candidateAlias: 'Network Pro',
+    employerOrgId: employerOrg,
+    employerName: 'Network Employer',
+    employerOwnerUid: employerUid,
+    roleId,
+    roleTitle: 'Network Support Technician',
+    matchScore: 85,
+    matchedSkills: ['networking', 'linux'],
+    missingSkills: [],
+    type: 'EMPLOYER_INVITE',
+    status: 'PENDING',
+    createdAt: serverTimestamp()
+  }));
+
+  const candidateRequest = doc(candidateDb, `talentContactRequests/${requestId}`);
+  await assertSucceeds(getDoc(candidateRequest));
+  await assertSucceeds(updateDoc(candidateRequest, {
+    status: 'ACCEPTED',
+    sharedEmail: 'candidate@example.com',
+    updatedAt: serverTimestamp()
+  }));
+  await assertFails(updateDoc(candidateRequest, {
+    status: 'ACCEPTED',
+    sharedEmail: 'candidate@example.com',
+    updatedAt: serverTimestamp()
+  }));
+  await assertFails(getDoc(doc(env.authenticatedContext('other-person').firestore(), `talentContactRequests/${requestId}`)));
+  await assertFails(updateDoc(doc(employerDb, `talentContactRequests/${requestId}`), {
+    status: 'ACCEPTED',
+    sharedEmail: 'forged@example.com',
+    updatedAt: serverTimestamp()
+  }));
+});
+
+test('supplier directory listings require owners and quote requests stay within both workspaces', async () => {
+  const supplierUid = 'supplier-workspace-owner';
+  const buyerUid = 'buyer-workspace-owner';
+  const supplierOrg = 'supplier-workspace-org';
+  const buyerOrg = 'buyer-workspace-org';
+  const requestId = 'supplier-quote-request';
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db, `organizations/${supplierOrg}`), {name: 'Nairobi Equipment Co', owner: supplierUid});
+    await setDoc(doc(db, `organizations/${supplierOrg}/members/${supplierUid}`), {role: 'owner', apps: []});
+    await setDoc(doc(db, `organizations/${buyerOrg}`), {name: 'Market Buyer', owner: buyerUid});
+    await setDoc(doc(db, `organizations/${buyerOrg}/members/${buyerUid}`), {role: 'owner', apps: []});
+  });
+
+  const supplierDb = env.authenticatedContext(supplierUid).firestore();
+  await assertSucceeds(setDoc(doc(supplierDb, `marketplaceSupplierListings/${supplierOrg}`), {
+    supplierOrgId: supplierOrg,
+    organizationName: 'Nairobi Equipment Co',
+    categories: ['Equipment'],
+    products: ['Cold room compressor'],
+    equipment: ['Refrigeration units'],
+    services: ['Installation'],
+    regions: ['Nairobi'],
+    capacity: 8,
+    published: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+  await assertSucceeds(getDoc(doc(env.authenticatedContext(buyerUid).firestore(), `marketplaceSupplierListings/${supplierOrg}`)));
+  await assertFails(setDoc(doc(env.authenticatedContext('not-supplier-owner').firestore(), 'marketplaceSupplierListings/forged'), {
+    supplierOrgId: 'forged',
+    organizationName: 'Forged Supplier',
+    categories: [], products: [], equipment: [], services: [], regions: [],
+    capacity: 0, published: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+  }));
+
+  const buyerDb = env.authenticatedContext(buyerUid).firestore();
+  await assertSucceeds(setDoc(doc(buyerDb, `marketplaceQuoteRequests/${requestId}`), {
+    buyerOrgId: buyerOrg,
+    supplierOrgId: supplierOrg,
+    supplierName: 'Nairobi Equipment Co',
+    createdBy: buyerUid,
+    gapKind: 'Equipment / Asset',
+    gapTitle: 'Cold room compressor',
+    gapDetail: 'Asset status: maintenance due',
+    location: 'Nairobi',
+    quantity: 1,
+    matchScore: 85,
+    matchReasons: ['Offers refrigeration units', 'Located in Nairobi'],
+    status: 'OPEN',
+    createdAt: serverTimestamp()
+  }));
+  await assertSucceeds(getDoc(doc(supplierDb, `marketplaceQuoteRequests/${requestId}`)));
+  await assertFails(getDoc(doc(env.authenticatedContext('unrelated-owner').firestore(), `marketplaceQuoteRequests/${requestId}`)));
 });
 
 test('app permission and expiry protect sensitive records even from another app user', async () => {

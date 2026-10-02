@@ -130,4 +130,27 @@ void main() {
     expect(find.text('Add record'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('dashboard fits a phone viewport with compact navigation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Dashboard(
+          store: DemoSuiteStore(),
+          workspaceName: 'Community Health Workspace',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.textContaining('Community Health Workspace'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

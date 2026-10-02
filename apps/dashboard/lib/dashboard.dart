@@ -34,8 +34,16 @@ import 'modules/generic_module_screen.dart';
 class Dashboard extends StatefulWidget {
   final SuiteStore store;
   final String? initialModuleId;
+  final String? workspaceName;
+  final VoidCallback? onSwitchWorkspace;
 
-  const Dashboard({super.key, required this.store, this.initialModuleId});
+  const Dashboard({
+    super.key,
+    required this.store,
+    this.initialModuleId,
+    this.workspaceName,
+    this.onSwitchWorkspace,
+  });
 
   @override
   State<Dashboard> createState() => _DashboardState();
@@ -179,7 +187,10 @@ class _DashboardState extends State<Dashboard> {
         targetScreen = DocumentsModuleScreen(store: store);
         break;
       default:
-        targetScreen = GenericEnterpriseModuleScreen(module: module, store: store);
+        targetScreen = GenericEnterpriseModuleScreen(
+          module: module,
+          store: store,
+        );
     }
 
     Navigator.push(context, MaterialPageRoute(builder: (_) => targetScreen));
@@ -236,6 +247,7 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 760;
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyK, control: true):
@@ -247,6 +259,35 @@ class _DashboardState extends State<Dashboard> {
         autofocus: true,
         child: Scaffold(
           backgroundColor: const Color(0xFFF1F5F9),
+          drawer: compact
+              ? Drawer(child: SafeArea(child: _buildSidebar(compact: true)))
+              : null,
+          bottomNavigationBar: compact
+              ? NavigationBar(
+                  selectedIndex: switch (_activeTab) {
+                    'billing' => 1,
+                    'reports' => 2,
+                    _ => 0,
+                  },
+                  onDestinationSelected: (index) => setState(() {
+                    _activeTab = ['workspace', 'billing', 'reports'][index];
+                  }),
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.extension_rounded),
+                      label: 'Workspace',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.credit_card_rounded),
+                      label: 'Apps',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.insights_rounded),
+                      label: 'Reports',
+                    ),
+                  ],
+                )
+              : null,
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0.5,
@@ -265,64 +306,87 @@ class _DashboardState extends State<Dashboard> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Text(
-                  'African Business OS',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${workspaceModules.length} apps',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2563EB),
-                    ),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        compact ? 'TeknTandao' : 'TeknTandao Workspace',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        '${widget.workspaceName ?? 'Workspace'} · ${store.orgId}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
             actions: [
-              OutlinedButton.icon(
-                onPressed: _openCommandPalette,
-                icon: const Icon(Icons.search_rounded, size: 16),
-                label: const Text(
-                  'Search apps · Cmd/Ctrl + K',
-                  style: TextStyle(fontSize: 12),
+              if (widget.onSwitchWorkspace != null)
+                IconButton(
+                  tooltip: 'Switch workspace',
+                  onPressed: widget.onSwitchWorkspace,
+                  icon: const Icon(Icons.business_rounded),
                 ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () =>
-                    setState(() => _showAiDrawer = !_showAiDrawer),
-                icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-                label: const Text('Ask AI Copilot'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4F46E5),
-                  foregroundColor: Colors.white,
+              if (compact) ...[
+                IconButton(
+                  tooltip: 'Search apps',
+                  onPressed: _openCommandPalette,
+                  icon: const Icon(Icons.search_rounded),
                 ),
-              ),
-              const SizedBox(width: 16),
+                IconButton(
+                  tooltip: 'Ask AI Copilot',
+                  onPressed: () =>
+                      setState(() => _showAiDrawer = !_showAiDrawer),
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                ),
+                const SizedBox(width: 4),
+              ] else ...[
+                OutlinedButton.icon(
+                  onPressed: _openCommandPalette,
+                  icon: const Icon(Icons.search_rounded, size: 16),
+                  label: const Text(
+                    'Search apps · Cmd/Ctrl + K',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () =>
+                      setState(() => _showAiDrawer = !_showAiDrawer),
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                  label: const Text('Ask AI Copilot'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
             ],
           ),
           body: Stack(
             children: [
               Row(
                 children: [
-                  _buildSidebar(),
+                  if (!compact) _buildSidebar(),
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
+                      padding: EdgeInsets.all(compact ? 12 : 24),
                       child: StreamBuilder<List<Map<String, dynamic>>>(
                         stream: store.watch('apps'),
                         builder: (context, snapshot) {
@@ -366,11 +430,11 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar({bool compact = false}) {
     return Material(
       color: Colors.white,
       child: SizedBox(
-        width: 240,
+        width: compact ? double.infinity : 240,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
           child: Column(
@@ -454,10 +518,7 @@ class _DashboardState extends State<Dashboard> {
                 ),
                 child: const Text(
                   'Africa-first integrations are enabled only when their real provider configuration is complete.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
-                  ),
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                 ),
               ),
             ],
@@ -468,17 +529,17 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Widget _navGroup(String title) => Padding(
-        padding: const EdgeInsets.only(left: 12, bottom: 8),
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF94A3B8),
-            letterSpacing: 0.8,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(left: 12, bottom: 8),
+    child: Text(
+      title,
+      style: const TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF94A3B8),
+        letterSpacing: 0.8,
+      ),
+    ),
+  );
 
   Widget _navItem(String id, String label, IconData icon) {
     final selected = _activeTab == id;
@@ -492,9 +553,7 @@ class _DashboardState extends State<Dashboard> {
           dense: true,
           leading: Icon(
             icon,
-            color: selected
-                ? const Color(0xFF2563EB)
-                : const Color(0xFF64748B),
+            color: selected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
             size: 20,
           ),
           title: Text(
@@ -507,7 +566,12 @@ class _DashboardState extends State<Dashboard> {
               fontSize: 13,
             ),
           ),
-          onTap: () => setState(() => _activeTab = id),
+          onTap: () {
+            setState(() => _activeTab = id);
+            if (MediaQuery.sizeOf(context).width < 760) {
+              Navigator.of(context).maybePop();
+            }
+          },
         ),
       ),
     );
@@ -515,14 +579,17 @@ class _DashboardState extends State<Dashboard> {
 
   Widget _buildBillingTab(List<Map<String, dynamic>> installed) {
     final query = _billingQuery.trim().toLowerCase();
-    final matches = workspaceModules.where((module) {
-      if (query.isEmpty) return true;
-      return '${module.name} ${module.category} ${module.description}'
-          .toLowerCase()
-          .contains(query);
-    }).toList(growable: false);
-    final visible =
-        query.isEmpty ? matches.take(80).toList(growable: false) : matches;
+    final matches = workspaceModules
+        .where((module) {
+          if (query.isEmpty) return true;
+          return '${module.name} ${module.category} ${module.description}'
+              .toLowerCase()
+              .contains(query);
+        })
+        .toList(growable: false);
+    final visible = query.isEmpty
+        ? matches.take(80).toList(growable: false)
+        : matches;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -554,8 +621,9 @@ class _DashboardState extends State<Dashboard> {
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final module = visible[index];
-              final isInstalled =
-                  installed.any((app) => app['id'] == module.id);
+              final isInstalled = installed.any(
+                (app) => app['id'] == module.id,
+              );
               return ListTile(
                 leading: Icon(module.icon, color: module.color),
                 title: Text(
@@ -587,10 +655,7 @@ class _DashboardState extends State<Dashboard> {
           const SizedBox(height: 10),
           Text(
             'Showing ${visible.length} of ${matches.length}. Search to locate any app in the full catalogue.',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF64748B),
-            ),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
         ],
       ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
+import 'supplier_marketplace_tab.dart';
 import '../widgets/record_form.dart';
 
 class EcommerceModuleScreen extends StatelessWidget {
@@ -33,7 +34,9 @@ class EcommerceModuleScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
       appBar: AppBar(
         title: const Row(
           children: [
@@ -42,13 +45,31 @@ class EcommerceModuleScreen extends StatelessWidget {
             Text('E-Commerce Storefront'),
           ],
         ),
+        bottom: const TabBar(
+          tabs: [
+            Tab(icon: Icon(Icons.storefront_rounded), text: 'Storefront'),
+            Tab(icon: Icon(Icons.hub_rounded), text: 'Marketplace'),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _createOrder(context),
-        icon: const Icon(Icons.add_shopping_cart_rounded),
-        label: const Text('New order'),
+      floatingActionButton: Builder(
+        builder: (context) {
+          final tabs = DefaultTabController.of(context);
+          return AnimatedBuilder(
+            animation: tabs,
+            builder: (context, _) => tabs.index == 0
+                ? FloatingActionButton.extended(
+                    onPressed: () => _createOrder(context),
+                    icon: const Icon(Icons.add_shopping_cart_rounded),
+                    label: const Text('New order'),
+                  )
+                : const SizedBox.shrink(),
+          );
+        },
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
+      body: TabBarView(
+        children: [
+          StreamBuilder<List<Map<String, dynamic>>>(
         stream: store.watch('ecommerce_orders'),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
@@ -170,6 +191,10 @@ class EcommerceModuleScreen extends StatelessWidget {
             ),
           );
         },
+          ),
+          SupplierMarketplaceTab(store: store),
+        ],
+      ),
       ),
     );
   }

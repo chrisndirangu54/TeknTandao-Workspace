@@ -53,23 +53,28 @@ class _JigsawCanvasState extends State<JigsawCanvas>
       .toList(growable: false);
 
   List<String> get _categories {
-    final values = workspaceModules.map((module) => module.category).toSet().toList()
-      ..sort();
+    final values =
+        workspaceModules.map((module) => module.category).toSet().toList()
+          ..sort();
     return values;
   }
 
   List<SuiteModule> get _filteredAvailableModules {
     final query = _catalogQuery.trim().toLowerCase();
-    return workspaceModules.where((module) {
-      if (_installedIds.contains(module.id)) return false;
-      if (_catalogCategory != 'All' && module.category != _catalogCategory) {
-        return false;
-      }
-      if (query.isEmpty) return true;
-      final haystack = '${module.name} ${module.description} ${module.category}'
-          .toLowerCase();
-      return haystack.contains(query);
-    }).toList(growable: false);
+    return workspaceModules
+        .where((module) {
+          if (_installedIds.contains(module.id)) return false;
+          if (_catalogCategory != 'All' &&
+              module.category != _catalogCategory) {
+            return false;
+          }
+          if (query.isEmpty) return true;
+          final haystack =
+              '${module.name} ${module.description} ${module.category}'
+                  .toLowerCase();
+          return haystack.contains(query);
+        })
+        .toList(growable: false);
   }
 
   List<SuiteModule> get _visibleAvailableModules {
@@ -136,82 +141,118 @@ class _JigsawCanvasState extends State<JigsawCanvas>
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 640;
+        final icon = Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(12),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
+          child: const Icon(
+            Icons.extension_rounded,
+            color: Color(0xFF60A5FA),
+            size: 28,
+          ),
+        );
+        final copy = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Jigsaw Puzzle Workspace',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: compact ? 19 : 22,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            child: const Icon(Icons.extension_rounded,
-                color: Color(0xFF60A5FA), size: 28),
+            const SizedBox(height: 4),
+            const Text(
+              'Search the master catalogue, add only the apps a business needs, and keep them on one tenant data fabric.',
+              style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
+            ),
+          ],
+        );
+        final counts = Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            Chip(
+              avatar: const Icon(
+                Icons.apps_rounded,
+                size: 16,
+                color: Color(0xFF60A5FA),
+              ),
+              label: Text('${workspaceModules.length} Apps'),
+              backgroundColor: const Color(0xFF172554),
+              side: const BorderSide(color: Color(0xFF3B82F6)),
+              labelStyle: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Chip(
+              avatar: const Icon(
+                Icons.hub_rounded,
+                size: 16,
+                color: Color(0xFF10B981),
+              ),
+              label: Text('${_installedModules.length} Active'),
+              backgroundColor: const Color(0xFF064E3B),
+              side: const BorderSide(color: Color(0xFF059669)),
+              labelStyle: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        );
+
+        return Container(
+          padding: EdgeInsets.all(compact ? 16 : 20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Jigsaw Puzzle Workspace',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.5,
-                  ),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        icon,
+                        const SizedBox(width: 12),
+                        Expanded(child: copy),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    counts,
+                  ],
+                )
+              : Row(
+                  children: [
+                    icon,
+                    const SizedBox(width: 16),
+                    Expanded(child: copy),
+                    const SizedBox(width: 12),
+                    counts,
+                  ],
                 ),
-                SizedBox(height: 4),
-                Text(
-                  'Search the master catalogue, add only the apps a business needs, and keep them on one tenant data fabric.',
-                  style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Chip(
-            avatar: const Icon(Icons.apps_rounded,
-                size: 16, color: Color(0xFF60A5FA)),
-            label: Text(
-              '${workspaceModules.length} Apps',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: const Color(0xFF172554),
-            side: const BorderSide(color: Color(0xFF3B82F6)),
-          ),
-          const SizedBox(width: 8),
-          Chip(
-            avatar: const Icon(Icons.hub_rounded,
-                size: 16, color: Color(0xFF10B981)),
-            label: Text(
-              '${_installedModules.length} Active',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: const Color(0xFF064E3B),
-            side: const BorderSide(color: Color(0xFF059669)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -248,15 +289,22 @@ class _JigsawCanvasState extends State<JigsawCanvas>
             children: [
               const Row(
                 children: [
-                  Icon(Icons.widgets_outlined,
-                      color: Color(0xFF475569), size: 20),
+                  Icon(
+                    Icons.widgets_outlined,
+                    color: Color(0xFF475569),
+                    size: 20,
+                  ),
                   SizedBox(width: 8),
-                  Text(
-                    'Active Organization Canvas',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                  Expanded(
+                    child: Text(
+                      'Active Organization Canvas',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
                     ),
                   ),
                 ],
@@ -268,20 +316,26 @@ class _JigsawCanvasState extends State<JigsawCanvas>
                   child: Center(
                     child: Column(
                       children: [
-                        Icon(Icons.extension_off_rounded,
-                            size: 52, color: Color(0xFFCBD5E1)),
+                        Icon(
+                          Icons.extension_off_rounded,
+                          size: 52,
+                          color: Color(0xFFCBD5E1),
+                        ),
                         SizedBox(height: 10),
                         Text(
                           'Your organization workspace is empty',
                           style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B)),
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                         SizedBox(height: 4),
                         Text(
                           'Search below, then drag or click Add to Workspace.',
                           style: TextStyle(
-                              fontSize: 12, color: Color(0xFF94A3B8)),
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                          ),
                         ),
                       ],
                     ),
@@ -316,94 +370,113 @@ class _JigsawCanvasState extends State<JigsawCanvas>
   }
 
   Widget _buildCatalogControls(int filteredCount, int visibleCount) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 640;
+        final search = TextField(
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.search_rounded),
+            hintText: 'Search CRM, payroll, mining, AI, school, M-Pesa...',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          onChanged: (value) =>
+              setState(() => _catalogQuery = value.toLowerCase()),
+        );
+        final category = DropdownButtonFormField<String>(
+          initialValue: _catalogCategory,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Category',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: [
+            const DropdownMenuItem(value: 'All', child: Text('All categories')),
+            for (final category in _categories)
+              DropdownMenuItem(value: category, child: Text(category)),
+          ],
+          onChanged: (value) =>
+              setState(() => _catalogCategory = value ?? 'All'),
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Master Application Catalogue',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        'Every app is independently installable and priced; bundle discounts are calculated at checkout.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '$filteredCount available',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3B82F6),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (compact)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [search, const SizedBox(height: 10), category],
+              )
+            else
+              Row(
                 children: [
-                  Text(
-                    'Master Application Catalogue',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A)),
-                  ),
-                  Text(
-                    'Every app is independently installable and priced; bundle discounts are calculated at checkout.',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                  ),
+                  Expanded(child: search),
+                  const SizedBox(width: 12),
+                  SizedBox(width: 300, child: category),
                 ],
               ),
-            ),
-            Text(
-              '$filteredCount available',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, color: Color(0xFF3B82F6)),
-            ),
+            if (visibleCount < filteredCount) const SizedBox(height: 4),
           ],
-        ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded),
-                  hintText: 'Search CRM, payroll, mining, AI, school, M-Pesa...',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                onChanged: (value) =>
-                    setState(() => _catalogQuery = value.toLowerCase()),
-              ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 300,
-              child: DropdownButtonFormField<String>(
-                initialValue: _catalogCategory,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                items: [
-                  const DropdownMenuItem(value: 'All', child: Text('All categories')),
-                  for (final category in _categories)
-                    DropdownMenuItem(value: category, child: Text(category)),
-                ],
-                onChanged: (value) =>
-                    setState(() => _catalogCategory = value ?? 'All'),
-              ),
-            ),
-          ],
-        ),
-        if (visibleCount < filteredCount) const SizedBox(height: 4),
-      ],
+        );
+      },
     );
   }
 
   Widget _emptyCatalogState() => const Card(
-        child: Padding(
-          padding: EdgeInsets.all(28),
-          child: Row(
-            children: [
-              Icon(Icons.search_off_rounded, color: Color(0xFF64748B)),
-              SizedBox(width: 12),
-              Text('No apps match the current search and category filters.'),
-            ],
-          ),
-        ),
-      );
+    child: Padding(
+      padding: EdgeInsets.all(28),
+      child: Row(
+        children: [
+          Icon(Icons.search_off_rounded, color: Color(0xFF64748B)),
+          SizedBox(width: 12),
+          Text('No apps match the current search and category filters.'),
+        ],
+      ),
+    ),
+  );
 
   Widget _buildInstalledPiece(SuiteModule module) {
     final activeConnections = module.dependencies
-        .where((dependency) => _installedIds.contains(dependency.targetModuleId))
+        .where(
+          (dependency) => _installedIds.contains(dependency.targetModuleId),
+        )
         .toList(growable: false);
     return Container(
       width: 270,
@@ -411,7 +484,9 @@ class _JigsawCanvasState extends State<JigsawCanvas>
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-            color: module.color.withValues(alpha: 0.4), width: 2),
+          color: module.color.withValues(alpha: 0.4),
+          width: 2,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -429,31 +504,42 @@ class _JigsawCanvasState extends State<JigsawCanvas>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(module.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text(module.category,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF64748B))),
+                      Text(
+                        module.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        module.category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 IconButton(
                   tooltip: 'Uninstall',
                   onPressed: () => widget.onUninstallModule(module.id),
-                  icon: const Icon(Icons.remove_circle_outline_rounded,
-                      color: Colors.redAccent, size: 19),
+                  icon: const Icon(
+                    Icons.remove_circle_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 19,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            Text(module.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            Text(
+              module.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
             if (activeConnections.isNotEmpty) ...[
               const SizedBox(height: 10),
               Wrap(
@@ -463,8 +549,10 @@ class _JigsawCanvasState extends State<JigsawCanvas>
                   for (final connection in activeConnections)
                     ActionChip(
                       avatar: const Icon(Icons.link_rounded, size: 13),
-                      label: Text(connection.targetModuleId.toUpperCase(),
-                          style: const TextStyle(fontSize: 10)),
+                      label: Text(
+                        connection.targetModuleId.toUpperCase(),
+                        style: const TextStyle(fontSize: 10),
+                      ),
                       onPressed: () => setState(() {
                         _selectedConnection = connection;
                         _selectedSourceModuleId = module.id;
@@ -528,34 +616,46 @@ class _JigsawCanvasState extends State<JigsawCanvas>
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(module.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(
+                    module.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
-                const Icon(Icons.drag_indicator_rounded,
-                    color: Color(0xFF94A3B8)),
+                const Icon(
+                  Icons.drag_indicator_rounded,
+                  color: Color(0xFF94A3B8),
+                ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(module.category,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: module.color)),
+            Text(
+              module.category,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: module.color,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(module.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            Text(
+              module.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
             const SizedBox(height: 10),
-            Text('${kes(module.monthlyPriceKes)}/mo',
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF059669))),
+            Text(
+              '${kes(module.monthlyPriceKes)}/mo',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF059669),
+              ),
+            ),
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
@@ -580,8 +680,10 @@ class _JigsawCanvasState extends State<JigsawCanvas>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Connected data fabric',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text(
+          'Connected data fabric',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -593,7 +695,8 @@ class _JigsawCanvasState extends State<JigsawCanvas>
                   ActionChip(
                     avatar: const Icon(Icons.sync_alt_rounded, size: 14),
                     label: Text(
-                        '${module.name} ↔ ${dependency.targetModuleId.toUpperCase()}'),
+                      '${module.name} ↔ ${dependency.targetModuleId.toUpperCase()}',
+                    ),
                     onPressed: () => setState(() {
                       _selectedConnection = dependency;
                       _selectedSourceModuleId = module.id;
@@ -617,8 +720,7 @@ class _JigsawCanvasState extends State<JigsawCanvas>
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline_rounded,
-              color: Color(0xFF1D4ED8)),
+          const Icon(Icons.info_outline_rounded, color: Color(0xFF1D4ED8)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -627,11 +729,15 @@ class _JigsawCanvasState extends State<JigsawCanvas>
                 Text(
                   '${source?.name ?? _selectedSourceModuleId} ↔ ${connection.targetModuleId.toUpperCase()}',
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E3A8A),
+                  ),
                 ),
                 const SizedBox(height: 3),
-                Text(connection.relationDescription,
-                    style: const TextStyle(color: Color(0xFF1E40AF))),
+                Text(
+                  connection.relationDescription,
+                  style: const TextStyle(color: Color(0xFF1E40AF)),
+                ),
               ],
             ),
           ),
