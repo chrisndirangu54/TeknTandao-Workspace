@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../suite.dart';
@@ -42,11 +41,12 @@ class _AutomationStudioState extends State<AutomationStudio> {
   Future<void> _load() async {
     try {
       final data = await widget.store.call('getAutomationStudio');
-      if (mounted)
+      if (mounted) {
         setState(() {
           _data = data;
           _error = null;
         });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     }
@@ -99,19 +99,42 @@ class _AutomationStudioState extends State<AutomationStudio> {
     final result = await _action('startAutomationOAuth', {
       'provider': provider,
     });
-    if (result == null) return;
-    try {
-      if (!await launchUrl(
-        Uri.parse(result['url'] as String),
-        webOnlyWindowName: '_blank',
-      )) {
-        throw StateError(
-          'Unable to open sign-in. Allow a new browser tab and try again.',
-        );
-      }
-    } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
-    }
+    if (result == null || !mounted) return;
+    final name = provider == 'google' ? 'Google' : 'Notion';
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Connect $name'),
+        content: const Text(
+          'Sign in in the new tab, then return here and refresh your connections.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              // Open directly from this gesture, after the OAuth URL is ready.
+              try {
+                final opened = await launchUrl(
+                  Uri.parse(result['url'] as String),
+                  webOnlyWindowName: '_blank',
+                );
+                if (!opened)
+                  throw StateError(
+                    'Unable to open sign-in. Allow a new browser tab and try again.',
+                  );
+              } catch (error) {
+                if (mounted) setState(() => _error = error.toString());
+              }
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: Text('Continue to $name'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _remoteConnection() async {
@@ -125,8 +148,9 @@ class _AutomationStudioState extends State<AutomationStudio> {
       },
       secretKeys: const {'token'},
     );
-    if (values != null)
+    if (values != null) {
       await _action('connectRemoteMcp', {'connection': values});
+    }
   }
 
   Future<void> _editWorkflow([Map<String, dynamic>? saved]) async {
@@ -140,11 +164,12 @@ class _AutomationStudioState extends State<AutomationStudio> {
         initial: saved,
       ),
     );
-    if (workflow != null)
+    if (workflow != null) {
       await _action('saveToolWorkflow', {
         'workflow': workflow,
         if (saved != null) 'id': saved['id'],
       });
+    }
   }
 
   Map<String, dynamic> _workflowDefinition(
@@ -165,8 +190,9 @@ class _AutomationStudioState extends State<AutomationStudio> {
           context,
           'Enable ${saved['name']}?',
           'This authorizes its configured tool actions, including external writes. ${saved['trigger'] == 'manual' ? 'It will run when you or an authorized MCP client starts it.' : 'It will run automatically on ${saved['trigger']} events.'}\n\n${_pretty.convert(saved['steps'])}',
-        ))
+        )) {
       return;
+    }
     await _action('saveToolWorkflow', {
       'id': saved['id'],
       'workflow': _workflowDefinition(saved, enable),
@@ -193,12 +219,13 @@ class _AutomationStudioState extends State<AutomationStudio> {
     );
     if (values == null) return;
     final result = await _action('generateCustomFeature', values);
-    if (result != null && mounted)
+    if (result != null && mounted) {
       await _featurePreview({
         'id': result['id'],
         'feature': result['feature'],
         'status': 'draft',
       });
+    }
   }
 
   Future<void> _developerFeature([Map<String, dynamic>? saved]) async {
@@ -264,8 +291,9 @@ class _AutomationStudioState extends State<AutomationStudio> {
           context,
           'Publish this feature?',
           'Make this form and its code available in this workspace. Submissions are saved, and an attached enabled workflow can perform external actions.',
-        ))
+        )) {
       return;
+    }
     await _action('publishCustomFeature', {
       'id': feature['id'],
       'enabled': enabled,
@@ -329,7 +357,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
     final result = await _action('createWorkspaceMcpKey', {
       'workflowIds': selected.toList(),
     });
-    if (result != null)
+    if (result != null) {
       await _showResult('Save this key — shown only once', {
         'url': result['url'],
         'headers': {'Authorization': 'Bearer ${result['token']}'},
@@ -337,6 +365,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
           result['expiresAt'] as int,
         ).toIso8601String(),
       });
+    }
   }
 
   @override
@@ -427,7 +456,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(subtitle),
-          if (extra != null) extra,
+          ?extra,
           if (actions.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -506,10 +535,11 @@ class _AutomationStudioState extends State<AutomationStudio> {
                         context,
                         'Disconnect this service?',
                         'Workflows using this connection will stop. You can also revoke provider consent in your Google or Notion account.',
-                      ))
+                      )) {
                         await _action('disconnectToolConnection', {
                           'id': connection['id'],
                         });
+                      }
                     },
               child: const Text('Disconnect'),
             ),
@@ -664,6 +694,15 @@ class _AutomationStudioState extends State<AutomationStudio> {
           ),
         ],
       ),
+    const SizedBox(height: 24),
+    const Text('Recent feature submissions', style: TextStyle(fontSize: 20)),
+    for (final record in _rows(_data?['records']))
+      _card('Feature ${record['featureId']}', 'Submission: ${record['id']}', [
+        TextButton(
+          onPressed: () => _showResult('Saved submission', record),
+          child: const Text('View submission'),
+        ),
+      ]),
   ]);
 
   Widget _mcpTab() => _page([
@@ -698,8 +737,9 @@ class _AutomationStudioState extends State<AutomationStudio> {
                       context,
                       'Revoke this key?',
                       'Clients using this key will lose access.',
-                    ))
+                    )) {
                       await _action('revokeWorkspaceMcpKey', {'id': key['id']});
+                    }
                   },
             child: const Text('Revoke'),
           ),
@@ -930,8 +970,9 @@ class _WorkflowEditorState extends State<_WorkflowEditor> {
                     : () {
                         try {
                           final decoded = jsonDecode(args.text);
-                          if (decoded is! Map<String, dynamic>)
+                          if (decoded is! Map<String, dynamic>) {
                             throw const FormatException('Use a JSON object');
+                          }
                           Navigator.pop(context, {
                             'kind': 'tool',
                             'connectionId': connectionId,
@@ -962,8 +1003,9 @@ class _WorkflowEditorState extends State<_WorkflowEditor> {
       initial: const {'code': 'return input;'},
       multilineKeys: const {'code'},
     );
-    if (values != null && mounted)
+    if (values != null && mounted) {
       setState(() => _steps.add({'kind': 'code', 'code': values['code']}));
+    }
   }
 
   @override
@@ -1096,6 +1138,7 @@ class _WorkflowRunnerState extends State<_WorkflowRunner> {
   final _input = TextEditingController(text: '{}');
   final _runId = _requestId();
   bool _busy = false;
+  bool _submitted = false;
   String? _result;
   @override
   void dispose() {
@@ -1107,8 +1150,10 @@ class _WorkflowRunnerState extends State<_WorkflowRunner> {
     setState(() => _busy = true);
     try {
       final input = jsonDecode(_input.text);
-      if (input is! Map)
+      if (input is! Map) {
         throw const FormatException('Input must be a JSON object');
+      }
+      setState(() => _submitted = true);
       final result = await widget.store.call('runToolWorkflow', {
         'id': widget.workflow['id'],
         'runId': _runId,
@@ -1138,7 +1183,7 @@ class _WorkflowRunnerState extends State<_WorkflowRunner> {
             const SizedBox(height: 12),
             TextField(
               controller: _input,
-              enabled: !_busy && _result == null,
+              enabled: !_busy && !_submitted,
               minLines: 5,
               maxLines: 15,
               decoration: const InputDecoration(labelText: 'Input JSON'),
@@ -1292,14 +1337,16 @@ class _FeatureFormState extends State<_FeatureForm> {
                                 : null,
                           ),
                           validator: (value) {
-                            if ((value ?? '').isEmpty)
+                            if ((value ?? '').isEmpty) {
                               return field['required'] == true
                                   ? 'Required'
                                   : null;
+                            }
                             if (field['type'] == 'number' &&
                                 (num.tryParse(value!) == null ||
-                                    !num.parse(value).isFinite))
+                                    !num.parse(value).isFinite)) {
                               return 'Enter a number';
+                            }
                             return null;
                           },
                         ),

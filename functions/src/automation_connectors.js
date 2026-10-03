@@ -1,4 +1,5 @@
 import {lookup} from 'node:dns';
+import {randomUUID} from 'node:crypto';
 import {Agent, fetch as httpFetch} from 'undici';
 import ipaddr from 'ipaddr.js';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
@@ -59,12 +60,14 @@ async function withMcp(connection, credential, work) {
 export async function discoverMcp(connection, credential) {
   return withMcp(connection, credential, async client => {
     const tools = [];
+    let pages = 0;
     let cursor;
     do {
       const page = await client.listTools(cursor ? {cursor} : {}, {timeout: 20000});
       tools.push(...page.tools);
       cursor = page.nextCursor;
-      if (tools.length > 100 || (cursor && tools.length >= 100)) throw new Error('MCP servers are limited to 100 tools per connection');
+      pages += 1;
+      if (tools.length > 100 || (cursor && (tools.length >= 100 || pages >= 10))) throw new Error('MCP servers are limited to 100 tools and 10 pages per connection');
     } while (cursor);
     return boundedJson(tools, 256000);
   });
@@ -102,8 +105,8 @@ const schemas = {
   notion_search: z.object({query: text.optional()}).strict(),
   notion_create_page: z.object({parentId: z.string().regex(/^[a-fA-F0-9-]{32,36}$/), title: z.string().min(1).max(200), content: z.string().max(2000)}).strict(),
 };
-export async function providerJson(url, options = {}) {
-  const response = await fetch(url, {...options, redirect: 'error', signal: AbortSignal.timeout(20000)});
+export async function providerJson(url, options = {}, timeoutMs = 20000) {
+  const response = await fetch(url, {...options, redirect: 'error', signal: AbortSignal.timeout(timeoutMs)});
   if (!response.ok) throw new Error(`Connection provider returned HTTP ${response.status}`);
   const reader = response.body.getReader();
   let size = 0;
@@ -133,7 +136,7 @@ export async function callBuiltin(provider, accessToken, name, raw) {
     }
     case 'drive_search': return google(`drive/v3/files?pageSize=20&fields=files(id,name,mimeType,webViewLink)&q=${encodeURIComponent(args.query || 'trashed = false')}`);
     case 'drive_create_text': {
-      const boundary = 'tekntandao_' + crypto.randomUUID();
+      const boundary = 'tekntandao_' + randomUUID();
       return providerJson('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {method: 'POST', headers: {...headers, 'Content-Type': `multipart/related; boundary=${boundary}`}, body: `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name: args.name, mimeType: 'text/plain'})}\r\n--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${args.content}\r\n--${boundary}--`});
     }
     case 'notion_search': return providerJson('https://api.notion.com/v1/search', {method: 'POST', headers: {...headers, 'Notion-Version': '2026-03-11'}, body: JSON.stringify({query: args.query || '', page_size: 20})});

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import {boundedJson, decryptCredential, encryptCredential, featureInput, featureSchema, hasPaidSubscription, resolveArguments, runCustomCode, workflowSchema} from '../src/automation_domain.js';
-import {builtinTools, isPublicAddress, remoteUrl} from '../src/automation_connectors.js';
+import {builtinTools, callBuiltin, isPublicAddress, remoteUrl} from '../src/automation_connectors.js';
 
 const feature = () => featureSchema.parse({name: 'Quote', description: 'Calculate a quote', fields: [{key: 'quantity', label: 'Quantity', type: 'number', required: true}], code: 'return {total: input.quantity * 100};'});
 
@@ -59,10 +59,29 @@ test('custom JavaScript executes calculations without host capabilities', async 
   await assert.rejects(runCustomCode('while(true) {}', {}), /Custom code failed/);
   await assert.rejects(runCustomCode('return "x".repeat(70000);', {}), /too large/);
   await assert.rejects(runCustomCode('return undefined;', {}), /must return JSON/);
+  await assert.rejects(runCustomCode('return Promise.resolve(1);', {}), /Async code/);
 });
 test('built-in tool catalog exposes bounded provider operations', () => {
   assert.ok(builtinTools.google.some(tool => tool.name === 'gmail_send'));
   assert.ok(builtinTools.google.some(tool => tool.name === 'drive_create_text'));
   assert.ok(builtinTools.notion.some(tool => tool.name === 'notion_create_page'));
   for (const tools of Object.values(builtinTools)) for (const tool of tools) assert.equal(tool.inputSchema.additionalProperties, false);
+});
+
+test('Gmail adapter encodes messages and rejects header injection before sending', async t => {
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    requests.push({url, options});
+    return new Response(JSON.stringify({id: 'message'}), {status: 200});
+  });
+  await callBuiltin('google', 'test-token', 'gmail_send', {to: 'customer@example.com', subject: 'Your quote', body: 'Total: KES 400'});
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, 'https://www.googleapis.com/gmail/v1/users/me/messages/send');
+  assert.equal(requests[0].options.redirect, 'error');
+  const mime = Buffer.from(JSON.parse(requests[0].options.body).raw, 'base64url').toString();
+  assert.ok(mime.includes('To: customer@example.com\r\n'));
+  assert.ok(mime.includes(Buffer.from('Total: KES 400').toString('base64')));
+  await assert.rejects(callBuiltin('google', 'test-token', 'gmail_send', {to: 'customer@example.com', subject: 'Subject\r\nBcc: other@example.com', body: 'text'}));
+  await assert.rejects(callBuiltin('notion', 'test-token', 'gmail_send', {to: 'customer@example.com', subject: 'Subject', body: 'text'}));
+  assert.equal(requests.length, 1);
 });

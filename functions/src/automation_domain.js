@@ -84,7 +84,7 @@ export async function runCustomCode(code, input, steps = []) {
   runtime.setInterruptHandler(() => Date.now() > deadline);
   const vm = runtime.newContext();
   try {
-    const result = vm.evalCode(`JSON.stringify((function(input, steps) { "use strict";\n${code}\n})(${JSON.stringify(boundedJson(input))}, ${JSON.stringify(boundedJson(steps))}))`);
+    const result = vm.evalCode(`(() => { const result = (function(input, steps) { "use strict";\n${code}\n})(${JSON.stringify(boundedJson(input))}, ${JSON.stringify(boundedJson(steps))}); if (result && typeof result.then === 'function') throw new Error('Async code is not supported'); return JSON.stringify(result); })()`);
     if (result.error) {
       const error = vm.dump(result.error);
       result.error.dispose();
