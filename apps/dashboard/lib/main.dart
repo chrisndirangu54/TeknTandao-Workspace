@@ -103,6 +103,12 @@ class _RuntimeEntryGateState extends State<RuntimeEntryGate> {
 
   Future<void> _resolve() async {
     final query = Uri.base.queryParameters;
+    // Module links belong to the signed-in workspace, even on a host that
+    // also serves a published website.
+    if (query['module']?.trim().isNotEmpty == true) {
+      if (mounted) setState(() => _resolved = const SignIn());
+      return;
+    }
     if (query['workspace']?.isNotEmpty == true &&
         query['invite']?.isNotEmpty == true) {
       if (mounted) setState(() => _resolved = const SignIn());

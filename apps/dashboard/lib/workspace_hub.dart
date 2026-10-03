@@ -88,6 +88,7 @@ class _WorkspaceHubState extends State<WorkspaceHub> {
         MaterialPageRoute<void>(
           builder: (_) => Dashboard(
             store: CostAwareFirebaseSuiteStore(workspace.id),
+            initialModuleId: initialModuleId,
             workspaceName: workspace.name,
             onSwitchWorkspace: () => navigator.pushReplacement(
               MaterialPageRoute<void>(

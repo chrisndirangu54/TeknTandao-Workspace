@@ -30,6 +30,7 @@ import 'modules/restaurant_module.dart';
 import 'modules/ngo_module.dart';
 import 'modules/documents_module.dart';
 import 'modules/generic_module_screen.dart';
+import 'modules/automation_studio.dart';
 
 class Dashboard extends StatefulWidget {
   final SuiteStore store;
@@ -64,6 +65,10 @@ class _DashboardState extends State<Dashboard> {
     if (moduleId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+        if (moduleId == 'automation') {
+          _openAutomationStudio();
+          return;
+        }
         final module = workspaceModuleById[moduleId];
         if (module != null) _navigateToModule(module);
       });
@@ -109,6 +114,16 @@ class _DashboardState extends State<Dashboard> {
   void _openKnownModule(String id) {
     final module = workspaceModuleById[id];
     if (module != null) _navigateToModule(module);
+  }
+
+  void _openAutomationStudio() {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AutomationStudio(
+      store: store,
+      onUpgrade: () {
+        Navigator.of(context).pop();
+        setState(() => _activeTab = 'billing');
+      },
+    )));
   }
 
   void _navigateToModule(SuiteModule module) {
@@ -336,6 +351,11 @@ class _DashboardState extends State<Dashboard> {
               ],
             ),
             actions: [
+              IconButton(
+                tooltip: 'Automation & custom features',
+                onPressed: _openAutomationStudio,
+                icon: const Icon(Icons.hub_outlined),
+              ),
               if (widget.onSwitchWorkspace != null)
                 IconButton(
                   tooltip: 'Switch workspace',
