@@ -1,7 +1,7 @@
 import {XMLParser} from 'fast-xml-parser';
 import {z} from 'zod';
 
-export const domainName = z.string().trim().toLowerCase().max(70).regex(/^(?!-)[a-z0-9-]+(?<!-)\.(?:com|net|org|co|io|biz|info)$/);
+export const domainName = z.string().trim().toLowerCase().max(70).regex(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(?:com|net|org|co|io|biz|info)$/);
 export const registrantSchema = z.object({
   FirstName: z.string().min(1).max(100), LastName: z.string().min(1).max(100),
   Address1: z.string().min(1).max(255), City: z.string().min(1).max(50),

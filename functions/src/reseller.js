@@ -160,7 +160,22 @@ export const createResellerBundle = callable(async request => {
     generationCharge = usage.charge;
   }
   const ref = db.collection('resellerBundles').doc();
-  await ref.create({name: input.name, sellerOrgId: org.id, clientOrgId, sourceProjectId: input.projectId, blueprint: compiled.blueprint, document: compiled.document, apps, policy, domainQuote, generationCharge, status: 'offered', domainStatus: domainQuote ? 'awaiting_payment' : 'not_requested', createdBy: uid, createdAt: stamp()});
+  const clientRef = org.collection('resellerClients').doc(clientOrgId);
+  const usageRef = input.generationId ? org.collection('siteGenerationUsage').doc(input.generationId) : null;
+  const domainRef = domainQuote ? db.doc(`resellerDomainReservations/${domainQuote.domain}`) : null;
+  await db.runTransaction(async tx => {
+    const currentClient = (await tx.get(clientRef)).data();
+    const currentBundle = currentClient ? (await tx.get(db.doc(`resellerBundles/${currentClient.bundleId}`))).data() : null;
+    if (currentBundle && (currentBundle.status !== 'cancelled' || currentBundle.paidThrough?.toMillis() > Date.now())) throw new Error('This client already has a current bundle from this reseller; cancel it and wait for paid access to expire before replacing it');
+    const usage = usageRef ? (await tx.get(usageRef)).data() : null;
+    const reservation = domainRef ? await tx.get(domainRef) : null;
+    if (usage?.soldToBundleId) throw new Error('This generation charge is already assigned to another client offer');
+    if (reservation?.exists) throw new Error('Domain is reserved by another bundle; review that offer before selling it again');
+    tx.create(ref, {name: input.name, sellerOrgId: org.id, clientOrgId, sourceProjectId: input.projectId, blueprint: compiled.blueprint, document: compiled.document, apps, policy, domainQuote, generationCharge, status: 'offered', domainStatus: domainQuote ? 'awaiting_payment' : 'not_requested', createdBy: uid, createdAt: stamp()});
+    tx.set(clientRef, {bundleId: ref.id});
+    if (usageRef) tx.update(usageRef, {soldToBundleId: ref.id});
+    if (domainRef) tx.create(domainRef, {bundleId: ref.id, sellerOrgId: org.id, clientOrgId, createdAt: stamp()});
+  });
   return {id: ref.id};
 });
 
@@ -207,6 +222,7 @@ export const startResellerInvoicePayment = callable(async request => {
     const fresh = (await tx.get(ref)).data();
     const bundle = (await tx.get(db.doc(`resellerBundles/${fresh.bundleId}`))).data();
     if (fresh.status !== 'due' || !['offered', 'active'].includes(bundle?.status)) throw new Error('Invoice is no longer payable');
+    if (bundle.firstInvoiceId !== id && (await tx.get(db.doc(`resellerInvoices/${bundle.firstInvoiceId}`))).data()?.status !== 'paid') throw new Error('Pay the first invoice, including setup charges, before a renewal');
     if (fresh.checkout) return fresh.checkout;
     tx.update(ref, {checkout: {reference, status: 'initializing'}});
     tx.create(db.collection('resellerPaymentReferences').doc(reference), {invoiceId: id, clientOrgId: org.id, uid, totalMinor: invoice.totalMinor, createdAt: stamp()});
@@ -239,7 +255,10 @@ export async function settleResellerPayment(reference, verified) {
     }
     if (invoice.status !== 'due') throw new Error('Invoice is no longer payable');
     const bundleRef = db.collection('resellerBundles').doc(invoice.bundleId), bundle = (await tx.get(bundleRef)).data();
-    if (!bundle || !['offered', 'active'].includes(bundle.status)) throw new Error('Bundle is no longer active');
+    // A previously opened checkout may settle after cancellation. Honor that
+    // payment without re-enabling future renewals.
+    if (!bundle || !['offered', 'active', 'cancelled'].includes(bundle.status)) throw new Error('Bundle is no longer active');
+    if (bundle.firstInvoiceId !== invoiceRef.id && (await tx.get(db.doc(`resellerInvoices/${bundle.firstInvoiceId}`))).data()?.status !== 'paid') throw new Error('First invoice must be settled before renewal');
     const client = root(bundle.clientOrgId), projectId = `bundle_${invoice.bundleId}`, publicId = `bundle_${invoice.bundleId}`;
     const projectRef = client.collection('websiteProjects').doc(projectId), existingProject = await tx.get(projectRef);
     const publicRef = db.doc(`publishedWebsiteSites/${publicId}`), existingPublic = await tx.get(publicRef);
@@ -253,10 +272,10 @@ export async function settleResellerPayment(reference, verified) {
     });
     if (!existingProject.exists) {
       tx.create(projectRef, {title: bundle.document.title, draft: bundle.document, contentBlueprint: bundle.blueprint, publicId, revision: 1, status: 'published', publishedVersion: 1, managedBundleId: invoice.bundleId, createdAt: stamp(), updatedAt: stamp()});
-      tx.create(db.doc(`websitePublicSiteOwners/${publicId}`), {orgId: client.id, projectId});
+      tx.create(db.doc(`websitePublicSiteOwners/${publicId}`), {orgId: client.id, projectId, managedBundleId: invoice.bundleId});
     }
     if (!existingPublic.exists) tx.set(publicRef, bundle.suspendedPublication || {publicId, document: bundle.document, version: 1, revision: 1, managedBundleId: invoice.bundleId, publishedAt: stamp()});
-    tx.update(bundleRef, {status: 'active', paidThrough: expiresAt, clientProjectId: projectId, publicId, updatedAt: stamp()});
+    tx.update(bundleRef, {status: bundle.status === 'cancelled' ? 'cancelled' : 'active', paidThrough: expiresAt, clientProjectId: projectId, publicId, updatedAt: stamp()});
     tx.update(invoiceRef, {status: 'paid', paidAt: stamp(), paymentReference: reference, providerTransactionId: String(verified.id)});
     tx.set(root(bundle.sellerOrgId).collection('resellerEarnings').doc(payment.invoiceId), {bundleId: invoice.bundleId, invoiceId: payment.invoiceId, grossMinor: invoice.totalMinor, profitMinor: invoice.monthly.profitMinor + (invoice.generationMinor ? bundle.generationCharge?.profitMinor || 0 : 0), currency: 'KES', status: 'recorded', createdAt: stamp()});
     return {status: 'paid', publicId, expiresAt: expiresAt.toMillis()};
@@ -334,7 +353,7 @@ export const connectResellerDomain = callable(async request => {
   return {domain, active, requiredDns, hostState: state?.hostState || 'provisioning', certState: state?.cert?.state || 'pending', instruction: 'Add the required DNS records in Namecheap Advanced DNS, then check again. TLS and DNS propagation may take time.'};
 });
 
-export const maintainResellerSubscriptions = onSchedule({region, schedule: 'every 24 hours', timeZone: 'Africa/Nairobi'}, async () => {
+export const maintainResellerSubscriptions = onSchedule({region, timeoutSeconds: 540, schedule: 'every 24 hours', timeZone: 'Africa/Nairobi'}, async () => {
   const snapshots = await db.collection('resellerBundles').where('status', 'in', ['active', 'cancelled']).limit(500).get();
   for (const doc of snapshots.docs) {
     const bundle = doc.data();

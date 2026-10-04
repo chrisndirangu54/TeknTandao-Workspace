@@ -40,11 +40,12 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
         widget.store.call('getResellerStudio'),
         widget.store.call('getClientBundleInvoices'),
       ]);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _data = values[0];
           _clientInvoices = _rows(values[1]['invoices']);
         });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     }
@@ -120,13 +121,14 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
           ),
           FilledButton(
             onPressed: () {
-              if (formKey.currentState!.validate())
+              if (formKey.currentState!.validate()) {
                 Navigator.pop(
                   context,
                   controllers.map(
                     (key, value) => MapEntry(key, value.text.trim()),
                   ),
                 );
+              }
             },
             child: const Text('Continue'),
           ),
@@ -228,11 +230,12 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
         },
       });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error =
               'Enter valid non-negative numbers for costs and profit, and a positive exchange rate.',
         );
+      }
     }
   }
 
@@ -279,21 +282,23 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
     );
     if (value == null || !mounted) return;
     final quote = await _call('quoteResellerDomain', value);
-    if (quote != null)
+    if (quote != null) {
       await _show('Domain quote — save the quote ID for your bundle', quote);
+    }
   }
 
   Future<void> _bundle(Map<String, dynamic> project) async {
+    final apps = await _chooseApps();
+    if (apps == null || !mounted) return;
     final value = await _form(
       'Offer ${project['title']} to a client',
       const {
         'name': 'Bundle name',
         'client': 'Client workspace ID',
-        'apps': 'Workspace app IDs, comma separated',
         'domain': 'Domain quote ID (optional)',
         'generation': 'Generation usage ID (optional)',
       },
-      optional: {'apps', 'domain', 'generation'},
+      optional: {'domain', 'generation'},
       note:
           'Website Builder is included automatically. The client reviews and pays their invoice in Reseller → Invoices. Profit rates are locked to this offer.',
     );
@@ -303,11 +308,7 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
         'name': value['name'],
         'clientWorkspaceId': value['client'],
         'projectId': project['id'],
-        'apps': value['apps']!
-            .split(',')
-            .map((id) => id.trim())
-            .where((id) => id.isNotEmpty)
-            .toList(),
+        'apps': apps,
         'domainQuoteId': value['domain']!.isEmpty ? null : value['domain'],
         'generationId': value['generation']!.isEmpty
             ? null
@@ -316,17 +317,89 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
     });
   }
 
+  Future<List<String>?> _chooseApps() async {
+    final selected = <String>{};
+    var query = '';
+    return showDialog<List<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) {
+          final apps = _rows(_data?['apps'])
+              .where(
+                (app) =>
+                    app['id'] != 'mc14_website_builder' &&
+                    app['name'].toString().toLowerCase().contains(
+                      query.toLowerCase(),
+                    ),
+              )
+              .toList();
+          return AlertDialog(
+            title: const Text('Include workspace apps'),
+            content: SizedBox(
+              width: 560,
+              height: 420,
+              child: Column(
+                children: [
+                  const Text(
+                    'Website Builder is included. Choose up to 30 additional apps.',
+                  ),
+                  TextField(
+                    decoration: const InputDecoration(labelText: 'Search apps'),
+                    onChanged: (value) => update(() => query = value),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: apps.length,
+                      itemBuilder: (context, index) {
+                        final app = apps[index], id = app['id'].toString();
+                        return CheckboxListTile(
+                          title: Text(app['name'].toString()),
+                          value: selected.contains(id),
+                          onChanged:
+                              selected.length >= 30 && !selected.contains(id)
+                              ? null
+                              : (value) => update(() {
+                                  if (value == true) {
+                                    selected.add(id);
+                                  } else {
+                                    selected.remove(id);
+                                  }
+                                }),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, selected.toList()),
+                child: const Text('Continue'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _saveTemplate(Map<String, dynamic> project) async {
     final value = await _form(
       'Save vetted template',
       const {'name': 'Template name'},
       initial: {'name': '${project['title']}'},
     );
-    if (value != null && mounted)
+    if (value != null && mounted) {
       await _call('saveVettedSiteTemplate', {
         ...value,
         'projectId': project['id'],
       });
+    }
   }
 
   Future<void> _export(Map<String, dynamic> project) async {
@@ -612,10 +685,6 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
           _button('Configure pricing', _pricing),
           _button('Record Firebase cost', _cost),
           _button('Quote Namecheap domain', _quote),
-          _button(
-            'App IDs for bundles',
-            () => _show('Available workspace apps', _data?['apps']),
-          ),
         ],
       ),
     if (_data?['pricing'] != null)
@@ -641,7 +710,18 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
       _card(
         '${usage['model']} · ${usage['status']}',
         'Usage ID: ${usage['id']}\n${usage['charge'] == null ? 'Unpriced — configure rates and review usage' : 'Token cost ${_money(usage['charge']['costMinor'])} + profit ${_money(usage['charge']['profitMinor'])} = ${_money(usage['charge']['totalMinor'])}'}',
-        [_button('View usage', () => _show('Generation record', usage))],
+        [
+          _button('View usage', () => _show('Generation record', usage)),
+          if (_seller &&
+              usage['charge'] == null &&
+              usage['status'] == 'validated')
+            _button(
+              'Apply configured token rates',
+              () => _call('priceResellerGeneration', {
+                'generationId': usage['id'],
+              }),
+            ),
+        ],
       ),
   ]);
 
@@ -677,11 +757,12 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
               final result = await _call('connectResellerDomain', {
                 'bundleId': bundle['id'],
               });
-              if (result != null)
+              if (result != null) {
                 await _show(
                   'Hosting DNS records — add these at Namecheap',
                   result,
                 );
+              }
             }),
           if (bundle['status'] != 'cancelled')
             _button('Cancel renewal', () async {
@@ -691,8 +772,9 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
                 note:
                     'Paid access remains until expiry. Domain registration is not refunded or cancelled.',
               );
-              if (value?['confirm'] == 'CANCEL' && mounted)
+              if (value?['confirm'] == 'CANCEL' && mounted) {
                 await _call('cancelResellerBundle', {'bundleId': bundle['id']});
+              }
             }),
         ],
       ),

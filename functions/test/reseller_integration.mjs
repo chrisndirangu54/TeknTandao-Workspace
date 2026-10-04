@@ -24,7 +24,22 @@ test('reseller offer, cost allocation, client checkout, verified settlement and 
   assert.ok((await api.exportVettedSite.run(req(seller, {projectId: site.projectId}))).files['index.html']);
   await assert.rejects(api.exportVettedSite.run(req(client, {projectId: site.projectId})));
   await assert.rejects(api.getResellerStudio.run(req(seller, {}, 'outsider')), /owner/);
-  const offered = await api.createResellerBundle.run(req(seller, {bundle: {name: 'Client website', clientWorkspaceId: client.id, projectId: site.projectId, apps: ['crm']}}));
+  const {generateVettedWebsite} = await import('../src/website_generation.js');
+  const {exampleWebsiteContent} = await import('../src/website_components.js');
+  const providerFetch = globalThis.fetch;
+  let generated;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/models/test:generateContent');
+    const body = JSON.parse(options.body);
+    assert.equal(body.generationConfig.responseJsonSchema.additionalProperties, false);
+    return new Response(JSON.stringify({candidates: [{content: {parts: [{text: JSON.stringify(exampleWebsiteContent('clinic'))}]}}], usageMetadata: {promptTokenCount: 1000000, candidatesTokenCount: 100000}}));
+  };
+  try { generated = await generateVettedWebsite({org: seller, user: 'owner', prompt: 'Clinic', key: 'test', model: 'test'}); }
+  finally { globalThis.fetch = providerFetch; }
+  assert.equal(generated.charge.costMinor, 13000);
+  assert.equal(generated.charge.totalMinor, 16300);
+  const offered = await api.createResellerBundle.run(req(seller, {bundle: {name: 'Client website', clientWorkspaceId: client.id, projectId: site.projectId, apps: ['crm'], generationId: generated.generationId}}));
+  await assert.rejects(api.createResellerBundle.run(req(seller, {bundle: {name: 'Duplicate cost allocation', clientWorkspaceId: client.id, projectId: site.projectId, apps: ['crm']}})), /already has/);
   const bundleRef = db.doc(`resellerBundles/${offered.id}`);
   const period = '2026-10';
   await assert.rejects(api.createResellerInvoice.run(req(seller, {bundleId: offered.id, period})), /cost/);
@@ -32,7 +47,13 @@ test('reseller offer, cost allocation, client checkout, verified settlement and 
   const invoices = await Promise.all([0, 1].map(() => api.createResellerInvoice.run(req(seller, {bundleId: offered.id, period}))));
   assert.equal(invoices[0].id, invoices[1].id);
   const invoice = invoices[0];
-  assert.equal(invoice.totalMinor, 70000);
+  assert.equal(invoice.totalMinor, 86300);
+  assert.equal(invoice.generationMinor, 16300);
+  await api.recordResellerFirebaseCost.run(req(seller, {cost: {clientWorkspaceId: client.id, period: '2026-11', amountMinor: 50000, source: 'Next billing period allocation', estimated: true}}));
+  const renewal = await api.createResellerInvoice.run(req(seller, {bundleId: offered.id, period: '2026-11'}));
+  assert.equal(renewal.totalMinor, 70000);
+  assert.equal(renewal.generationMinor, 0);
+  await assert.rejects(api.startResellerInvoicePayment.run(req(client, {invoiceId: renewal.id})), /first invoice/);
   await assert.rejects(api.startResellerInvoicePayment.run(req(seller, {invoiceId: invoice.id})), /invoice/);
   const original = globalThis.fetch;
   let initialized = 0;
@@ -65,6 +86,8 @@ test('reseller offer, cost allocation, client checkout, verified settlement and 
   await bundleRef.update({domainQuote: {domain: 'example.com', costMinor: 9999}, domainStatus: 'awaiting_payment'});
   await assert.rejects(api.registerResellerDomain.run(req(seller, {bundleId: offered.id, confirmPurchase: true})), /domain invoice/);
   await bundleRef.update({paidThrough: Timestamp.fromMillis(0)});
+  const runtime = await import('../src/website_runtime_cost_guard.js');
+  await assert.rejects(runtime.resolveCostAwarePublishedWebsiteExperience.run({data: {publicId: bundle.publicId}}), /expired/);
   await api.maintainResellerSubscriptions.run({});
   assert.equal((await publicRef.get()).exists, false);
   assert.ok((await bundleRef.get()).data().suspendedPublication);

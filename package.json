@@ -4,6 +4,7 @@
   "scripts": {
     "test": "npm --prefix functions test",
     "test:automation": "firebase emulators:exec --project demo-tandao --only firestore \"node --test functions/test/automation_integration.mjs\"",
+    "test:reseller": "firebase emulators:exec --project demo-tandao --only firestore \"node --test functions/test/reseller_integration.mjs functions/test/automation_integration.mjs\"",
     "test:rules": "firebase emulators:exec --project demo-tandao --only firestore \"node --test tests/rules.test.mjs functions/test/integration.mjs\"",
     "emulators": "firebase emulators:start --project demo-tandao"
   },

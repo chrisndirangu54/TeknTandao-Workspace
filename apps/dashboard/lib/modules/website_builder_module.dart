@@ -152,7 +152,18 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
                 ),
               ),
             ),
-          SegmentedButton<int>(
+          if (MediaQuery.sizeOf(context).width < 700)
+            PopupMenuButton<int>(
+              tooltip: 'Website Studio sections',
+              initialValue: _tab,
+              onSelected: (value) => setState(() => _tab = value),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 0, child: Text('Builder')),
+                PopupMenuItem(value: 1, child: Text('Templates')),
+                PopupMenuItem(value: 2, child: Text('Creator')),
+              ],
+            )
+          else SegmentedButton<int>(
             segments: const [
               ButtonSegment(value: 0, icon: Icon(Icons.design_services_rounded), label: Text('Builder')),
               ButtonSegment(value: 1, icon: Icon(Icons.storefront_rounded), label: Text('Templates')),

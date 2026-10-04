@@ -30,11 +30,11 @@ After configuring the secrets below and `GEMINI_MODEL` in
 ./scripts/deploy-automation.ps1
 ```
 
-Add `-Deploy` to build the production dashboard, deploy the 17 automation
+Add `-Deploy` to build the production dashboard, deploy the affected automation, reseller and website
 functions, and then publish Hosting. A failed build or backend deployment stops
 before Hosting. The script checks the Dart configuration's target project and
 rejects preview/emulator configurations. It does not link billing accounts,
-create credentials, or deploy unrelated functions.
+create credentials, or deploy unrelated functions. See [reseller setup](reseller-platform.md) for the additional registrar/payment secrets.
 
 Configure these Firebase Secret Manager secrets:
 
@@ -66,12 +66,14 @@ https://europe-west1-tekntandaoworkspace.cloudfunctions.net/automationOAuthCallb
 
 Google setup: create a Web application OAuth client, configure its consent
 screen and permitted test users or production publishing, enable Gmail API and
-Google Drive API, and request these scopes:
+Google Drive, Calendar and Sheets APIs, and request these scopes:
 
 ```text
 https://www.googleapis.com/auth/gmail.readonly
 https://www.googleapis.com/auth/gmail.send
 https://www.googleapis.com/auth/drive.file
+https://www.googleapis.com/auth/calendar.events
+https://www.googleapis.com/auth/spreadsheets
 ```
 
 Google may require verification for production use of Gmail scopes. `drive.file`
@@ -245,3 +247,27 @@ flutter analyze lib/modules/automation_studio.dart lib/dashboard.dart
 
 Live Google/Notion consent and Gemini generation require the configured
 credentials and a deployed callback; local tests use no production accounts.
+
+
+## Business connectors and Developer API
+
+Google connections also expose Calendar event listing/creation and Sheets range reads/literal appends. Existing Google connections must be reauthorized to grant the new scopes. Sheets appends use RAW values, so user text is not interpreted as formulas.
+
+Slack uses an owner-supplied bot token with `channels:read`, `channels:history` and `chat:write`; invite the bot to the channels it should access. HubSpot uses a private-app token with `crm.objects.contacts.read`, `crm.objects.contacts.write`, and `crm.objects.deals.read`. Tokens are validated using a read-only API call and encrypted in the existing server-only credential store. Provider rate limits and channel/record permissions still apply.
+
+For Stripe, add a remote MCP connection using `https://mcp.stripe.com` and an appropriately restricted Stripe agent API key. Discovery lists the tools actually granted to that key. This is a remote MCP connection, not built-in Stripe OAuth. Other public HTTPS Streamable HTTP business MCPs can be connected with their compatible bearer credentials; OAuth-only MCP servers require their own supported connection flow.
+
+The **Developer** tab exposes both the workspace MCP URL and REST API URL. They share the same expiring, revocable, workflow-scoped bearer keys. Each request rechecks that the key's issuer remains a workspace owner. Both endpoints share a daily 2,000-request workspace quota; workflow execution retains its existing limits and paid checks for code.
+
+```text
+GET  https://europe-west1-PROJECT.cloudfunctions.net/workspaceApi/v1/workflows
+POST https://europe-west1-PROJECT.cloudfunctions.net/workspaceApi/v1/workflows/WORKFLOW_ID/runs
+Authorization: Bearer YOUR_SCOPED_KEY
+Content-Type: application/json
+
+{"runId":"unique-request-id","input":{"quantity":2}}
+```
+
+GET returns `{workflows: [{id, name, description}]}` restricted to enabled workflows in the key scope. POST returns the workflow receipt/result. Reuse the same `runId` and input for retries. A `needs_review` result must be checked against the external provider before starting a different run; HTTP 200 alone does not mean every external action succeeded. Authentication errors use 401, scope errors 403, quota errors 429, invalid requests 400 and unknown routes 404. Browser CORS is not enabled; this API is intended for server-side integrations. Firebase ID tokens are also supported with `?workspace=WORKSPACE_ID` and current owner membership.
+
+References: [Stripe MCP](https://docs.stripe.com/mcp), [Google Calendar](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert), [Sheets append](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/append), [Slack messaging](https://docs.slack.dev/reference/methods/chat.postMessage/), [HubSpot contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/create-contact).

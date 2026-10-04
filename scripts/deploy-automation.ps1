@@ -27,7 +27,7 @@ try {
     }
 
     # Query metadata only. Never fetch or print secret payloads.
-    foreach ($secret in @('AUTOMATION_ENCRYPTION_KEY', 'AUTOMATION_OAUTH_CONFIG', 'GEMINI_API_KEY')) {
+    foreach ($secret in @('AUTOMATION_ENCRYPTION_KEY', 'AUTOMATION_OAUTH_CONFIG', 'GEMINI_API_KEY', 'NAMECHEAP_CONFIG', 'PAYSTACK_SECRET_KEY', 'WEBSITE_ANALYTICS_SIGNING_KEY')) {
         $versions = Invoke-Checked 'gcloud' @('secrets', 'versions', 'list', $secret, "--project=$ProjectId", '--filter=state:ENABLED', '--limit=1', '--format=value(name)', '--quiet')
         if (-not $versions) { throw "Secret $secret needs an enabled version. See docs/automation-studio.md." }
     }
@@ -64,7 +64,15 @@ try {
         'runToolWorkflow', 'processToolWorkflowEvent', 'processOperationalToolEvent',
         'generateCustomFeature', 'saveCustomFeature', 'previewCustomFeature',
         'publishCustomFeature', 'runCustomFeature', 'createWorkspaceMcpKey',
-        'revokeWorkspaceMcpKey', 'workspaceMcp'
+        'revokeWorkspaceMcpKey', 'workspaceMcp', 'workspaceApi', 'connectBusinessTool',
+        'setResellerAccount', 'getResellerStudio', 'saveResellerPricing', 'priceResellerGeneration',
+        'recordResellerFirebaseCost', 'saveVettedSiteTemplate', 'installVettedSiteTemplate', 'exportVettedSite',
+        'quoteResellerDomain', 'createResellerBundle', 'createResellerInvoice', 'getClientBundleInvoices',
+        'startResellerInvoicePayment', 'checkResellerInvoicePayment', 'resellerPaystackWebhook',
+        'cancelResellerBundle', 'registerResellerDomain', 'connectResellerDomain', 'maintainResellerSubscriptions',
+        'generateWebsiteFromPrompt', 'replaceWebsiteDocument', 'generateWebsiteBusinessPlan',
+        'requestWebsiteBusinessAction', 'resolveWebsiteBusinessAction', 'executeAgentAction',
+        'paystackWebhook', 'resolvePublishedWebsiteExperience'
     )
     $targets = ($functionNames | ForEach-Object { "functions:suite:$_" }) -join ','
     Push-Location $workspaceRoot

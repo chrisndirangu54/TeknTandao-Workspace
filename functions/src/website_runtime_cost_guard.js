@@ -78,10 +78,17 @@ async function resolveSite(publicId) {
     throw new HttpsError('not-found', 'Published website not found');
   }
   const owner = ownerSnapshot.data();
+  let paidThrough = null;
+  if (owner.managedBundleId) {
+    const bundle = (await db.doc(`resellerBundles/${identifier(owner.managedBundleId)}`).get()).data();
+    if (bundle?.clientOrgId !== owner.orgId || bundle.publicId !== publicId) throw new HttpsError('not-found', 'Published website not found');
+    paidThrough = bundle.paidThrough?.toMillis?.() || 0;
+  }
   return put(siteCache, publicId, {
     site: siteSnapshot.data(),
     owner,
     org: orgRoot(owner.orgId),
+    paidThrough,
   }, SITE_TTL_MS);
 }
 
@@ -128,6 +135,7 @@ export const resolveCostAwarePublishedWebsiteExperience = onCall({
   try {
     const publicId = await resolvePublicId(request.data.publicId, request.data.host);
     const resolved = await resolveSite(publicId);
+    if (resolved.paidThrough !== null && resolved.paidThrough <= Date.now()) throw new HttpsError('not-found', 'Website subscription has expired');
     const visitorHash = hashVisitor(
       analyticsSigningKey.value(),
       request.data.visitorId || randomUUID(),
