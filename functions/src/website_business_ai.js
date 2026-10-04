@@ -1,3 +1,6 @@
+import {websitePlanContentSchema, compileWebsitePlan} from './website_plan_content.js';
+import {websiteContentGuide} from './website_components.js';
+import {recordGenerationUsage, consumeWebsiteGenerationQuota} from './website_generation.js';
 import './index.js';
 import {randomUUID} from 'node:crypto';
 import {FieldValue, getFirestore} from 'firebase-admin/firestore';
@@ -15,7 +18,6 @@ import {
   productRecordDigest,
   publicProductValues,
   summarizeBusinessGraph,
-  validateWebsiteBusinessPlan,
   websiteBuilderAppId,
   websiteBusinessAgentId,
 } from './website_business_ai_domain.js';
@@ -154,20 +156,23 @@ function extractGeminiJson(payload) {
   return JSON.parse(stripped);
 }
 
-async function callGemini(prompt, key) {
+async function callGemini(prompt, key, org, user) {
   const model = process.env.GEMINI_MODEL;
   if (!key || !model) throw new Error('Configure GEMINI_API_KEY and GEMINI_MODEL before using the Website Business AI');
+  await consumeWebsiteGenerationQuota(org);
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'x-goog-api-key': key},
     body: JSON.stringify({
       contents: [{parts: [{text: prompt}]}],
-      generationConfig: {responseMimeType: 'application/json', temperature: 0.35},
+      generationConfig: {responseMimeType: 'application/json', responseJsonSchema: websitePlanContentSchema, temperature: 0.2, maxOutputTokens: 8192},
     }),
     signal: AbortSignal.timeout(45000),
   });
   if (!response.ok) throw new Error(`AI provider unavailable (${response.status})`);
-  return extractGeminiJson(await response.json());
+  const payload = await response.json();
+  const usage = await recordGenerationUsage({org, user, model, payload});
+  return {raw: extractGeminiJson(payload), usage};
 }
 
 async function ensureBusinessProductCollection(org, user = 'system') {
@@ -259,9 +264,16 @@ export const generateWebsiteBusinessPlan = callable(async request => {
     productPerformance: context.productPerformance,
     analytics: context.analytics,
   };
-  const guide = `You are the governed Website Business Operator inside TeknTandao. Return JSON only with keys summary, rationale, document, productChanges, publishRecommended, optimizationGoal. document MUST be a complete valid TeknTandao website JSON document using schemaVersion 1 and only these node types: page,section,container,row,column,wrap,stack,heading,text,richText,image,button,icon,divider,spacer,card,grid,navbar,hero,features,pricing,testimonials,cta,footer,form. Every node needs id,type,props,style,responsive,action,children. Actions are none, navigate with path, or externalUrl with an http/https/mailto/tel URL. Never output scripts, HTML, CSS, Dart, secrets or Firebase paths. For live product grids, use props.dataCollection="${businessProductCollectionId}" and child bindings such as {{name}}, {{description}}, {{price}}, {{stock}}, {{imageUrl}}. Product changes must be an array of {mutationId,operation,productId,product,reason}; operation is create or update. Product price is ALWAYS integer KES minor units: KES 250 = 25000. Stock and reorderLevel are non-negative integers. For create, product.name is required. For update, productId must match an existing product and product contains only changed fields. Do not invent product changes unless the user's goal asks for them. Preserve the current website when the goal only concerns products. Use aggregate Business Graph context and product/sales/website analytics to make evidence-based design, merchandising and optimization decisions.`;
-  const raw = await callGemini(`${guide}\n\nUser goal:\n${goal}\n\nCurrent website:\n${JSON.stringify(context.project.document)}\n\nBusiness context (no customer PII):\n${JSON.stringify(safeContext)}`, geminiKey.value());
-  const validated = validateWebsiteBusinessPlan(raw);
+  const guide = `${websiteContentGuide} Return a business plan matching the supplied JSON schema. Use contentBlueprint null when the goal only concerns products, preserving the existing website. Otherwise supply the complete plain-content blueprint. Never return a document, node tree, styles or bindings. Propose product changes only when explicitly requested. Product prices are integer KES minor units (KES 250 = 25000); update only known product IDs. Do not invent business claims or prices.`;
+  const {raw, usage} = await callGemini(`${guide}\nUser goal: ${goal}\nCurrent website content: ${JSON.stringify(context.project.document)}\nBusiness context: ${JSON.stringify(safeContext)}`, geminiKey.value(), org, user);
+  let validated;
+  try {
+    validated = compileWebsitePlan(raw, context.project.document);
+    await org.collection('siteGenerationUsage').doc(usage.generationId).update({status: 'validated', blueprint: validated.contentBlueprint, billable: !!validated.contentBlueprint});
+  } catch (error) {
+    await org.collection('siteGenerationUsage').doc(usage.generationId).update({status: 'invalid_content', billable: false});
+    throw error;
+  }
   const productChanges = validated.productChanges.map(mutation => {
     if (mutation.operation !== 'update') return mutation;
     const baseProductDigest = context.productDigests[mutation.productId];
@@ -282,6 +294,8 @@ export const generateWebsiteBusinessPlan = callable(async request => {
     summary: plan.summary,
     rationale: plan.rationale,
     document: plan.document,
+    contentBlueprint: plan.contentBlueprint,
+    generationId: usage.generationId,
     productChanges: plan.productChanges,
     publishRecommended: plan.publishRecommended,
     optimizationGoal: plan.optimizationGoal,

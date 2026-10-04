@@ -132,6 +132,7 @@ class _RuntimeEntryGateState extends State<RuntimeEntryGate> {
       final result = await FirebaseFunctions.instanceFor(region: 'europe-west1')
           .httpsCallable('resolvePublishedWebsiteExperience')
           .call({
+            if (query['site']?.isNotEmpty == true) 'publicId': query['site'],
             'host': Uri.base.host,
             'path': Uri.base.path.isEmpty ? '/' : Uri.base.path,
             'visitorId': visitorId,

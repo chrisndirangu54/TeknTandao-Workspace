@@ -52,6 +52,7 @@ function actionFromPlan(plan, input) {
         projectId: plan.projectId,
         expectedRevision: plan.sourceRevision,
         document: plan.document,
+        contentBlueprint: plan.contentBlueprint || null,
         planId: plan.planId,
       },
     };

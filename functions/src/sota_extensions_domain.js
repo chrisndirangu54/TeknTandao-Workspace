@@ -1,3 +1,4 @@
+import {compileWebsiteContent} from './website_components.js';
 import {identifier, money, optionalText, sanitizeRecord, textValue} from './domain.js';
 import {scalarMap, validateAutomationRule, validateBusinessEvent, validateGraphNode} from './sota_domain.js';
 import {validateWebsiteDocument} from './website_builder_domain.js';
@@ -243,7 +244,8 @@ export function validateAgentExecution(input, appId) {
       payload: {
         projectId: identifier(input.payload?.projectId),
         expectedRevision,
-        document: validateWebsiteDocument(input.payload?.document),
+        document: input.payload?.contentBlueprint ? compileWebsiteContent(input.payload.contentBlueprint).document : validateWebsiteDocument(input.payload?.document),
+        contentBlueprint: input.payload?.contentBlueprint ? compileWebsiteContent(input.payload.contentBlueprint).blueprint : null,
         planId: input.payload?.planId ? identifier(input.payload.planId) : null,
       },
     };

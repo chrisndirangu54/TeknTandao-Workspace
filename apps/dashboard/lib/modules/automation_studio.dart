@@ -121,10 +121,11 @@ class _AutomationStudioState extends State<AutomationStudio> {
                   Uri.parse(result['url'] as String),
                   webOnlyWindowName: '_blank',
                 );
-                if (!opened)
+                if (!opened) {
                   throw StateError(
                     'Unable to open sign-in. Allow a new browser tab and try again.',
                   );
+                }
               } catch (error) {
                 if (mounted) setState(() => _error = error.toString());
               }
@@ -150,6 +151,20 @@ class _AutomationStudioState extends State<AutomationStudio> {
     );
     if (values != null) {
       await _action('connectRemoteMcp', {'connection': values});
+    }
+  }
+
+  Future<void> _businessConnection(String provider) async {
+    final values = await _textDialog(
+      context,
+      'Connect $provider',
+      const {'name': 'Connection name', 'token': 'Provider access token'},
+      secretKeys: const {'token'},
+    );
+    if (values != null) {
+      await _action('connectBusinessTool', {
+        'connection': {...values, 'provider': provider},
+      });
     }
   }
 
@@ -388,7 +403,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
             Tab(text: 'Workflows'),
             Tab(text: 'Customization'),
             Tab(text: 'Run history'),
-            Tab(text: 'MCP access'),
+            Tab(text: 'Developer'),
           ],
         ),
       ),
@@ -477,8 +492,8 @@ class _AutomationStudioState extends State<AutomationStudio> {
       'Connections are managed by workspace owners. After signing in with a provider, return here and refresh.',
     ),
     _card(
-      'Gmail & Google Drive',
-      'Search and read mail, send email, and find or create files authorized for this app.',
+      'Google Workspace',
+      'Gmail, Drive, Calendar and Sheets: send mail, manage files, schedule events and update spreadsheets. Reconnect existing Google accounts to authorize the new tools.',
       [
         FilledButton.icon(
           onPressed: _busy ? null : () => _connect('google'),
@@ -506,6 +521,36 @@ class _AutomationStudioState extends State<AutomationStudio> {
           onPressed: _busy ? null : _remoteConnection,
           icon: const Icon(Icons.add_link),
           label: const Text('Add MCP server'),
+        ),
+      ],
+    ),
+    _card(
+      'Slack',
+      'List channels, read history and post messages. Use a bot token with channels:read, channels:history and chat:write; invite the bot to each channel.',
+      [
+        OutlinedButton(
+          onPressed: _busy ? null : () => _businessConnection('slack'),
+          child: const Text('Connect Slack'),
+        ),
+      ],
+    ),
+    _card(
+      'HubSpot CRM',
+      'Read contacts and deals, and create contacts. Use a private-app token with contacts read/write and deals read scopes.',
+      [
+        OutlinedButton(
+          onPressed: _busy ? null : () => _businessConnection('hubspot'),
+          child: const Text('Connect HubSpot'),
+        ),
+      ],
+    ),
+    _card(
+      'Stripe MCP',
+      'Use the remote MCP connection with https://mcp.stripe.com and a scoped Stripe agent API key. Review the tools before enabling payment workflows.',
+      [
+        TextButton(
+          onPressed: _busy ? null : _remoteConnection,
+          child: const Text('Add Stripe MCP'),
         ),
       ],
     ),
@@ -707,7 +752,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
 
   Widget _mcpTab() => _page([
     const Text(
-      'Connect an AI client to this workspace',
+      'Developer: MCP & REST API',
       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
     ),
     const SizedBox(height: 8),
@@ -716,6 +761,12 @@ class _AutomationStudioState extends State<AutomationStudio> {
     ),
     const SizedBox(height: 16),
     SelectableText(_data?['mcpUrl']?.toString() ?? ''),
+    const SizedBox(height: 16),
+    const Text('REST API — use the same scoped bearer key'),
+    SelectableText(_data?['apiUrl']?.toString() ?? ''),
+    const SelectableText(
+      'GET /v1/workflows\nPOST /v1/workflows/{workflowId}/runs\nAuthorization: Bearer YOUR_KEY\nContent-Type: application/json\n\n{"runId":"unique-request-id","input":{}}\n\nReuse runId with identical input when retrying. A needs_review result requires checking the external service before starting a new run.',
+    ),
     const SizedBox(height: 16),
     Align(
       alignment: Alignment.centerLeft,

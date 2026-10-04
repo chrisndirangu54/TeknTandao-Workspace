@@ -270,7 +270,7 @@ export const executeAgentAction = callable(async request => {
       }, {merge: true});
       result = {eventId: ref.id};
     } else if (execution.action === 'website.document.apply') {
-      const {projectId, expectedRevision, document, planId} = execution.payload;
+      const {projectId, expectedRevision, document, planId, contentBlueprint} = execution.payload;
       assertWebsiteSized(document);
       const projectRef = org.collection('websiteProjects').doc(projectId);
       const collaborationRef = org.collection('websiteCollaboration').doc(projectId);
@@ -282,6 +282,7 @@ export const executeAgentAction = callable(async request => {
         const revision = expectedRevision + 1;
         tx.update(projectRef, {
           draft: document,
+          contentBlueprint: contentBlueprint || null,
           title: document.title,
           revision,
           status: project.publishedVersion ? 'modified' : 'draft',

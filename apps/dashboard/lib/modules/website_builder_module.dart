@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../suite.dart';
 import 'website_builder_runtime.dart';
+import 'reseller_studio.dart';
 
 class WebsiteBuilderModuleScreen extends StatefulWidget {
   final SuiteStore store;
@@ -139,6 +140,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
           ],
         ),
         actions: [
+          IconButton(tooltip: 'Reseller platform', icon: const Icon(Icons.storefront), onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ResellerStudioScreen(store: store)))),
           if (_busy)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -822,7 +824,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
             maxLines: 10,
             decoration: const InputDecoration(
               labelText: 'Prompt',
-              helperText: 'The model can only return validated TeknTandao JSON nodes—no scripts or arbitrary code.',
+              helperText: 'AI fills content fields in tested templates. Layout and components are fixed by the library.',
               border: OutlineInputBorder(),
             ),
           ),
@@ -849,6 +851,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
         'projectId': project['id'],
         'expectedRevision': project['revision'],
         'document': generated['document'],
+        'contentBlueprint': generated['contentBlueprint'],
       });
       if (mounted) {
         setState(() {

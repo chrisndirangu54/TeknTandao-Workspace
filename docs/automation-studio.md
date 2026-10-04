@@ -14,6 +14,28 @@ The feature is implemented in the existing Firebase Functions codebase and
 Flutter dashboard. It requires deployment of both before it is available online.
 No credentials are included in the repository.
 
+The project must have billing enabled (Firebase Blaze) for Cloud Functions.
+The deployment check on 2026-10-03 found billing disabled and the Cloud Functions
+and Secret Manager APIs disabled for `tekntandaoworkspace`. No live release was
+made. Enable billing in the Firebase console, then enable the required APIs:
+
+```powershell
+gcloud services enable cloudfunctions.googleapis.com secretmanager.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com --project=tekntandaoworkspace
+```
+
+After configuring the secrets below and `GEMINI_MODEL` in
+`functions/.env.tekntandaoworkspace`, run the metadata-only preflight:
+
+```powershell
+./scripts/deploy-automation.ps1
+```
+
+Add `-Deploy` to build the production dashboard, deploy the 17 automation
+functions, and then publish Hosting. A failed build or backend deployment stops
+before Hosting. The script checks the Dart configuration's target project and
+rejects preview/emulator configurations. It does not link billing accounts,
+create credentials, or deploy unrelated functions.
+
 Configure these Firebase Secret Manager secrets:
 
 - `AUTOMATION_ENCRYPTION_KEY`: a randomly generated 32-byte key, base64 encoded.

@@ -23,6 +23,7 @@ const root = id => db.doc(`organizations/${automationId.parse(id)}`);
 const credentials = (org, id) => db.doc(`workspaceAutomationSecrets/${org.id}/connections/${automationId.parse(id)}`);
 const callbackUrl = () => `https://${region}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/automationOAuthCallback`;
 const mcpUrl = () => `https://${region}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/workspaceMcp`;
+const apiUrl = () => `https://${region}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/workspaceApi`;
 const safeError = error => error instanceof z.ZodError ? 'Invalid input: check required fields and JSON format.' : error?.message?.startsWith('Custom code failed:') ? error.message : 'Operation failed. Check the connection, permissions and input, then retry.';
 
 async function owner(org, uid) {
@@ -85,8 +86,21 @@ export const getAutomationStudio = callable(async request => {
     premiumEnabled(org), org.collection('mcpKeys').limit(30).get(),
     org.collection('customFeatureRecords').orderBy('createdAt', 'desc').limit(30).get(),
   ]);
-  return {connections: connections.docs.map(publicDoc), workflows: workflows.docs.map(publicDoc), features: features.docs.map(publicDoc), runs: runs.docs.map(publicDoc), records: records.docs.map(publicDoc), premium, keys: keys.docs.map(publicDoc), mcpUrl: mcpUrl()};
+  return {connections: connections.docs.map(publicDoc), workflows: workflows.docs.map(publicDoc), features: features.docs.map(publicDoc), runs: runs.docs.map(publicDoc), records: records.docs.map(publicDoc), premium, keys: keys.docs.map(publicDoc), mcpUrl: mcpUrl(), apiUrl: apiUrl()};
 });
+
+export const connectBusinessTool = callable(async request => {
+  const {org, uid} = await authorize(request);
+  const input = z.object({provider: z.enum(['slack', 'hubspot']), token: z.string().min(10).max(8000), name: z.string().min(1).max(120)}).strict().parse(request.data.connection);
+  await consumeQuota(org, 'connect', 30);
+  // Validate credentials with a read-only operation before saving them.
+  await callBuiltin(input.provider, input.token, input.provider === 'slack' ? 'slack_channels' : 'hubspot_contacts', {});
+  const id = randomUUID(), batch = db.batch();
+  batch.set(credentials(org, id), encryptCredential({access_token: input.token, expiresAt: null}, encryptionKey.value(), `${org.id}/${id}`));
+  batch.set(org.collection('toolConnections').doc(id), {provider: input.provider, name: input.name, tools: builtinTools[input.provider], status: 'connected', createdBy: uid, createdAt: stamp()});
+  await batch.commit();
+  return {id};
+}, [encryptionKey]);
 
 export const connectRemoteMcp = callable(async request => {
   const {org, uid} = await authorize(request);
@@ -127,7 +141,7 @@ export const startAutomationOAuth = callable(async request => {
   await db.doc(`workspaceAutomationOAuth/${digest(state)}`).set({orgId: org.id, uid, provider, expiresAt: Timestamp.fromMillis(Date.now() + 600000)});
   const url = new URL(provider === 'google' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://api.notion.com/v1/oauth/authorize');
   const params = {client_id: config.clientId, redirect_uri: callbackUrl(), response_type: 'code', state};
-  if (provider === 'google') Object.assign(params, {access_type: 'offline', prompt: 'consent', scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file'});
+  if (provider === 'google') Object.assign(params, {access_type: 'offline', prompt: 'consent', scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets'});
   else params.owner = 'user';
   url.search = new URLSearchParams(params).toString();
   return {url: url.toString()};
@@ -161,7 +175,7 @@ export const automationOAuthCallback = onRequest({region, secrets: [encryptionKe
     if (!token.access_token) throw new Error('Missing access token');
     if (google) {
       const granted = new Set((token.scope || '').split(' '));
-      if (!['gmail.readonly', 'gmail.send', 'drive.file'].every(scope => granted.has(`https://www.googleapis.com/auth/${scope}`))) throw new Error('Required scopes were not granted');
+      if (!['gmail.readonly', 'gmail.send', 'drive.file', 'calendar.events', 'spreadsheets'].every(scope => granted.has(`https://www.googleapis.com/auth/${scope}`))) throw new Error('Required scopes were not granted');
     }
     const id = randomUUID();
     const batch = db.batch();
@@ -409,24 +423,54 @@ export const revokeWorkspaceMcpKey = callable(async request => {
   return {ok: true};
 });
 
+async function developerAccess(request) {
+  const token = /^Bearer ([^\s]+)$/.exec(request.headers.authorization || '')?.[1];
+  if (!token) throw new HttpsError('unauthenticated', 'Bearer token required');
+  let org, uid, allowed;
+  if (token.startsWith('ttw_')) {
+    const key = (await db.doc(`workspaceMcpKeys/${digest(token)}`).get()).data();
+    if (!key || key.expiresAt <= Date.now()) throw new HttpsError('unauthenticated', 'Expired or revoked key');
+    org = root(key.orgId); uid = key.uid; allowed = new Set(key.workflowIds);
+  } else {
+    let verified;
+    try { verified = await getAuth().verifyIdToken(token, true); }
+    catch { throw new HttpsError('unauthenticated', 'Invalid token'); }
+    org = root(request.query.workspace); uid = verified.uid;
+  }
+  await owner(org, uid);
+  await consumeQuota(org, 'developer', 2000);
+  if (Buffer.byteLength(JSON.stringify(request.body || {})) > 128000) throw new HttpsError('invalid-argument', 'Request too large');
+  return {org, uid, allowed};
+}
+
+export const workspaceApi = onRequest({region, secrets: [encryptionKey, oauthConfig], timeoutSeconds: 300, memory: '512MiB', cors: false}, async (request, response) => {
+  response.set('Cache-Control', 'no-store');
+  try {
+    const {org, uid, allowed} = await developerAccess(request);
+    const path = request.path.replace(/\/$/, '');
+    if (request.method === 'GET' && path === '/v1/workflows') {
+      const rows = await org.collection('toolWorkflows').where('enabled', '==', true).limit(100).get();
+      return response.json({workflows: rows.docs.filter(doc => !allowed || allowed.has(doc.id)).map(doc => ({id: doc.id, name: doc.data().name, description: doc.data().description}))});
+    }
+    const match = /^\/v1\/workflows\/([a-zA-Z0-9_-]+)\/runs$/.exec(path);
+    if (request.method === 'POST' && match) {
+      const workflowId = automationId.parse(match[1]);
+      if (allowed && !allowed.has(workflowId)) throw new HttpsError('permission-denied', 'Workflow outside key scope');
+      const args = z.object({runId: automationId, input: z.record(z.unknown())}).strict().parse(request.body);
+      return response.json(await executeWorkflow(org, workflowId, args.input, args.runId, uid));
+    }
+    return response.status(404).json({error: 'Route not found'});
+  } catch (error) {
+    const status = {'unauthenticated': 401, 'permission-denied': 403, 'resource-exhausted': 429}[error.code] || 400;
+    return response.status(status).json({error: safeError(error)});
+  }
+});
+
 export const workspaceMcp = onRequest({region, secrets: [encryptionKey, oauthConfig], timeoutSeconds: 300, memory: '512MiB', cors: false}, async (request, response) => {
   response.set('Cache-Control', 'no-store');
   try {
     if (request.method !== 'POST') return response.status(405).send('Use MCP Streamable HTTP POST');
-    const token = /^Bearer ([^\s]+)$/.exec(request.headers.authorization || '')?.[1];
-    if (!token) return response.status(401).send('Bearer token required');
-    let org, uid, allowed;
-    if (token.startsWith('ttw_')) {
-      const key = (await db.doc(`workspaceMcpKeys/${digest(token)}`).get()).data();
-      if (!key || key.expiresAt <= Date.now()) return response.status(401).send('Expired or revoked key');
-      org = root(key.orgId); uid = key.uid; allowed = new Set(key.workflowIds);
-    } else {
-      const verified = await getAuth().verifyIdToken(token, true);
-      org = root(request.query.workspace); uid = verified.uid;
-    }
-    await owner(org, uid);
-    await consumeQuota(org, 'mcp', 2000);
-    if (Buffer.byteLength(JSON.stringify(request.body || {})) > 128000) return response.status(413).send('Request too large');
+    const {org, uid, allowed} = await developerAccess(request);
     const server = new Server({name: 'tekntandao-workspace', version: '1.0.0'}, {capabilities: {tools: {}}});
     server.setRequestHandler(ListToolsRequestSchema, async () => ({tools: [
       {name: 'list_workflows', description: 'List enabled workspace workflows available to this token', inputSchema: {type: 'object', properties: {}, additionalProperties: false}, annotations: {readOnlyHint: true}},
@@ -451,6 +495,6 @@ export const workspaceMcp = onRequest({region, secrets: [encryptionKey, oauthCon
     await server.connect(transport);
     await transport.handleRequest(request, response, request.body);
   } catch (error) {
-    if (!response.headersSent) response.status(error instanceof HttpsError && error.code === 'permission-denied' ? 403 : 400).send('MCP request rejected');
+    if (!response.headersSent) response.status({'unauthenticated': 401, 'permission-denied': 403, 'resource-exhausted': 429}[error.code] || 400).send('MCP request rejected');
   }
 });

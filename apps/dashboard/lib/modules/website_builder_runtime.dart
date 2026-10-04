@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-typedef WebsiteCmsResolver = Future<List<Map<String, dynamic>>> Function(
-  String collectionId,
-  int limit,
-);
-typedef WebsitePluginResolver = Future<Map<String, dynamic>> Function(
-  String pluginId,
-  String component,
-  Map<String, dynamic> input,
-);
-typedef WebsiteFormSubmitter = Future<Map<String, dynamic>> Function(
-  String formId,
-  Map<String, String> values,
-  int elapsedMs,
-);
+typedef WebsiteCmsResolver =
+    Future<List<Map<String, dynamic>>> Function(String collectionId, int limit);
+typedef WebsitePluginResolver =
+    Future<Map<String, dynamic>> Function(
+      String pluginId,
+      String component,
+      Map<String, dynamic> input,
+    );
+typedef WebsiteFormSubmitter =
+    Future<Map<String, dynamic>> Function(
+      String formId,
+      Map<String, String> values,
+      int elapsedMs,
+    );
 typedef WebsiteConversionRecorder = Future<void> Function(String event);
 
 Color siteColor(dynamic value, [Color fallback = const Color(0xFF0F172A)]) {
@@ -30,9 +30,9 @@ Map<String, dynamic> siteMap(dynamic value) =>
 
 List<Map<String, dynamic>> siteList(dynamic value) => value is List
     ? value
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList()
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList()
     : <Map<String, dynamic>>[];
 
 String websiteBreakpoint(double width) {
@@ -88,19 +88,20 @@ Map<String, dynamic> _bindMap(
   Map<String, dynamic> input,
   Map<String, dynamic> context,
 ) => {
-      for (final entry in input.entries)
-        entry.key: entry.value is String
-            ? _bindString(entry.value as String, context)
-            : entry.value,
-    };
+  for (final entry in input.entries)
+    entry.key: entry.value is String
+        ? _bindString(entry.value as String, context)
+        : entry.value,
+};
 
-class JsonWebsiteRuntime extends StatelessWidget {
+class JsonWebsiteRuntime extends StatefulWidget {
   final Map<String, dynamic> document;
   final String? pageId;
   final bool editable;
   final String? selectedNodeId;
   final ValueChanged<String>? onSelectNode;
-  final void Function(String parentNodeId, String componentType)? onDropComponent;
+  final void Function(String parentNodeId, String componentType)?
+  onDropComponent;
   final Map<String, dynamic> dataContext;
   final WebsiteCmsResolver? cmsResolver;
   final WebsitePluginResolver? pluginResolver;
@@ -123,7 +124,43 @@ class JsonWebsiteRuntime extends StatelessWidget {
   });
 
   @override
+  State<JsonWebsiteRuntime> createState() => _JsonWebsiteRuntimeState();
+}
+
+class _JsonWebsiteRuntimeState extends State<JsonWebsiteRuntime> {
+  String? _navigatedPageId;
+
+  @override
+  void didUpdateWidget(JsonWebsiteRuntime oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pageId != widget.pageId ||
+        oldWidget.document != widget.document) {
+      _navigatedPageId = null;
+    }
+  }
+
+  void navigate(String path) {
+    for (final page in siteList(widget.document['pages'])) {
+      if (page['path'] == path) {
+        setState(() => _navigatedPageId = page['id'].toString());
+        return;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final document = widget.document;
+    final pageId = _navigatedPageId ?? widget.pageId;
+    final editable = widget.editable;
+    final selectedNodeId = widget.selectedNodeId;
+    final onSelectNode = widget.onSelectNode;
+    final onDropComponent = widget.onDropComponent;
+    final dataContext = widget.dataContext;
+    final cmsResolver = widget.cmsResolver;
+    final pluginResolver = widget.pluginResolver;
+    final formSubmitter = widget.formSubmitter;
+    final conversionRecorder = widget.conversionRecorder;
     final pages = siteList(document['pages']);
     if (pages.isEmpty) {
       return const Center(child: Text('This website has no pages.'));
@@ -141,13 +178,14 @@ class JsonWebsiteRuntime extends StatelessWidget {
         return ColoredBox(
           color: siteColor(theme['backgroundColor'], Colors.white),
           child: SingleChildScrollView(
+            key: ValueKey(page['id']),
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: (((theme['maxContentWidth'] as num?)?.toDouble() ??
-                              1200)
-                          .clamp(320, 2400))
-                      .toDouble(),
+                  maxWidth:
+                      (((theme['maxContentWidth'] as num?)?.toDouble() ?? 1200)
+                              .clamp(320, 2400))
+                          .toDouble(),
                 ),
                 child: _SiteNode(
                   node: siteMap(page['root']),
@@ -179,7 +217,8 @@ class _SiteNode extends StatelessWidget {
   final bool editable;
   final String? selectedNodeId;
   final ValueChanged<String>? onSelectNode;
-  final void Function(String parentNodeId, String componentType)? onDropComponent;
+  final void Function(String parentNodeId, String componentType)?
+  onDropComponent;
   final Map<String, dynamic> dataContext;
   final WebsiteCmsResolver? cmsResolver;
   final WebsitePluginResolver? pluginResolver;
@@ -215,7 +254,8 @@ class _SiteNode extends StatelessWidget {
     if (editable) {
       final selected = id == selectedNodeId;
       content = DragTarget<String>(
-        onWillAcceptWithDetails: (_) => _acceptsChildren(node['type']?.toString()),
+        onWillAcceptWithDetails: (_) =>
+            _acceptsChildren(node['type']?.toString()),
         onAcceptWithDetails: (details) =>
             onDropComponent?.call(id, details.data),
         builder: (context, candidates, _) => MouseRegion(
@@ -230,8 +270,8 @@ class _SiteNode extends StatelessWidget {
                   color: selected
                       ? const Color(0xFF2563EB)
                       : candidates.isNotEmpty
-                          ? const Color(0xFF10B981)
-                          : Colors.transparent,
+                      ? const Color(0xFF10B981)
+                      : Colors.transparent,
                   width: selected || candidates.isNotEmpty ? 2 : 0,
                 ),
               ),
@@ -245,15 +285,15 @@ class _SiteNode extends StatelessWidget {
   }
 
   bool _acceptsChildren(String? type) => !{
-        'heading',
-        'text',
-        'richText',
-        'image',
-        'button',
-        'icon',
-        'divider',
-        'spacer',
-      }.contains(type);
+    'heading',
+    'text',
+    'richText',
+    'image',
+    'button',
+    'icon',
+    'divider',
+    'spacer',
+  }.contains(type);
 
   List<Widget> _children([Map<String, dynamic>? childContext]) =>
       siteList(node['children'])
@@ -284,7 +324,9 @@ class _SiteNode extends StatelessWidget {
     final type = node['type']?.toString() ?? 'text';
     final props = _bindMap(siteMap(node['props']), dataContext);
     final dataCollection = props['dataCollection']?.toString();
-    if (dataCollection != null && dataCollection.isNotEmpty && cmsResolver != null) {
+    if (dataCollection != null &&
+        dataCollection.isNotEmpty &&
+        cmsResolver != null) {
       return _CmsCollection(
         collectionId: dataCollection,
         limit: ((props['dataLimit'] as num?)?.toInt() ?? 20).clamp(1, 100),
@@ -362,8 +404,7 @@ class _SiteNode extends StatelessWidget {
             (style['radius'] as num?)?.toDouble() ?? 12,
           ),
           child: AspectRatio(
-            aspectRatio:
-                (props['aspectRatio'] as num?)?.toDouble() ?? 16 / 9,
+            aspectRatio: (props['aspectRatio'] as num?)?.toDouble() ?? 16 / 9,
             child: Image.network(
               imageUrl,
               fit: BoxFit.cover,
@@ -398,10 +439,7 @@ class _SiteNode extends StatelessWidget {
         );
       case 'divider':
         return Divider(
-          color: siteColor(
-            style['borderColor'],
-            const Color(0xFFE2E8F0),
-          ),
+          color: siteColor(style['borderColor'], const Color(0xFFE2E8F0)),
         );
       case 'spacer':
         return SizedBox(height: (props['height'] as num?)?.toDouble() ?? 32);
@@ -431,8 +469,8 @@ class _SiteNode extends StatelessWidget {
         final columns = availableWidth < 600
             ? 1
             : availableWidth < 960
-                ? requested.clamp(1, 2)
-                : requested.clamp(1, 6);
+            ? requested.clamp(1, 2)
+            : requested.clamp(1, 6);
         return GridView.count(
           crossAxisCount: columns,
           crossAxisSpacing: gap,
@@ -486,22 +524,28 @@ class _SiteNode extends StatelessWidget {
     List<Widget> children,
     Color foreground,
   ) {
+    final brand = Text(
+      props['brand']?.toString() ?? document['title']?.toString() ?? 'Brand',
+      style: TextStyle(
+        color: foreground,
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    if (availableWidth < 760) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          brand,
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 4, children: children.take(5).toList()),
+        ],
+      );
+    }
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            props['brand']?.toString() ??
-                document['title']?.toString() ??
-                'Brand',
-            style: TextStyle(
-              color: foreground,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        if (availableWidth >= 760) ...children.take(5),
-        if (availableWidth < 760) const Icon(Icons.menu_rounded),
+        Expanded(child: brand),
+        ...children.take(5),
       ],
     );
   }
@@ -560,52 +604,50 @@ class _SiteNode extends StatelessWidget {
     Map<String, dynamic> props,
     List<Widget> children,
     Color foreground,
-  ) =>
-      Column(
-        children: [
-          Text(
-            props['title']?.toString() ?? 'Ready to get started?',
+  ) => Column(
+    children: [
+      Text(
+        props['title']?.toString() ?? 'Ready to get started?',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: foreground,
+          fontSize: 32,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      if ((props['subtitle']?.toString() ?? '').isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Text(
+            props['subtitle'].toString(),
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: foreground,
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-            ),
           ),
-          if ((props['subtitle']?.toString() ?? '').isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(
-                props['subtitle'].toString(),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          if (children.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 18),
-              child: Wrap(spacing: 12, runSpacing: 12, children: children),
-            ),
-        ],
-      );
+        ),
+      if (children.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 18),
+          child: Wrap(spacing: 12, runSpacing: 12, children: children),
+        ),
+    ],
+  );
 
   Widget _footer(
     Map<String, dynamic> props,
     List<Widget> children,
     Color foreground,
-  ) =>
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ...children,
-          if ((props['copyright']?.toString() ?? '').isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Text(
-              props['copyright'].toString(),
-              style: TextStyle(color: foreground.withValues(alpha: 0.65)),
-            ),
-          ],
-        ],
-      );
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      ...children,
+      if ((props['copyright']?.toString() ?? '').isNotEmpty) ...[
+        const SizedBox(height: 20),
+        Text(
+          props['copyright'].toString(),
+          style: TextStyle(color: foreground.withValues(alpha: 0.65)),
+        ),
+      ],
+    ],
+  );
 
   Widget _decorate(
     Widget child,
@@ -614,7 +656,8 @@ class _SiteNode extends StatelessWidget {
   ) {
     final padding = (style['padding'] as num?)?.toDouble() ?? 0;
     final margin = (style['margin'] as num?)?.toDouble() ?? 0;
-    final radius = (style['radius'] as num?)?.toDouble() ??
+    final radius =
+        (style['radius'] as num?)?.toDouble() ??
         (theme['radius'] as num?)?.toDouble() ??
         0;
     final maxWidth = (style['maxWidth'] as num?)?.toDouble();
@@ -658,8 +701,8 @@ class _SiteNode extends StatelessWidget {
       case 'navigate':
         final target = action['path']?.toString();
         if (target != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Runtime navigation target: $target')),
+          context.findAncestorStateOfType<_JsonWebsiteRuntimeState>()?.navigate(
+            target,
           );
         }
         break;
@@ -675,10 +718,7 @@ class _SiteNode extends StatelessWidget {
     for (var i = 0; i < children.length; i++) {
       if (i > 0) {
         result.add(
-          SizedBox(
-            width: vertical ? 0 : gap,
-            height: vertical ? gap : 0,
-          ),
+          SizedBox(width: vertical ? 0 : gap, height: vertical ? gap : 0),
         );
       }
       result.add(children[i]);
@@ -687,35 +727,35 @@ class _SiteNode extends StatelessWidget {
   }
 
   Alignment _alignment(dynamic value) => switch (value?.toString()) {
-        'center' => Alignment.center,
-        'end' => Alignment.centerRight,
-        _ => Alignment.centerLeft,
-      };
+    'center' => Alignment.center,
+    'end' => Alignment.centerRight,
+    _ => Alignment.centerLeft,
+  };
 
   FontWeight? _fontWeight(dynamic value) => switch ((value as num?)?.toInt()) {
-        100 => FontWeight.w100,
-        200 => FontWeight.w200,
-        300 => FontWeight.w300,
-        400 => FontWeight.w400,
-        500 => FontWeight.w500,
-        600 => FontWeight.w600,
-        700 => FontWeight.w700,
-        800 => FontWeight.w800,
-        900 => FontWeight.w900,
-        _ => null,
-      };
+    100 => FontWeight.w100,
+    200 => FontWeight.w200,
+    300 => FontWeight.w300,
+    400 => FontWeight.w400,
+    500 => FontWeight.w500,
+    600 => FontWeight.w600,
+    700 => FontWeight.w700,
+    800 => FontWeight.w800,
+    900 => FontWeight.w900,
+    _ => null,
+  };
 
   IconData _icon(String? value) => switch (value) {
-        'store' => Icons.storefront_rounded,
-        'rocket' => Icons.rocket_launch_rounded,
-        'check' => Icons.check_circle_rounded,
-        'security' => Icons.security_rounded,
-        'analytics' => Icons.analytics_rounded,
-        'phone' => Icons.phone_rounded,
-        'mail' => Icons.mail_rounded,
-        'location' => Icons.location_on_rounded,
-        _ => Icons.auto_awesome_rounded,
-      };
+    'store' => Icons.storefront_rounded,
+    'rocket' => Icons.rocket_launch_rounded,
+    'check' => Icons.check_circle_rounded,
+    'security' => Icons.security_rounded,
+    'analytics' => Icons.analytics_rounded,
+    'phone' => Icons.phone_rounded,
+    'mail' => Icons.mail_rounded,
+    'location' => Icons.location_on_rounded,
+    _ => Icons.auto_awesome_rounded,
+  };
 }
 
 class _CmsCollection extends StatelessWidget {
@@ -732,7 +772,8 @@ class _CmsCollection extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<List<Map<String, dynamic>>>(
+  Widget build(BuildContext context) =>
+      FutureBuilder<List<Map<String, dynamic>>>(
         future: resolver(collectionId, limit),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -767,23 +808,23 @@ class _PluginFragment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
-        future: resolver(pluginId, component, input),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Text('Plugin unavailable: ${snapshot.error}');
-          }
-          final result = snapshot.data ?? const {};
-          final fragment = siteMap(result['fragment']);
-          if (fragment.isEmpty) {
-            final data = siteMap(result['data']);
-            return Text(data['text']?.toString() ?? 'Plugin returned data.');
-          }
-          return renderer(fragment);
-        },
-      );
+    future: resolver(pluginId, component, input),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      if (snapshot.hasError) {
+        return Text('Plugin unavailable: ${snapshot.error}');
+      }
+      final result = snapshot.data ?? const {};
+      final fragment = siteMap(result['fragment']);
+      if (fragment.isEmpty) {
+        final data = siteMap(result['data']);
+        return Text(data['text']?.toString() ?? 'Plugin returned data.');
+      }
+      return renderer(fragment);
+    },
+  );
 }
 
 class _RuntimeForm extends StatefulWidget {
@@ -840,11 +881,10 @@ class _RuntimeFormState extends State<_RuntimeForm> {
       _message = null;
     });
     try {
-      final result = await widget.submitter!(
-        widget.formId,
-        {for (final entry in _controllers.entries) entry.key: entry.value.text.trim()},
-        DateTime.now().difference(_openedAt).inMilliseconds,
-      );
+      final result = await widget.submitter!(widget.formId, {
+        for (final entry in _controllers.entries)
+          entry.key: entry.value.text.trim(),
+      }, DateTime.now().difference(_openedAt).inMilliseconds);
       if (result['accepted'] == true) {
         await widget.conversionRecorder?.call('form_submit');
       }
@@ -853,7 +893,7 @@ class _RuntimeFormState extends State<_RuntimeForm> {
         _message = result['accepted'] == false
             ? 'Thanks. Your submission was received for review.'
             : widget.props['successMessage']?.toString() ??
-                'Thanks — your submission was received.';
+                  'Thanks — your submission was received.';
       });
       if (result['accepted'] == true) {
         for (final controller in _controllers.values) {
@@ -883,7 +923,8 @@ class _RuntimeFormState extends State<_RuntimeForm> {
             controller: entry.value,
             decoration: InputDecoration(
               labelText:
-                  widget.props[entry.key]?.toString() ?? entry.key.toUpperCase(),
+                  widget.props[entry.key]?.toString() ??
+                  entry.key.toUpperCase(),
             ),
           ),
           const SizedBox(height: 12),

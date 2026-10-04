@@ -57,10 +57,13 @@ test('studio enforces owner and paid access, publishes features and prevents dup
     for await (const chunk of req) chunks.push(chunk);
     req.body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined;
     req.query = Object.fromEntries(new URL(req.url, 'http://localhost').searchParams);
+    req.path = new URL(req.url, 'http://localhost').pathname;
     res.set = (name, value) => { res.setHeader(name, value); return res; };
     res.status = status => { res.statusCode = status; return res; };
     res.send = body => { res.end(body); return res; };
-    await api.workspaceMcp(req, res);
+    res.json = body => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)); return res; };
+    if (req.path.startsWith('/v1/')) await api.workspaceApi(req, res);
+    else await api.workspaceMcp(req, res);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const client = new Client({name: 'integration-test', version: '1'});
@@ -73,8 +76,18 @@ test('studio enforces owner and paid access, publishes features and prevents dup
     assert.deepEqual(JSON.parse(remoteRun.content[0].text).result, {total: 70});
     const denied = await client.callTool({name: 'run_workflow', arguments: {workflowId: 'outside-scope', runId: 'other-run', input: {}}});
     assert.equal(denied.isError, true);
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const headers = {Authorization: `Bearer ${key.token}`, 'Content-Type': 'application/json'};
+    assert.equal((await fetch(`${base}/v1/workflows`)).status, 401);
+    assert.equal((await (await fetch(`${base}/v1/workflows`, {headers})).json()).workflows[0].id, savedWorkflow.id);
+    const route = `${base}/v1/workflows/${savedWorkflow.id}/runs`;
+    const body = JSON.stringify({runId: 'api-run', input: {quantity: 8}});
+    assert.deepEqual((await (await fetch(route, {method: 'POST', headers, body})).json()).result, {total: 80});
+    assert.deepEqual((await (await fetch(route, {method: 'POST', headers, body})).json()).result, {total: 80});
+    assert.equal((await fetch(`${base}/v1/workflows/outside-scope/runs`, {method: 'POST', headers, body})).status, 403);
     await api.revokeWorkspaceMcpKey.run(request({id: key.id}));
     await assert.rejects(client.listTools());
+    assert.equal((await fetch(`${base}/v1/workflows`, {headers})).status, 401);
   } finally {
     await client.close();
     await new Promise(resolve => server.close(resolve));

@@ -1,0 +1,2794 @@
+[
+  {
+    "schemaVersion": 1,
+    "title": "Business essentials",
+    "theme": {
+      "primaryColor": "#176B59",
+      "secondaryColor": "#7C3AED",
+      "backgroundColor": "#FFFFFF",
+      "surfaceColor": "#F8FAFC",
+      "textColor": "#0F172A",
+      "mutedTextColor": "#64748B",
+      "fontFamily": "Inter",
+      "radius": 16,
+      "maxContentWidth": 1120
+    },
+    "pages": [
+      {
+        "id": "home",
+        "name": "Home",
+        "path": "/",
+        "title": "A clear introduction to your business",
+        "description": "Replace this sample content with your own business story.",
+        "root": {
+          "id": "home_root",
+          "type": "page",
+          "props": {},
+          "style": {},
+          "responsive": {},
+          "action": {
+            "type": "none"
+          },
+          "children": [
+            {
+              "id": "home_nav",
+              "type": "navbar",
+              "props": {
+                "brand": "Business essentials"
+              },
+              "style": {
+                "padding": 16
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "home_home_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Home"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "home_contact_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "hero",
+              "type": "hero",
+              "props": {
+                "title": "A clear introduction to your business",
+                "subtitle": "Replace this sample content with your own business story.",
+                "eyebrow": "Business essentials"
+              },
+              "style": {
+                "backgroundColor": "#F8FAFC",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "hero_action",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "services",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#F8FAFC",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "services_title",
+                  "type": "heading",
+                  "props": {
+                    "text": "Our services"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "services_row_0",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_0",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_0",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 0"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_0",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_1",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_1",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 1"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_1",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "services_row_1",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_2",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_2",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 2"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_2",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_3",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_3",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 3"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_3",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "services_row_2",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_4",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_4",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 4"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_4",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_5",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_5",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 5"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_5",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "about",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "about_title",
+                  "type": "heading",
+                  "props": {
+                    "text": "About us"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "about_text",
+                  "type": "text",
+                  "props": {
+                    "text": "Tell visitors what makes your business useful to them."
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_cta",
+              "type": "cta",
+              "props": {
+                "title": "Contact us",
+                "subtitle": ""
+              },
+              "style": {
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "cta_action",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "home_footer",
+              "type": "footer",
+              "props": {
+                "copyright": "Your business"
+              },
+              "style": {
+                "backgroundColor": "#F1F5F9",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "contact",
+        "name": "Contact",
+        "path": "/contact",
+        "title": "Contact Business essentials",
+        "description": "",
+        "root": {
+          "id": "contact_root",
+          "type": "page",
+          "props": {},
+          "style": {},
+          "responsive": {},
+          "action": {
+            "type": "none"
+          },
+          "children": [
+            {
+              "id": "contact_nav",
+              "type": "navbar",
+              "props": {
+                "brand": "Business essentials"
+              },
+              "style": {
+                "padding": 16
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "contact_home_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Home"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_contact_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_section",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "contact_heading",
+                  "type": "heading",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_address",
+                  "type": "text",
+                  "props": {
+                    "text": ""
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_phone",
+                  "type": "text",
+                  "props": {
+                    "text": ""
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_footer",
+              "type": "footer",
+              "props": {
+                "copyright": "Your business"
+              },
+              "style": {
+                "backgroundColor": "#F1F5F9",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ],
+    "settings": {
+      "language": "en",
+      "direction": "ltr",
+      "faviconUrl": "",
+      "analyticsKey": ""
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "title": "Clinic and care",
+    "theme": {
+      "primaryColor": "#4338CA",
+      "secondaryColor": "#7C3AED",
+      "backgroundColor": "#FFFFFF",
+      "surfaceColor": "#F8FAFC",
+      "textColor": "#0F172A",
+      "mutedTextColor": "#64748B",
+      "fontFamily": "Inter",
+      "radius": 16,
+      "maxContentWidth": 1120
+    },
+    "pages": [
+      {
+        "id": "home",
+        "name": "Home",
+        "path": "/",
+        "title": "A clear introduction to your business",
+        "description": "Replace this sample content with your own business story.",
+        "root": {
+          "id": "home_root",
+          "type": "page",
+          "props": {},
+          "style": {},
+          "responsive": {},
+          "action": {
+            "type": "none"
+          },
+          "children": [
+            {
+              "id": "home_nav",
+              "type": "navbar",
+              "props": {
+                "brand": "Clinic and care"
+              },
+              "style": {
+                "padding": 16
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "home_home_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Home"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "home_contact_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "hero",
+              "type": "hero",
+              "props": {
+                "title": "A clear introduction to your business",
+                "subtitle": "Replace this sample content with your own business story.",
+                "eyebrow": "Clinic and care"
+              },
+              "style": {
+                "backgroundColor": "#F8FAFC",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "hero_action",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "services",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#F8FAFC",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "services_title",
+                  "type": "heading",
+                  "props": {
+                    "text": "Our services"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "services_row_0",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_0",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_0",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 0"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_0",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_1",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_1",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 1"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_1",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "services_row_1",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_2",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_2",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 2"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_2",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_3",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_3",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 3"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_3",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "services_row_2",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_4",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_4",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 4"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_4",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_5",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_5",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 5"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_5",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "about",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "about_title",
+                  "type": "heading",
+                  "props": {
+                    "text": "About us"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "about_text",
+                  "type": "text",
+                  "props": {
+                    "text": "Tell visitors what makes your business useful to them."
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_cta",
+              "type": "cta",
+              "props": {
+                "title": "Contact us",
+                "subtitle": ""
+              },
+              "style": {
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "cta_action",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "home_footer",
+              "type": "footer",
+              "props": {
+                "copyright": "Your business"
+              },
+              "style": {
+                "backgroundColor": "#F1F5F9",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "contact",
+        "name": "Contact",
+        "path": "/contact",
+        "title": "Contact Clinic and care",
+        "description": "",
+        "root": {
+          "id": "contact_root",
+          "type": "page",
+          "props": {},
+          "style": {},
+          "responsive": {},
+          "action": {
+            "type": "none"
+          },
+          "children": [
+            {
+              "id": "contact_nav",
+              "type": "navbar",
+              "props": {
+                "brand": "Clinic and care"
+              },
+              "style": {
+                "padding": 16
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "contact_home_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Home"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_contact_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_section",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "contact_heading",
+                  "type": "heading",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_address",
+                  "type": "text",
+                  "props": {
+                    "text": ""
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_phone",
+                  "type": "text",
+                  "props": {
+                    "text": ""
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_footer",
+              "type": "footer",
+              "props": {
+                "copyright": "Your business"
+              },
+              "style": {
+                "backgroundColor": "#F1F5F9",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ],
+    "settings": {
+      "language": "en",
+      "direction": "ltr",
+      "faviconUrl": "",
+      "analyticsKey": ""
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "title": "Agency and consulting",
+    "theme": {
+      "primaryColor": "#334155",
+      "secondaryColor": "#7C3AED",
+      "backgroundColor": "#FFFFFF",
+      "surfaceColor": "#F8FAFC",
+      "textColor": "#0F172A",
+      "mutedTextColor": "#64748B",
+      "fontFamily": "Inter",
+      "radius": 16,
+      "maxContentWidth": 1120
+    },
+    "pages": [
+      {
+        "id": "home",
+        "name": "Home",
+        "path": "/",
+        "title": "A clear introduction to your business",
+        "description": "Replace this sample content with your own business story.",
+        "root": {
+          "id": "home_root",
+          "type": "page",
+          "props": {},
+          "style": {},
+          "responsive": {},
+          "action": {
+            "type": "none"
+          },
+          "children": [
+            {
+              "id": "home_nav",
+              "type": "navbar",
+              "props": {
+                "brand": "Agency and consulting"
+              },
+              "style": {
+                "padding": 16
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "home_home_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Home"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "home_contact_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "hero",
+              "type": "hero",
+              "props": {
+                "title": "A clear introduction to your business",
+                "subtitle": "Replace this sample content with your own business story.",
+                "eyebrow": "Agency and consulting"
+              },
+              "style": {
+                "backgroundColor": "#F8FAFC",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "hero_action",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "about",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "about_title",
+                  "type": "heading",
+                  "props": {
+                    "text": "About us"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "about_text",
+                  "type": "text",
+                  "props": {
+                    "text": "Tell visitors what makes your business useful to them."
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "services",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#F8FAFC",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "services_title",
+                  "type": "heading",
+                  "props": {
+                    "text": "Our services"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "services_row_0",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_0",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_0",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 0"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_0",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_1",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_1",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 1"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_1",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "services_row_1",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_2",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_2",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 2"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_2",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_3",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_3",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 3"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_3",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "services_row_2",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_4",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_4",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 4"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_4",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_5",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_5",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 5"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_5",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "contact_cta",
+              "type": "cta",
+              "props": {
+                "title": "Contact us",
+                "subtitle": ""
+              },
+              "style": {
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "cta_action",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "home_footer",
+              "type": "footer",
+              "props": {
+                "copyright": "Your business"
+              },
+              "style": {
+                "backgroundColor": "#F1F5F9",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "contact",
+        "name": "Contact",
+        "path": "/contact",
+        "title": "Contact Agency and consulting",
+        "description": "",
+        "root": {
+          "id": "contact_root",
+          "type": "page",
+          "props": {},
+          "style": {},
+          "responsive": {},
+          "action": {
+            "type": "none"
+          },
+          "children": [
+            {
+              "id": "contact_nav",
+              "type": "navbar",
+              "props": {
+                "brand": "Agency and consulting"
+              },
+              "style": {
+                "padding": 16
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "contact_home_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Home"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_contact_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_section",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "contact_heading",
+                  "type": "heading",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_address",
+                  "type": "text",
+                  "props": {
+                    "text": ""
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_phone",
+                  "type": "text",
+                  "props": {
+                    "text": ""
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_footer",
+              "type": "footer",
+              "props": {
+                "copyright": "Your business"
+              },
+              "style": {
+                "backgroundColor": "#F1F5F9",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ],
+    "settings": {
+      "language": "en",
+      "direction": "ltr",
+      "faviconUrl": "",
+      "analyticsKey": ""
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "title": "Restaurant and hospitality",
+    "theme": {
+      "primaryColor": "#92400E",
+      "secondaryColor": "#7C3AED",
+      "backgroundColor": "#FFFFFF",
+      "surfaceColor": "#F8FAFC",
+      "textColor": "#0F172A",
+      "mutedTextColor": "#64748B",
+      "fontFamily": "Inter",
+      "radius": 16,
+      "maxContentWidth": 1120
+    },
+    "pages": [
+      {
+        "id": "home",
+        "name": "Home",
+        "path": "/",
+        "title": "A clear introduction to your business",
+        "description": "Replace this sample content with your own business story.",
+        "root": {
+          "id": "home_root",
+          "type": "page",
+          "props": {},
+          "style": {},
+          "responsive": {},
+          "action": {
+            "type": "none"
+          },
+          "children": [
+            {
+              "id": "home_nav",
+              "type": "navbar",
+              "props": {
+                "brand": "Restaurant and hospitality"
+              },
+              "style": {
+                "padding": 16
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "home_home_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Home"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "home_contact_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "hero",
+              "type": "hero",
+              "props": {
+                "title": "A clear introduction to your business",
+                "subtitle": "Replace this sample content with your own business story.",
+                "eyebrow": "Restaurant and hospitality"
+              },
+              "style": {
+                "backgroundColor": "#F8FAFC",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "hero_action",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "services",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#F8FAFC",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "services_title",
+                  "type": "heading",
+                  "props": {
+                    "text": "What we offer"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "services_row_0",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_0",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_0",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 0"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_0",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_1",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_1",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 1"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_1",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "services_row_1",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_2",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_2",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 2"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_2",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_3",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_3",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 3"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_3",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "services_row_2",
+                  "type": "row",
+                  "props": {},
+                  "style": {
+                    "gap": 20
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": [
+                    {
+                      "id": "service_4",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_4",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 4"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_4",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "service_5",
+                      "type": "card",
+                      "props": {},
+                      "style": {
+                        "gap": 12
+                      },
+                      "responsive": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "children": [
+                        {
+                          "id": "service_title_5",
+                          "type": "heading",
+                          "props": {
+                            "text": "Service 5"
+                          },
+                          "style": {
+                            "fontSize": 28,
+                            "fontWeight": 700
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        },
+                        {
+                          "id": "service_description_5",
+                          "type": "text",
+                          "props": {
+                            "text": "Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business. Reliable support for your business."
+                          },
+                          "style": {
+                            "fontSize": 17
+                          },
+                          "responsive": {},
+                          "action": {
+                            "type": "none"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "about",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "about_title",
+                  "type": "heading",
+                  "props": {
+                    "text": "About us"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "about_text",
+                  "type": "text",
+                  "props": {
+                    "text": "Tell visitors what makes your business useful to them."
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_cta",
+              "type": "cta",
+              "props": {
+                "title": "Contact us",
+                "subtitle": ""
+              },
+              "style": {
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "cta_action",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "home_footer",
+              "type": "footer",
+              "props": {
+                "copyright": "Your business"
+              },
+              "style": {
+                "backgroundColor": "#F1F5F9",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "contact",
+        "name": "Contact",
+        "path": "/contact",
+        "title": "Contact Restaurant and hospitality",
+        "description": "",
+        "root": {
+          "id": "contact_root",
+          "type": "page",
+          "props": {},
+          "style": {},
+          "responsive": {},
+          "action": {
+            "type": "none"
+          },
+          "children": [
+            {
+              "id": "contact_nav",
+              "type": "navbar",
+              "props": {
+                "brand": "Restaurant and hospitality"
+              },
+              "style": {
+                "padding": 16
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "contact_home_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Home"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_contact_link",
+                  "type": "button",
+                  "props": {
+                    "text": "Contact"
+                  },
+                  "style": {},
+                  "responsive": {},
+                  "action": {
+                    "type": "navigate",
+                    "path": "/contact"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_section",
+              "type": "section",
+              "props": {},
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "padding": 24,
+                "gap": 20
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": [
+                {
+                  "id": "contact_heading",
+                  "type": "heading",
+                  "props": {
+                    "text": "Contact us"
+                  },
+                  "style": {
+                    "fontSize": 28,
+                    "fontWeight": 700
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_address",
+                  "type": "text",
+                  "props": {
+                    "text": ""
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "contact_phone",
+                  "type": "text",
+                  "props": {
+                    "text": ""
+                  },
+                  "style": {
+                    "fontSize": 17
+                  },
+                  "responsive": {},
+                  "action": {
+                    "type": "none"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "contact_footer",
+              "type": "footer",
+              "props": {
+                "copyright": "Your business"
+              },
+              "style": {
+                "backgroundColor": "#F1F5F9",
+                "padding": 24
+              },
+              "responsive": {},
+              "action": {
+                "type": "none"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ],
+    "settings": {
+      "language": "en",
+      "direction": "ltr",
+      "faviconUrl": "",
+      "analyticsKey": ""
+    }
+  }
+]

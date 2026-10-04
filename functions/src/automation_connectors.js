@@ -89,10 +89,24 @@ export const builtinTools = {
     tool('gmail_send', 'Send a plain-text email', {to: string, subject: string, body: string}, ['to', 'subject', 'body']),
     tool('drive_search', 'Find Google Drive files authorized for this app', {query: string}),
     tool('drive_create_text', 'Create a text file in Google Drive', {name: string, content: string}, ['name', 'content']),
+    tool('calendar_list_events', 'List upcoming calendar events', {calendarId: string, timeMin: string}),
+    tool('calendar_create_event', 'Create a calendar appointment', {calendarId: string, summary: string, start: string, end: string}, ['summary', 'start', 'end']),
+    tool('sheets_read', 'Read a spreadsheet range', {spreadsheetId: string, range: string}, ['spreadsheetId', 'range']),
+    tool('sheets_append', 'Append literal values to a spreadsheet', {spreadsheetId: string, range: string, values: {type: 'array', items: {type: 'array', items: {type: ['string', 'number', 'boolean']}}}}, ['spreadsheetId', 'range', 'values']),
   ],
   notion: [
     tool('notion_search', 'Search pages shared with this connection', {query: string}),
     tool('notion_create_page', 'Create a child page under a shared page', {parentId: string, title: string, content: string}, ['parentId', 'title', 'content']),
+  ],
+  slack: [
+    tool('slack_channels', 'List public channels accessible to the bot', {}),
+    tool('slack_history', 'Read recent messages in a channel', {channel: string}, ['channel']),
+    tool('slack_post_message', 'Post a channel message', {channel: string, text: string}, ['channel', 'text']),
+  ],
+  hubspot: [
+    tool('hubspot_contacts', 'List CRM contacts', {}),
+    tool('hubspot_create_contact', 'Create a CRM contact', {email: string, firstName: string, lastName: string}, ['email']),
+    tool('hubspot_deals', 'List CRM deals', {}),
   ],
 };
 const text = z.string().max(30000);
@@ -104,6 +118,14 @@ const schemas = {
   drive_create_text: z.object({name: z.string().min(1).max(200), content: text}).strict(),
   notion_search: z.object({query: text.optional()}).strict(),
   notion_create_page: z.object({parentId: z.string().regex(/^[a-fA-F0-9-]{32,36}$/), title: z.string().min(1).max(200), content: z.string().max(2000)}).strict(),
+  calendar_list_events: z.object({calendarId: z.string().max(254).default('primary'), timeMin: z.string().datetime({offset: true}).optional()}).strict(),
+  calendar_create_event: z.object({calendarId: z.string().max(254).default('primary'), summary: z.string().min(1).max(200), start: z.string().datetime({offset: true}), end: z.string().datetime({offset: true})}).strict().refine(value => Date.parse(value.end) > Date.parse(value.start), 'End must follow start'),
+  sheets_read: z.object({spreadsheetId: z.string().regex(/^[\w-]{10,150}$/), range: z.string().min(1).max(200)}).strict(),
+  sheets_append: z.object({spreadsheetId: z.string().regex(/^[\w-]{10,150}$/), range: z.string().min(1).max(200), values: z.array(z.array(z.union([z.string().max(4000), z.number().finite(), z.boolean()])).max(30)).min(1).max(50)}).strict(),
+  slack_channels: z.object({}).strict(), slack_history: z.object({channel: z.string().regex(/^[CG][A-Z0-9]{5,30}$/)}).strict(),
+  slack_post_message: z.object({channel: z.string().regex(/^[CG][A-Z0-9]{5,30}$/), text: z.string().min(1).max(4000)}).strict(),
+  hubspot_contacts: z.object({}).strict(), hubspot_deals: z.object({}).strict(),
+  hubspot_create_contact: z.object({email: z.string().email(), firstName: z.string().max(100).optional(), lastName: z.string().max(100).optional()}).strict(),
 };
 export async function providerJson(url, options = {}, timeoutMs = 20000) {
   const response = await fetch(url, {...options, redirect: 'error', signal: AbortSignal.timeout(timeoutMs)});
@@ -127,7 +149,22 @@ export async function callBuiltin(provider, accessToken, name, raw) {
   const args = schemas[name].parse(raw);
   const headers = {Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json'};
   const google = (path, options = {}) => providerJson(`https://www.googleapis.com/${path}`, {...options, headers});
+  const slack = async (method, body = {}) => {
+    const result = await providerJson(`https://slack.com/api/${method}`, {method: 'POST', headers, body: JSON.stringify(body)});
+    if (!result.ok) throw new Error('Slack rejected the request; check bot scopes and channel membership');
+    return result;
+  };
   switch (name) {
+    case 'calendar_list_events': return google(`calendar/v3/calendars/${encodeURIComponent(args.calendarId)}/events?maxResults=20&singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(args.timeMin || new Date().toISOString())}`);
+    case 'calendar_create_event': return google(`calendar/v3/calendars/${encodeURIComponent(args.calendarId)}/events`, {method: 'POST', body: JSON.stringify({summary: args.summary, start: {dateTime: args.start}, end: {dateTime: args.end}})});
+    case 'sheets_read': return providerJson(`https://sheets.googleapis.com/v4/spreadsheets/${args.spreadsheetId}/values/${encodeURIComponent(args.range)}`, {headers});
+    case 'sheets_append': return providerJson(`https://sheets.googleapis.com/v4/spreadsheets/${args.spreadsheetId}/values/${encodeURIComponent(args.range)}:append?valueInputOption=RAW`, {method: 'POST', headers, body: JSON.stringify({values: args.values})});
+    case 'slack_channels': return slack('conversations.list', {limit: 50, types: 'public_channel'});
+    case 'slack_history': return slack('conversations.history', {channel: args.channel, limit: 20});
+    case 'slack_post_message': return slack('chat.postMessage', {...args, unfurl_links: false, unfurl_media: false});
+    case 'hubspot_contacts': return providerJson('https://api.hubapi.com/crm/v3/objects/contacts?limit=20&properties=email,firstname,lastname', {headers});
+    case 'hubspot_deals': return providerJson('https://api.hubapi.com/crm/v3/objects/deals?limit=20&properties=dealname,amount,dealstage', {headers});
+    case 'hubspot_create_contact': return providerJson('https://api.hubapi.com/crm/v3/objects/contacts', {method: 'POST', headers, body: JSON.stringify({properties: {email: args.email, firstname: args.firstName || '', lastname: args.lastName || ''}})});
     case 'gmail_search': return google(`gmail/v1/users/me/messages?maxResults=20&q=${encodeURIComponent(args.query)}`);
     case 'gmail_read': return google(`gmail/v1/users/me/messages/${args.messageId}?format=full`);
     case 'gmail_send': {

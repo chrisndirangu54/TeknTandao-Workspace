@@ -48,8 +48,9 @@ class _Store extends SuiteStore {
       };
     }
     if (name == 'previewCustomFeature') return {'result': 400};
-    if (name == 'startAutomationOAuth')
+    if (name == 'startAutomationOAuth') {
       return {'url': 'https://accounts.google.com/o/oauth2/v2/auth?state=test'};
+    }
     return {};
   }
 

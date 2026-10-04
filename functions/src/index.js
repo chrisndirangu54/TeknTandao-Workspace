@@ -286,7 +286,13 @@ export const paystackWebhook = onRequest({region, secrets: [paystackSecret]}, as
   try {
     const reference = identifier(req.body.data.reference);
     const mapping = (await db.doc(`paymentReferences/${reference}`).get()).data();
-    if (!mapping) { res.sendStatus(200); return; }
+    if (!mapping) {
+      if ((await db.doc(`resellerPaymentReferences/${reference}`).get()).exists) {
+        const {settleResellerPayment} = await import('./reseller.js');
+        await settleResellerPayment(reference, await verifyTransaction(paystackSecret.value(), reference));
+      }
+      res.sendStatus(200); return;
+    }
     const verified = await verifyTransaction(paystackSecret.value(), reference);
     const org = root(mapping.orgId);
     await db.runTransaction(async tx => {

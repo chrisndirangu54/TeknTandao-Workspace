@@ -31,6 +31,7 @@ import 'modules/ngo_module.dart';
 import 'modules/documents_module.dart';
 import 'modules/generic_module_screen.dart';
 import 'modules/automation_studio.dart';
+import 'modules/reseller_studio.dart';
 
 class Dashboard extends StatefulWidget {
   final SuiteStore store;
@@ -65,6 +66,10 @@ class _DashboardState extends State<Dashboard> {
     if (moduleId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+        if (moduleId == 'reseller') {
+          _openResellerStudio();
+          return;
+        }
         if (moduleId == 'automation') {
           _openAutomationStudio();
           return;
@@ -124,6 +129,10 @@ class _DashboardState extends State<Dashboard> {
         setState(() => _activeTab = 'billing');
       },
     )));
+  }
+
+  void _openResellerStudio() {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ResellerStudioScreen(store: store)));
   }
 
   void _navigateToModule(SuiteModule module) {
@@ -362,6 +371,7 @@ class _DashboardState extends State<Dashboard> {
                   onPressed: widget.onSwitchWorkspace,
                   icon: const Icon(Icons.business_rounded),
                 ),
+                IconButton(tooltip: 'Reseller platform', onPressed: _openResellerStudio, icon: const Icon(Icons.storefront_outlined)),
               if (compact) ...[
                 IconButton(
                   tooltip: 'Search apps',

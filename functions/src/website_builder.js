@@ -3,6 +3,8 @@ import {randomUUID} from 'node:crypto';
 import {FieldValue, Timestamp, getFirestore} from 'firebase-admin/firestore';
 import {HttpsError, onCall, onRequest} from 'firebase-functions/v2/https';
 import {defineSecret} from 'firebase-functions/params';
+import {compileWebsiteContent} from './website_components.js';
+import {generateVettedWebsite} from './website_generation.js';
 import {catalog, canAccess, identifier, textValue} from './domain.js';
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
 import {
@@ -152,13 +154,15 @@ export const replaceWebsiteDocument = callable(async request => {
   if (!Number.isInteger(expectedRevision) || expectedRevision < 1) throw new Error('Expected revision is required');
   const document = validateWebsiteDocument(request.data.document);
   assertFirestoreSized(document);
+  const contentBlueprint = request.data.contentBlueprint ? compileWebsiteContent(request.data.contentBlueprint).blueprint : null;
+  if (contentBlueprint && websiteDigest(compileWebsiteContent(contentBlueprint).document) !== websiteDigest(document)) throw new Error('Content blueprint does not match the website document');
   const ref = org.collection('websiteProjects').doc(projectId);
   return db.runTransaction(async tx => {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) throw new Error('Website project not found');
     if (snapshot.data().revision !== expectedRevision) throw new Error(`Revision conflict: server is at ${snapshot.data().revision}`);
     const revision = expectedRevision + 1;
-    tx.update(ref, {draft: document, title: document.title, revision, status: snapshot.data().publishedVersion ? 'modified' : 'draft', updatedBy: user, updatedAt: stamp()});
+    tx.update(ref, {draft: document, contentBlueprint, title: document.title, revision, status: snapshot.data().publishedVersion ? 'modified' : 'draft', updatedBy: user, updatedAt: stamp()});
     tx.set(org.collection('websiteProjectEvents').doc(`${projectId}_${revision}`), {projectId, revision, kind: 'replace_document', digest: websiteDigest(document), actorUid: user, createdAt: stamp()});
     return {projectId, revision, digest: websiteDigest(document)};
   });
@@ -506,30 +510,11 @@ export const getWebsiteCreatorDashboard = callable(async request => {
   };
 });
 
-function extractGeminiJson(payload) {
-  const text = payload?.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('') || '';
-  const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-  if (!stripped) throw new Error('AI returned an empty website');
-  return JSON.parse(stripped);
-}
-
 export const generateWebsiteFromPrompt = callable(async request => {
-  await authorize(request, {ownerOnly: true});
+  const {org, user} = await authorize(request, {ownerOnly: true});
   const prompt = textValue(request.data.prompt, 4000);
-  const key = geminiKey.value();
-  const model = process.env.GEMINI_MODEL;
-  if (!key || !model) throw new Error('Configure GEMINI_API_KEY and GEMINI_MODEL before AI website generation');
-  const schemaGuide = `Return JSON only. Build a responsive website document with schemaVersion 1, title, theme, settings, and pages. Each page has id,name,path,title,description,root. Each node has id,type,props,style,responsive,action,children. Allowed node types: page,section,container,row,column,wrap,stack,heading,text,richText,image,button,icon,divider,spacer,card,grid,navbar,hero,features,pricing,testimonials,cta,footer,form. Actions are none, navigate with path, or externalUrl with url. Do not include scripts, HTML, CSS, secrets, Firebase paths or arbitrary code. Use stable unique ids.`;
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'x-goog-api-key': key},
-    body: JSON.stringify({contents: [{parts: [{text: `${schemaGuide}\n\nDesign brief:\n${prompt}`}]}], generationConfig: {responseMimeType: 'application/json', temperature: 0.7}})
-  });
-  if (!response.ok) throw new Error('AI website provider unavailable');
-  const payload = await response.json();
-  const document = validateWebsiteDocument(extractGeminiJson(payload));
-  assertFirestoreSized(document);
-  return {document, digest: websiteDigest(document)};
+  const generated = await generateVettedWebsite({org, user, prompt, key: geminiKey.value(), model: process.env.GEMINI_MODEL});
+  return {...generated, contentBlueprint: generated.blueprint, digest: websiteDigest(generated.document)};
 }, [geminiKey]);
 
 export const getWebsiteBuilderOverview = callable(async request => {

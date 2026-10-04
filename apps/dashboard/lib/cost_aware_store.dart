@@ -53,7 +53,7 @@ class CostAwareFirebaseSuiteStore extends SuiteStore {
   Duration? _cacheTtl(String name) {
     // OAuth completes in a separate browser tab; refresh must see its new
     // connection immediately, as well as asynchronous workflow results.
-    if (name == 'getAutomationStudio') return Duration.zero;
+    if (['getAutomationStudio', 'getResellerStudio', 'getClientBundleInvoices'].contains(name)) return Duration.zero;
     if (name == 'getCatalog') return const Duration(minutes: 5);
     if (name == 'getWorkspaceContext') return const Duration(minutes: 2);
     if (name == 'getFirebaseCostPolicy') return const Duration(minutes: 5);
