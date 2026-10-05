@@ -31,7 +31,7 @@ function sheetXml(rows){
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rowsXml+'</sheetData></worksheet>';
 }
 export function buildXlsx(tables){
-  const items=Object.entries(tables).slice(0,20),sheets=items.map(([name],i)=>({id:i+1,name:String(name).replace(/[\\/*?:[\]]/g,' ').slice(0,31)||('Sheet'+(i+1))}));
+  const items=Object.entries(tables).slice(0,20),sheets=items.map(([name],i)=>{let safe=String(name);for(const ch of ['\\','/','*','?',':','[',']'])safe=safe.replaceAll(ch,' ');return {id:i+1,name:safe.slice(0,31)||('Sheet'+(i+1))};});
   const overrides=sheets.map(s=>'<Override PartName="/xl/worksheets/sheet'+s.id+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('');
   const sheetNodes=sheets.map(s=>'<sheet name="'+esc(s.name)+'" sheetId="'+s.id+'" r:id="rId'+s.id+'"/>').join('');
   const rels=sheets.map(s=>'<Relationship Id="rId'+s.id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+s.id+'.xml"/>').join('');
