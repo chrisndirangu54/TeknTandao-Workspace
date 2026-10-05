@@ -70,11 +70,68 @@ class SuiteApp extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff176b59)),
-      scaffoldBackgroundColor: const Color(0xfff5f6f3),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF2563EB),
+        brightness: Brightness.light,
+        surface: const Color(0xFFFFFFFF),
       ),
+      scaffoldBackgroundColor: const Color(0xFFF5F7FB),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.white,
+        foregroundColor: Color(0xFF0F172A),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+      ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFDDE3EA)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFDDE3EA)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide.none,
+      ),
+      navigationBarTheme: const NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        indicatorColor: Color(0xFFDBEAFE),
+      ),
+      dividerColor: const Color(0xFFE5E7EB),
     ),
     home: preview
         ? Dashboard(
