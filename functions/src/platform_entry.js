@@ -45,3 +45,5 @@ export * from './process_intelligence_domain.js';
 export * from './agent_benchmark_domain.js';
 export * from './decision_intelligence_domain.js';
 export * from './digital_twin_domain.js';
+
+export * from './super_admin.js';
