@@ -45,6 +45,7 @@ export const extractedRecordSchema = z.object({
   confidence: z.number().min(0).max(1),
   evidence: z.array(z.string().max(500)).max(20).default([]),
   warnings: z.array(z.string().max(500)).max(20).default([]),
+  risk: z.enum(['standard', 'financial-draft', 'transaction-draft']).optional(),
 }).strict();
 
 export const extractionSchema = z.object({
