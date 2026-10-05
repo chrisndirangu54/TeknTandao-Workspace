@@ -382,6 +382,28 @@ function mappedValue(raw, transform) {
   return raw;
 }
 
+const dataExchangeReadTools = new Set([
+  'gmail_search','gmail_read','drive_search','calendar_list_events','sheets_read',
+  'notion_search','slack_channels','slack_history','hubspot_contacts','hubspot_deals',
+  'salesforce_accounts','salesforce_contacts','salesforce_opportunities',
+  'jira_search_issues','jira_projects','zoho_contacts','zoho_deals',
+  'odoo_contacts','odoo_sale_orders','odoo_products',
+]);
+
+function assertReadOnlyExchangeTool(connection, toolName) {
+  const tool = connection.tools.find(item => item.name === toolName);
+  if (!tool) throw new Error('Selected source tool is unavailable');
+  if (connection.provider === 'mcp') {
+    if (tool.annotations?.readOnlyHint !== true) {
+      throw new Error('MCP Data Exchange requires a tool declaring readOnlyHint=true');
+    }
+    return;
+  }
+  if (!dataExchangeReadTools.has(toolName)) {
+    throw new Error('Data Exchange source must be a read-only connector tool');
+  }
+}
+
 const exchangeTargets = Object.freeze({
   crm: {collection:'contacts', appId:'crm', fields:['name','email','phone','location','type']},
   inventory: {collection:'products', appId:'inventory', fields:['name','sku','stock','price','warehouse','category']},
@@ -413,6 +435,8 @@ export const previewAutomationConnectionTool = callable(async request => {
   const connectionId = automationId.parse(request.data.connectionId);
   const toolName = z.string().min(1).max(160).parse(request.data.tool);
   const args = boundedJson(request.data.args || {});
+  const previewConnection = await getConnection(org, connectionId);
+  assertReadOnlyExchangeTool(previewConnection, toolName);
   const result = await executeAutomationConnectionTool(org, connectionId, toolName, args);
   return {sample: rowsFromConnectorResult(result).slice(0, 5), rawShape: Array.isArray(result) ? 'array' : Object.keys(result || {}).slice(0, 30)};
 }, [encryptionKey, oauthConfig]);
@@ -423,6 +447,8 @@ export const suggestDataExchangeMapping = callable(async request => {
   const toolName = z.string().min(1).max(160).parse(request.data.tool);
   const target = z.enum(['crm','inventory','helpdesk','projects']).parse(request.data.target);
   const args = boundedJson(request.data.args || {});
+  const mappingConnection = await getConnection(org, connectionId);
+  assertReadOnlyExchangeTool(mappingConnection, toolName);
   const result = await executeAutomationConnectionTool(org, connectionId, toolName, args);
   const sample = rowsFromConnectorResult(result).slice(0, 5);
   if (!sample.length) throw new Error('Connector returned no sample rows to map');
@@ -464,7 +490,7 @@ export const saveDataExchangeRule = callable(async request => {
   const {org, uid} = await authorize(request);
   const rule = exchangeRuleSchema.parse(boundedJson(request.data.rule));
   const connection = await getConnection(org, rule.connectionId);
-  if (!connection.tools.some(tool=>tool.name===rule.sourceTool)) throw new Error('Selected source tool is unavailable');
+  assertReadOnlyExchangeTool(connection, rule.sourceTool);
   const allowed = new Set(exchangeTargets[rule.target].fields);
   if (rule.mappings.some(item=>!allowed.has(item.targetField))) throw new Error('Rule maps unsupported target fields');
   const id = request.data.id ? automationId.parse(request.data.id) : randomUUID();
@@ -495,7 +521,7 @@ async function performDataExchange(org, id, rule, startedBy) {
   await consumeQuota(org,'sync',200);
 
   const connection = await getConnection(org,rule.connectionId);
-  if (!connection.tools.some(tool=>tool.name===rule.sourceTool)) throw new Error('Source tool is no longer available');
+  assertReadOnlyExchangeTool(connection, rule.sourceTool);
   const result = await executeAutomationConnectionTool(org,rule.connectionId,rule.sourceTool,rule.sourceArgs||{});
   const rows = rowsFromConnectorResult(result).slice(0,200);
   const target = exchangeTargets[rule.target];
