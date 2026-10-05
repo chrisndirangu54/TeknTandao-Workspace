@@ -69,7 +69,7 @@ try {
         'previewAutomationConnectionTool', 'suggestDataExchangeMapping', 'saveDataExchangeRule',
         'getDataExchange', 'runDataExchangeRule', 'runScheduledDataExchange',
         'getExecutiveIntelligence', 'generateExecutiveBrief',
-        'exportExecutiveReport', 'exportExecutiveReportToOneDrive',
+        'exportExecutiveReport', 'exportExecutiveReportToGoogleWorkspace', 'exportExecutiveReportToOneDrive',
         'publishExecutiveDataToPowerBi', 'getReportExportHistory', 'purgeExpiredReportExports',
         'setResellerAccount', 'getResellerStudio', 'saveResellerPricing', 'priceResellerGeneration',
         'recordResellerFirebaseCost', 'saveVettedSiteTemplate', 'installVettedSiteTemplate', 'exportVettedSite',
