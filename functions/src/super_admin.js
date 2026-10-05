@@ -4,11 +4,12 @@ import {getAuth} from 'firebase-admin/auth';
 import {FieldValue, getFirestore} from 'firebase-admin/firestore';
 import {HttpsError, onCall} from 'firebase-functions/v2/https';
 import {z} from 'zod';
+import {bootstrapSuperAdminEmail,isBootstrapSuperAdminToken,isSuperAdminToken,canMutateProtectedAdmin} from './super_admin_domain.js';
 
 const db=getFirestore();
 const auth=getAuth();
 const region='europe-west1';
-export const BOOTSTRAP_SUPER_ADMIN_EMAIL='chrisndirangu54@gmail.com';
+export const BOOTSTRAP_SUPER_ADMIN_EMAIL=bootstrapSuperAdminEmail;
 const stamp=()=>FieldValue.serverTimestamp();
 const emailSchema=z.string().trim().email().max(254);
 const idSchema=z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/);
@@ -23,14 +24,12 @@ function signedIn(request){
 }
 
 async function isBootstrap(request){
-  const session=signedIn(request);
-  const email=String(session.token.email||'').toLowerCase();
-  return email===BOOTSTRAP_SUPER_ADMIN_EMAIL && session.token.email_verified===true;
+  return isBootstrapSuperAdminToken(signedIn(request).token);
 }
 
 async function requireSuperAdmin(request){
   const session=signedIn(request);
-  if(session.token.superAdmin===true || await isBootstrap(request)) return session;
+  if(isSuperAdminToken(session.token)) return session;
   throw new HttpsError('permission-denied','Super administrator required');
 }
 
@@ -119,7 +118,7 @@ export const updatePlatformUser=callable(async request=>{
 export const deletePlatformUser=callable(async request=>{
   const actor=await requireSuperAdmin(request);
   const input=z.object({uid:idSchema,confirmEmail:emailSchema}).strict().parse(request.data);
-  if(input.uid===actor.uid) throw new Error('You cannot delete your own administrator account');
+  if(!canMutateProtectedAdmin({actorUid:actor.uid,targetUid:input.uid,targetEmail:input.confirmEmail,operation:'delete-user'})) throw new Error('Protected administrator accounts cannot be deleted');
   const target=await auth.getUser(input.uid);
   if((target.email||'').toLowerCase()!==input.confirmEmail.toLowerCase()) throw new Error('Email confirmation does not match the target user');
   if(target.email?.toLowerCase()===BOOTSTRAP_SUPER_ADMIN_EMAIL) throw new Error('Bootstrap super admin cannot be deleted');
@@ -142,9 +141,8 @@ export const grantSuperAdmin=callable(async request=>{
 export const revokeSuperAdmin=callable(async request=>{
   const actor=await requireSuperAdmin(request);
   const uid=idSchema.parse(request.data.uid);
-  if(uid===actor.uid) throw new Error('You cannot revoke your own super-admin access');
   const target=await auth.getUser(uid);
-  if(target.email?.toLowerCase()===BOOTSTRAP_SUPER_ADMIN_EMAIL) throw new Error('Bootstrap super admin cannot be revoked');
+  if(!canMutateProtectedAdmin({actorUid:actor.uid,targetUid:uid,targetEmail:target.email||'',operation:'revoke-admin'})) throw new Error('Protected administrator access cannot be revoked');
   await setAdminClaims(uid,false);
   await db.doc(`platformSuperAdmins/${uid}`).set({email:target.email||'',active:false,revokedBy:actor.uid,updatedAt:stamp()},{merge:true});
   await db.collection('platformAudit').add({action:'superadmin.revoke',targetUid:uid,targetEmail:target.email||'',actorUid:actor.uid,createdAt:stamp()});
