@@ -70,7 +70,7 @@ try {
         'getDataExchange', 'runDataExchangeRule', 'runScheduledDataExchange',
         'getExecutiveIntelligence', 'generateExecutiveBrief',
         'exportExecutiveReport', 'exportExecutiveReportToOneDrive',
-        'publishExecutiveDataToPowerBi', 'getReportExportHistory',
+        'publishExecutiveDataToPowerBi', 'getReportExportHistory', 'purgeExpiredReportExports',
         'setResellerAccount', 'getResellerStudio', 'saveResellerPricing', 'priceResellerGeneration',
         'recordResellerFirebaseCost', 'saveVettedSiteTemplate', 'installVettedSiteTemplate', 'exportVettedSite',
         'quoteResellerDomain', 'createResellerBundle', 'createResellerInvoice', 'getClientBundleInvoices',
