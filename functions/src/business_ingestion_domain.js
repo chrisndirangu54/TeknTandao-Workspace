@@ -161,6 +161,7 @@ export function commitShape(record) {
           category: String(fields.category || '').slice(0, 120),
           notes: String(fields.notes || '').slice(0, 4000),
           state: 'draft_review',
+          status: 'DRAFT',
         },
       };
     case 'sale':
