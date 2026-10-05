@@ -11,6 +11,7 @@ import {websiteDigest} from './website_builder_domain.js';
 import {resellerPricingSchema, monthlyBundlePrice, domainCostMinor, generationPrice} from './reseller_pricing.js';
 import {quoteNamecheapDomain, registerNamecheapDomain, registrantSchema} from './namecheap.js';
 import {initializePaystack, verifyTransaction, verifyPaystack} from './providers.js';
+import {isSuperAdminToken} from './super_admin_domain.js';
 import {resellerHostingDomains, desiredHostingDns} from './website_builder_advanced.js';
 
 const db = getFirestore(), region = 'europe-west1';
@@ -29,9 +30,7 @@ function callable(work, secrets = [], network = false) {
   });
 }
 function isSuperAdminRequest(request) {
-  const email = String(request.auth?.token?.email || '').toLowerCase();
-  return request.auth?.token?.superAdmin === true ||
-    (email === 'chrisndirangu54@gmail.com' && request.auth?.token?.email_verified === true);
+  return isSuperAdminToken(request.auth?.token || {});
 }
 async function authorize(request, reseller = false) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first');
