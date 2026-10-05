@@ -149,6 +149,39 @@ export const revokeSuperAdmin=callable(async request=>{
   return {ok:true};
 });
 
+
+export const getWorkspaceMembersAsSuperAdmin=callable(async request=>{
+  await requireSuperAdmin(request);
+  const workspaceId=idSchema.parse(request.data.workspaceId);
+  const org=db.doc(`organizations/${workspaceId}`);
+  const orgSnap=await org.get();
+  if(!orgSnap.exists)throw new Error('Workspace not found');
+  const members=await org.collection('members').limit(500).get();
+  const rows=[];
+  for(const member of members.docs){
+    let user=null;
+    try{user=await auth.getUser(member.id);}catch(_){}
+    rows.push({
+      uid:member.id,
+      email:user?.email||'',
+      displayName:user?.displayName||'',
+      role:member.data()?.role||'member',
+      apps:Array.isArray(member.data()?.apps)?member.data().apps:[],
+      isOwner:orgSnap.data()?.owner===member.id
+    });
+  }
+  return {workspaceId,name:orgSnap.data()?.name||'Workspace',ownerUid:orgSnap.data()?.owner||'',members:rows};
+});
+
+export const sendPlatformUserPasswordReset=callable(async request=>{
+  const actor=await requireSuperAdmin(request);
+  const email=emailSchema.parse(request.data.email);
+  const target=await auth.getUserByEmail(email);
+  const passwordResetLink=await auth.generatePasswordResetLink(email);
+  await db.collection('platformAudit').add({action:'user.password_reset_link',targetUid:target.uid,targetEmail:email,actorUid:actor.uid,createdAt:stamp()});
+  return {passwordResetLink};
+});
+
 export const createWorkspaceAsSuperAdmin=callable(async request=>{
   const actor=await requireSuperAdmin(request);
   const input=z.object({name:z.string().trim().min(1).max(120),ownerEmail:emailSchema}).strict().parse(request.data);
