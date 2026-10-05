@@ -191,7 +191,24 @@ export const exportExecutiveReportToOneDrive=callable(async request=>{
   const title=cleanFilename(request.data.title||'TeknTandao Executive Intelligence');
   const facts=await loadExecutiveFacts(org),data=reportData(facts),buffer=render(format,data,title),filename=title+'.'+format;
   const token=await microsoftToken(org,connectionId,'microsoft');
-  const folder=encodeURIComponent('TeknTandao Exports'),fileName=encodeURIComponent(filename);
+  const folderName='TeknTandao Exports';
+  const folderLookup=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/'+encodeURIComponent(folderName),{
+    headers:{Authorization:'Bearer '+token},redirect:'error',signal:AbortSignal.timeout(30000),
+  });
+  if(folderLookup.status===404){
+    const createdFolder=await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children',{
+      method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({name:folderName,folder:{},'@microsoft.graph.conflictBehavior':'fail'}),redirect:'error',signal:AbortSignal.timeout(30000),
+    });
+    if(!createdFolder.ok&&createdFolder.status!==409){
+      const folderError=await createdFolder.json().catch(()=>({}));
+      throw new Error(folderError?.error?.message||'Unable to create OneDrive export folder');
+    }
+  }else if(!folderLookup.ok){
+    const folderError=await folderLookup.json().catch(()=>({}));
+    throw new Error(folderError?.error?.message||'Unable to access OneDrive export folder');
+  }
+  const folder=encodeURIComponent(folderName),fileName=encodeURIComponent(filename);
   const response=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/'+folder+'/'+fileName+':/content',{
     method:'PUT',
     headers:{Authorization:'Bearer '+token,'Content-Type':mimeFor(format)},
@@ -210,7 +227,7 @@ export const exportExecutiveReportToOneDrive=callable(async request=>{
 
 function powerBiTables(){
   return [
-    {name:'KPIs',columns:[{name:'GeneratedAt',dataType:'DateTime'},{name:'Metric',dataType:'string'},{name:'Value',dataType:'double'},{name:'Detail',dataType:'string'}]},
+    {name:'KPIs',columns:[{name:'GeneratedAt',dataType:'DateTime'},{name:'Metric',dataType:'string'},{name:'Value',dataType:'Double'},{name:'Detail',dataType:'string'}]},
     {name:'SalesTrend',columns:[{name:'GeneratedAt',dataType:'DateTime'},{name:'Period',dataType:'string'},{name:'ValueMinor',dataType:'Int64'},{name:'Count',dataType:'Int64'}]},
     {name:'Recommendations',columns:[{name:'GeneratedAt',dataType:'DateTime'},{name:'Priority',dataType:'string'},{name:'Title',dataType:'string'},{name:'Reason',dataType:'string'},{name:'Action',dataType:'string'},{name:'Source',dataType:'string'}]},
   ];
