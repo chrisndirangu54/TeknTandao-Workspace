@@ -60,6 +60,32 @@ Configure Paystack's webhook URL as `https://europe-west1-YOUR_PROJECT_ID.cloudf
 
 These credentials collect **Tandao app subscription payments**. Merchant checkout payments for goods/services are not implemented; POS sales remain unpaid records.
 
+
+## Super-admin security operations
+
+The platform super-admin console includes a high-security Secret Manager vault for provider keys and other server credentials. Secret values are **write-only** in the UI: the console can create and rotate values, inspect version metadata, enable/disable versions, and permanently destroy versions, but it never returns stored secret material to the browser.
+
+For production, run the security callables under a dedicated service account instead of the general Functions runtime identity. Set `SECURITY_ADMIN_SERVICE_ACCOUNT` in the Functions environment to that service-account email before deployment. Grant that identity only the Secret Manager lifecycle permissions required by the console:
+
+- `secretmanager.secrets.get`
+- `secretmanager.secrets.list`
+- `secretmanager.secrets.create`
+- `secretmanager.secrets.delete`
+- `secretmanager.versions.add`
+- `secretmanager.versions.get`
+- `secretmanager.versions.list`
+- `secretmanager.versions.enable`
+- `secretmanager.versions.disable`
+- `secretmanager.versions.destroy`
+
+A custom IAM role with those permissions is preferred over granting project-wide Owner/Editor. The Functions deploy identity must also be allowed to act as the dedicated service account.
+
+High-security operations require a recently authenticated super-admin token. Destructive operations require typed confirmation, and whole-secret deletion is restricted to the protected root account. Session revocation and emergency user lockout are also available and are written to `platformSecurityAudit`.
+
+Existing Firebase `defineSecret(...)` bindings use Secret Manager too. The following core credentials are deployment-bound in the current codebase: `PAYSTACK_SECRET_KEY`, `MPESA_CONFIG`, `GEMINI_API_KEY`, `AUTOMATION_ENCRYPTION_KEY`, `AUTOMATION_OAUTH_CONFIG`, `NAMECHEAP_CONFIG`, `WEBSITE_ANALYTICS_SIGNING_KEY`, `CLOUDFLARE_API_TOKEN`, and `TURNSTILE_SECRET_KEY`. After rotating one of these, redeploy the Functions that bind it (or deploy all Functions) so new revisions use the new secret version.
+
+Never store service-account JSON files, private keys, API keys, OAuth client secrets, M-Pesa credentials, or provider tokens in Git, Flutter assets, Dart defines, or Firestore user-visible documents.
+
 ## eTIMS
 
 The code queues draft invoices with `blocked_configuration`. It intentionally has no guessed tax rates, fake KRA response or fabricated fiscal identifier. Remaining integration needs: taxpayer PIN and branch/device identity, approved OSCU/VSCU route, tax/item/unit mappings, invoice numbering, certified connector access, sandbox acceptance tests, retries/reconciliation and credit-note handling. An accepted KRA response must be persisted before an invoice is presented as fiscally issued.
