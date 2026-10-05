@@ -127,6 +127,30 @@ async function listVersionsFor(name) {
     .sort((a, b) => Number(b.version) - Number(a.version));
 }
 
+export const getPlatformSecurityAudit = callable(async request => {
+  requireSuperAdmin(request);
+  const snapshot = await db.collection('platformSecurityAudit')
+    .orderBy('createdAt', 'desc')
+    .limit(100)
+    .get();
+  return {
+    events: snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        action: data.action || '',
+        actorUid: data.actorUid || '',
+        actorEmail: data.actorEmail || '',
+        targetUid: data.targetUid || '',
+        targetEmail: data.targetEmail || '',
+        secretId: data.secretId || '',
+        version: data.version || '',
+        createdAt: data.createdAt?.toMillis?.() ?? null,
+      };
+    }),
+  };
+});
+
 export const getPlatformSecretVault = callable(async request => {
   requireSuperAdmin(request);
   const listed = await secretManagerJson(parent() + '/secrets?pageSize=200');
