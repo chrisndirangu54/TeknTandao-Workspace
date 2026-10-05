@@ -17,6 +17,7 @@
     "ipaddr.js": "^2.5.0",
     "quickjs-emscripten": "^0.32.0",
     "undici": "^7.30.0",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "@google-cloud/secret-manager": "^6.0.0"
   }
 }
