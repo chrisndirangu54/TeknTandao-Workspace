@@ -221,7 +221,8 @@ export const disconnectToolConnection = callable(async request => {
 });
 
 function configFor(provider) {
-  const config = JSON.parse(oauthConfig.value() || '{}')[provider];
+  const all = JSON.parse(oauthConfig.value() || '{}');
+  const config = all[provider] || (provider === 'powerbi' ? all.microsoft : null);
   if (!config?.clientId || !config?.clientSecret) throw new HttpsError('failed-precondition', `Configure ${provider} OAuth credentials before connecting`);
   return config;
 }
