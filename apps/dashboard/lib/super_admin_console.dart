@@ -3,7 +3,32 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class SuperAdminGate {
+  static Future<Map<String, dynamic>> context() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const {'isSuperAdmin': false, 'isBootstrap': false};
+    try {
+      final result = await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('getSuperAdminContext')
+          .call();
+      final data = Map<String, dynamic>.from(result.data as Map);
+      if (data['refreshToken'] == true) await user.getIdToken(true);
+      return data;
+    } catch (_) {
+      return const {'isSuperAdmin': false, 'isBootstrap': false};
+    }
+  }
+
   static Future<bool> resolve() async {
+    final data = await context();
+    return data['isSuperAdmin'] == true;
+  }
+
+  static Future<bool> isBootstrap() async {
+    final data = await context();
+    return data['isBootstrap'] == true;
+  }
+
+  static Future<bool> _legacyResolve() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
     try {
