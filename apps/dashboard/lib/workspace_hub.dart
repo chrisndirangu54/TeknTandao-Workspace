@@ -6,6 +6,7 @@ import 'cost_aware_store.dart';
 import 'dashboard.dart';
 import 'modules/talent_marketplace.dart';
 import 'workspace_memberships.dart';
+import 'super_admin_console.dart';
 
 class WorkspaceHub extends StatefulWidget {
   final User user;
@@ -28,11 +29,18 @@ class WorkspaceHub extends StatefulWidget {
 class _WorkspaceHubState extends State<WorkspaceHub> {
   String? _activeWorkspaceId;
   bool _creating = false;
+  bool _isSuperAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _activeWorkspaceId = widget.initialWorkspaceId;
+    _resolveSuperAdmin();
+  }
+
+  Future<void> _resolveSuperAdmin() async {
+    final allowed = await SuperAdminGate.resolve();
+    if (mounted) setState(() => _isSuperAdmin = allowed);
   }
 
   Future<void> _createWorkspace() async {
@@ -90,6 +98,7 @@ class _WorkspaceHubState extends State<WorkspaceHub> {
             store: CostAwareFirebaseSuiteStore(workspace.id),
             initialModuleId: initialModuleId,
             workspaceName: workspace.name,
+            isSuperAdmin: _isSuperAdmin,
             onSwitchWorkspace: () => navigator.pushReplacement(
               MaterialPageRoute<void>(
                 builder: (_) => WorkspaceHub(
@@ -144,6 +153,14 @@ class _WorkspaceHubState extends State<WorkspaceHub> {
       appBar: AppBar(
         title: const Text('Your workspaces'),
         actions: [
+          if (_isSuperAdmin)
+            IconButton(
+              tooltip: 'Super admin console',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SuperAdminConsole()),
+              ),
+              icon: const Icon(Icons.admin_panel_settings_rounded),
+            ),
           IconButton(
             tooltip: 'Talent profile',
             onPressed: () => Navigator.of(context).push(
