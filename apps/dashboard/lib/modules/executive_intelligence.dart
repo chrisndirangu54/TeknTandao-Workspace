@@ -115,6 +115,7 @@ class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>
         TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
         TextButton(onPressed:()=>Navigator.pop(ctx,'download'),child:const Text('Download')),
         TextButton(onPressed:()=>Navigator.pop(ctx,'onedrive'),child:const Text('OneDrive')),
+        TextButton(onPressed:()=>Navigator.pop(ctx,'google'),child:const Text('Google Workspace')),
         FilledButton(onPressed:()=>Navigator.pop(ctx,'powerbi'),child:const Text('Power BI')),
       ],
     ));
@@ -128,6 +129,51 @@ class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>
         if(url.isEmpty)throw StateError('Export URL was not returned.');
         final opened=await launchUrl(Uri.parse(url),webOnlyWindowName:'_blank');
         if(!opened)throw StateError('Unable to open the generated export.');
+        return;
+      }
+
+      if(mode=='google'){
+        final connection=await _selectConnection('google');
+        if(connection==null)return;
+        final target=await showDialog<String>(context:context,builder:(ctx)=>SimpleDialog(
+          title:const Text('Publish to Google Workspace'),
+          children:[
+            SimpleDialogOption(
+              onPressed:()=>Navigator.pop(ctx,'slides'),
+              child:const ListTile(leading:Icon(Icons.slideshow_rounded),title:Text('Google Slides')),
+            ),
+            SimpleDialogOption(
+              onPressed:()=>Navigator.pop(ctx,'sheets'),
+              child:const ListTile(leading:Icon(Icons.grid_on_rounded),title:Text('Google Sheets')),
+            ),
+            SimpleDialogOption(
+              onPressed:()=>Navigator.pop(ctx,'docs'),
+              child:const ListTile(leading:Icon(Icons.description_rounded),title:Text('Google Docs')),
+            ),
+            SimpleDialogOption(
+              onPressed:()=>Navigator.pop(ctx,'drive'),
+              child:const ListTile(leading:Icon(Icons.add_to_drive_rounded),title:Text('Google Drive file')),
+            ),
+          ],
+        ));
+        if(target==null)return;
+        String? format;
+        if(target=='drive'){
+          format=await _chooseFormat();
+          if(format==null)return;
+        }
+        final result=await widget.store.call('exportExecutiveReportToGoogleWorkspace',{
+          'connectionId':connection['id'],
+          'target':target,
+          if(format!=null)'format':format,
+        });
+        final url=(result['webUrl']??'').toString();
+        if(url.isNotEmpty)await launchUrl(Uri.parse(url),webOnlyWindowName:'_blank');
+        if(mounted){
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content:Text('Published to '+(result['format']??'Google Workspace').toString()+'.')),
+          );
+        }
         return;
       }
       if(mode=='onedrive'){
