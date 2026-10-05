@@ -38,3 +38,10 @@ export * from './website_business_ai.js';
 export * from './website_business_agent_governance.js';
 export * from './automation_studio.js';
 export * from './reseller.js';
+
+export * from './agentic_orchestration_domain.js';
+export * from './temporal_intelligence_domain.js';
+export * from './process_intelligence_domain.js';
+export * from './agent_benchmark_domain.js';
+export * from './decision_intelligence_domain.js';
+export * from './digital_twin_domain.js';
