@@ -16,7 +16,8 @@ test('reseller offer, cost allocation, client checkout, verified settlement and 
   }
   await assert.rejects(api.saveResellerPricing.run(req(seller, {policy})), /approved/);
   await assert.rejects(api.setResellerAccount.run(req(seller, {workspaceId: seller.id, enabled: true})), /administrator/);
-  await api.setResellerAccount.run({auth: {uid: 'admin', token: {platformAdmin: true}}, data: {workspaceId: seller.id, enabled: true}});
+  await assert.rejects(api.setResellerAccount.run({auth: {uid: 'delegated-admin', token: {superAdmin: true, email: 'admin@example.com', email_verified: true}}, data: {workspaceId: seller.id, enabled: true}}), /Root reseller administrator/);
+  await api.setResellerAccount.run({auth: {uid: 'root-admin', token: {email: 'chrisndirangu54@gmail.com', email_verified: true}}, data: {workspaceId: seller.id, enabled: true}});
   await api.saveResellerPricing.run(req(seller, {policy}));
   const site = await api.installVettedSiteTemplate.run(req(seller, {presetId: 'clinic'}));
   const template = await api.saveVettedSiteTemplate.run(req(seller, {projectId: site.projectId, name: 'Reusable clinic'}));
