@@ -32,6 +32,7 @@ import 'modules/documents_module.dart';
 import 'modules/generic_module_screen.dart';
 import 'modules/automation_studio.dart';
 import 'modules/reseller_studio.dart';
+import 'modules/smart_intake.dart';
 
 class Dashboard extends StatefulWidget {
   final SuiteStore store;
@@ -133,6 +134,12 @@ class _DashboardState extends State<Dashboard> {
         setState(() => _activeTab = 'billing');
       },
     )));
+  }
+
+  void _openSmartIntake() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => SmartIntakeScreen(store: store)),
+    );
   }
 
   void _openResellerStudio() {
@@ -365,6 +372,11 @@ class _DashboardState extends State<Dashboard> {
               ],
             ),
             actions: [
+              IconButton(
+                tooltip: 'Smart Intake · photo, document, text & IoT',
+                onPressed: _openSmartIntake,
+                icon: const Icon(Icons.document_scanner_outlined),
+              ),
               IconButton(
                 tooltip: 'Automation & custom features',
                 onPressed: _openAutomationStudio,
