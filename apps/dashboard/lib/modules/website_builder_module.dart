@@ -142,7 +142,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
         ),
         actions: [
           FutureBuilder<bool>(
-            future: SuperAdminGate.resolve(),
+            future: SuperAdminGate.isBootstrap(),
             builder: (context, snapshot) => snapshot.data == true
                 ? IconButton(
                     tooltip: 'Reseller platform',
