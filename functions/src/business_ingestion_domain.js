@@ -2,9 +2,9 @@ import {createHash, timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 
 export const intakeTargets = Object.freeze({
-  asset: {appId: 'assetmgmt', risk: 'standard'},
+  asset: {appId: 'assets', risk: 'standard'},
   inventory: {appId: 'inventory', risk: 'standard'},
-  expense: {appId: 'accounting', risk: 'financial-draft'},
+  expense: {appId: 'expenses', risk: 'financial-draft'},
   sale: {appId: 'pos', risk: 'transaction-draft'},
   support_ticket: {appId: 'helpdesk', risk: 'standard'},
   generic: {appId: null, risk: 'standard'},
