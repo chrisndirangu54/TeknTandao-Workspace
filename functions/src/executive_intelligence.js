@@ -133,7 +133,7 @@ function deterministicRecommendations(facts){
   return out.slice(0,8);
 }
 
-async function loadFacts(org){
+export async function loadExecutiveFacts(org){
   const [
     sales,products,contacts,tickets,projects,expenses,connections,syncRuns,apps
   ]=await Promise.all([
@@ -246,7 +246,7 @@ async function loadFacts(org){
 
 export const getExecutiveIntelligence=publicCallable(async request=>{
   const {org}=await authorize(request);
-  const facts=await loadFacts(org);
+  const facts=await loadExecutiveFacts(org);
   const recommendations=deterministicRecommendations(facts);
   return {
     generatedAt:Date.now(),
@@ -262,7 +262,7 @@ export const getExecutiveIntelligence=publicCallable(async request=>{
 
 export const generateExecutiveBrief=publicCallable(async request=>{
   const {org}=await authorize(request);
-  const facts=await loadFacts(org);
+  const facts=await loadExecutiveFacts(org);
   const deterministic=deterministicRecommendations(facts);
   if(request.data?.useAi!==true){
     return {
