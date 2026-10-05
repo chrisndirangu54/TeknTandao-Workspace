@@ -38,6 +38,7 @@ class Dashboard extends StatefulWidget {
   final String? initialModuleId;
   final String? workspaceName;
   final VoidCallback? onSwitchWorkspace;
+  final bool isSuperAdmin;
 
   const Dashboard({
     super.key,
@@ -45,6 +46,7 @@ class Dashboard extends StatefulWidget {
     this.initialModuleId,
     this.workspaceName,
     this.onSwitchWorkspace,
+    this.isSuperAdmin = false,
   });
 
   @override
@@ -67,7 +69,7 @@ class _DashboardState extends State<Dashboard> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         if (moduleId == 'reseller') {
-          _openResellerStudio();
+          if (widget.isSuperAdmin) _openResellerStudio();
           return;
         }
         if (moduleId == 'automation') {
@@ -132,6 +134,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   void _openResellerStudio() {
+    if (!widget.isSuperAdmin) return;
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ResellerStudioScreen(store: store)));
   }
 
