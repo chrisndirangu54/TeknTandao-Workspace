@@ -130,6 +130,139 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
     catch (e) { toast('Could not add super admin: ' + e.toString(), bad: true); }
   }
 
+  Future<void> resetPassword(Map<String, dynamic> user) async {
+    final email = user['email']?.toString() ?? '';
+    if (email.isEmpty) {
+      toast('This user has no email address.', bad: true);
+      return;
+    }
+    try {
+      final result = await call('sendPlatformUserPasswordReset', {'email': email});
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Password reset link'),
+          content: SelectableText(result['passwordResetLink']?.toString() ?? ''),
+          actions: [
+            FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+          ],
+        ),
+      );
+    } catch (e) {
+      toast('Could not create password reset link: ' + e.toString(), bad: true);
+    }
+  }
+
+  Future<void> manageWorkspaceMembers(Map<String, dynamic> workspace) async {
+    try {
+      final result = await call('getWorkspaceMembersAsSuperAdmin', {'workspaceId': workspace['id']});
+      if (!mounted) return;
+      final members = (result['members'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text('Members · ' + (workspace['name'] ?? workspace['id']).toString()),
+            content: SizedBox(
+              width: 720,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 520),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          final email = await prompt('Add workspace member', 'Existing user email');
+                          if (email == null || email.isEmpty) return;
+                          try {
+                            await call('addWorkspaceMemberAsSuperAdmin', {
+                              'workspaceId': workspace['id'],
+                              'email': email,
+                              'role': 'member',
+                              'apps': <String>[],
+                            });
+                            final refreshed = await call('getWorkspaceMembersAsSuperAdmin', {'workspaceId': workspace['id']});
+                            final next = (refreshed['members'] as List? ?? const [])
+                                .whereType<Map>()
+                                .map((item) => Map<String, dynamic>.from(item))
+                                .toList();
+                            setDialogState(() {
+                              members
+                                ..clear()
+                                ..addAll(next);
+                            });
+                          } catch (e) {
+                            toast('Could not add member: ' + e.toString(), bad: true);
+                          }
+                        },
+                        icon: const Icon(Icons.person_add_alt_1_rounded),
+                        label: const Text('Add member'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (members.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('No members found for this workspace.'),
+                      )
+                    else
+                      for (final member in members)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            child: Text(
+                              ((member['displayName'] ?? member['email'] ?? '?').toString().trim().isEmpty
+                                      ? '?'
+                                      : (member['displayName'] ?? member['email']).toString().trim()[0])
+                                  .toUpperCase(),
+                            ),
+                          ),
+                          title: Text((member['displayName'] ?? member['email'] ?? member['uid']).toString()),
+                          subtitle: Text(
+                            (member['email'] ?? '').toString() +
+                                ' · ' +
+                                (member['role'] ?? 'member').toString(),
+                          ),
+                          trailing: member['isOwner'] == true
+                              ? const Chip(label: Text('Owner'))
+                              : IconButton(
+                                  tooltip: 'Remove member',
+                                  onPressed: () async {
+                                    try {
+                                      await call('removeWorkspaceMemberAsSuperAdmin', {
+                                        'workspaceId': workspace['id'],
+                                        'uid': member['uid'],
+                                      });
+                                      setDialogState(() => members.removeWhere((row) => row['uid'] == member['uid']));
+                                    } catch (e) {
+                                      toast('Could not remove member: ' + e.toString(), bad: true);
+                                    }
+                                  },
+                                  icon: const Icon(Icons.person_remove_outlined),
+                                ),
+                        ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      toast('Could not load workspace members: ' + e.toString(), bad: true);
+    }
+  }
+
   Future<void> editUser(Map<String, dynamic> user) async {
     final name = await prompt('Edit user', 'Display name');
     if (name == null || name.isEmpty) return;
@@ -285,7 +418,8 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
             isThreeLine: true,
             trailing: Wrap(spacing: 4, children: [
               if (user['isSuperAdmin'] == true) const Chip(label: Text('Super admin')),
-              IconButton(onPressed: () => editUser(user), icon: const Icon(Icons.edit_outlined)),
+              IconButton(tooltip: 'Edit user', onPressed: () => editUser(user), icon: const Icon(Icons.edit_outlined)),
+              IconButton(tooltip: 'Password reset', onPressed: () => resetPassword(user), icon: const Icon(Icons.password_rounded)),
               IconButton(onPressed: () => toggleUser(user), icon: Icon(user['disabled'] == true ? Icons.play_circle_outline : Icons.block_rounded)),
               IconButton(onPressed: () => deleteUser(user), icon: const Icon(Icons.delete_outline_rounded)),
             ]),
@@ -304,6 +438,7 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
             title: Text((workspace['name'] ?? workspace['id']).toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text('ID: ' + workspace['id'].toString() + ' · Owner: ' + (workspace['owner'] ?? 'unknown').toString()),
             trailing: Wrap(spacing: 4, children: [
+              IconButton(tooltip: 'Manage members', onPressed: () => manageWorkspaceMembers(workspace), icon: const Icon(Icons.group_outlined)),
               IconButton(onPressed: () => renameWorkspace(workspace), icon: const Icon(Icons.edit_outlined)),
               IconButton(onPressed: () => archiveWorkspace(workspace), icon: Icon(workspace['archived'] == true ? Icons.unarchive_outlined : Icons.archive_outlined)),
               IconButton(onPressed: () => deleteWorkspace(workspace), icon: const Icon(Icons.delete_forever_outlined)),
