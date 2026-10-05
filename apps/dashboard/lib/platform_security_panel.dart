@@ -11,6 +11,7 @@ class _PlatformSecurityPanelState extends State<PlatformSecurityPanel> {
   bool busy = true;
   String? error;
   Map<String, dynamic> vault = const {'secrets': []};
+  List<Map<String, dynamic>> audit = const [];
 
   FirebaseFunctions get functions =>
       FirebaseFunctions.instanceFor(region: 'europe-west1');
@@ -30,7 +31,12 @@ class _PlatformSecurityPanelState extends State<PlatformSecurityPanel> {
     setState(() { busy = true; error = null; });
     try {
       final next = await call('getPlatformSecretVault');
-      if (mounted) setState(() => vault = next);
+      final auditResult = await call('getPlatformSecurityAudit');
+      final events = (auditResult['events'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      if (mounted) setState(() { vault = next; audit = events; });
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
@@ -206,6 +212,10 @@ class _PlatformSecurityPanelState extends State<PlatformSecurityPanel> {
                       (vault['policy'] ?? 'Secret values are never returned after storage.').toString(),
                       style: const TextStyle(color: Color(0xFFCBD5E1), height: 1.4),
                     ),
+                    if (vault['deploymentNote'] != null) ...[
+                      const SizedBox(height: 5),
+                      Text(vault['deploymentNote'].toString(), style: const TextStyle(color: Color(0xFFFDE68A), fontSize: 12, height: 1.4)),
+                    ],
                   ],
                 ),
               ),
@@ -232,6 +242,28 @@ class _PlatformSecurityPanelState extends State<PlatformSecurityPanel> {
           )
         else
           for (final secret in rows) ...[secretCard(secret), const SizedBox(height: 12)],
+        const SizedBox(height: 8),
+        Text('Recent high-security activity', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 10),
+        if (audit.isEmpty)
+          const Card(child: Padding(padding: EdgeInsets.all(18), child: Text('No high-security audit events yet.')))
+        else
+          Card(
+            child: Column(
+              children: [
+                for (final event in audit.take(20))
+                  ListTile(
+                    leading: const Icon(Icons.history_rounded),
+                    title: Text((event['action'] ?? 'security.operation').toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                      ((event['actorEmail'] ?? event['actorUid'] ?? '').toString()) +
+                          ((event['secretId'] ?? '').toString().isEmpty ? '' : ' · ' + event['secretId'].toString()) +
+                          ((event['targetEmail'] ?? '').toString().isEmpty ? '' : ' · ' + event['targetEmail'].toString()),
+                    ),
+                  ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -258,7 +290,7 @@ class _PlatformSecurityPanelState extends State<PlatformSecurityPanel> {
       child: ExpansionTile(
         leading: const CircleAvatar(backgroundColor: Color(0xFFECFDF5), child: Icon(Icons.key_rounded, color: Color(0xFF059669))),
         title: Text(secret['id'].toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text(latestText),
+        subtitle: Text(latestText + (secret['deploymentBound'] == true ? ' · redeploy required after rotation' : '')),
         trailing: Wrap(
           spacing: 4,
           children: [
