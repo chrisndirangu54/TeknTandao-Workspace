@@ -11,6 +11,7 @@ import {CallToolRequestSchema, ListToolsRequestSchema} from '@modelcontextprotoc
 import {z} from 'zod';
 import {automationId, boundedJson, decryptCredential, encryptCredential, featureInput, featureSchema, hasPaidSubscription, resolveArguments, runCustomCode, workflowSchema} from './automation_domain.js';
 import {builtinTools, callBuiltin, callMcp, discoverMcp, providerJson, remoteUrl} from './automation_connectors.js';
+import {enterpriseBuiltinTools, callEnterpriseBuiltin, validateEnterpriseConnection, validateEnterpriseCredential} from './enterprise_connectors.js';
 
 const db = getFirestore();
 const region = 'europe-west1';
@@ -100,6 +101,36 @@ export const connectBusinessTool = callable(async request => {
   batch.set(org.collection('toolConnections').doc(id), {provider: input.provider, name: input.name, tools: builtinTools[input.provider], status: 'connected', createdBy: uid, createdAt: stamp()});
   await batch.commit();
   return {id};
+}, [encryptionKey]);
+
+
+export const connectEnterpriseTool = callable(async request => {
+  const {org, uid} = await authorize(request);
+  const input = z.object({
+    provider: z.enum(['salesforce', 'atlassian', 'zoho', 'odoo']),
+    name: z.string().trim().min(1).max(120),
+    credential: z.record(z.any()),
+  }).strict().parse(request.data.connection);
+  await consumeQuota(org, 'connect', 30);
+  const credential = validateEnterpriseCredential(input.provider, input.credential);
+  await validateEnterpriseConnection(input.provider, credential);
+  const id = randomUUID();
+  const batch = db.batch();
+  batch.set(
+    credentials(org, id),
+    encryptCredential(credential, encryptionKey.value(), `${org.id}/${id}`),
+  );
+  batch.set(org.collection('toolConnections').doc(id), {
+    provider: input.provider,
+    name: input.name,
+    tools: enterpriseBuiltinTools[input.provider],
+    status: 'connected',
+    credentialMode: 'encrypted_api',
+    createdBy: uid,
+    createdAt: stamp(),
+  });
+  await batch.commit();
+  return {id, toolCount: enterpriseBuiltinTools[input.provider].length};
 }, [encryptionKey]);
 
 export const connectRemoteMcp = callable(async request => {
@@ -218,13 +249,32 @@ async function accessToken(org, id, connection) {
     return updated.access_token;
   } finally { await lock.delete(); }
 }
-async function executeTool(org, connectionId, name, args) {
+export async function executeAutomationConnectionTool(org, connectionId, name, args) {
   const connection = await getConnection(org, connectionId);
-  if (!connection.tools.some(tool => tool.name === name)) throw new HttpsError('failed-precondition', 'Tool is not available on this connection');
+  if (!connection.tools.some(tool => tool.name === name)) {
+    throw new HttpsError('failed-precondition', 'Tool is not available on this connection');
+  }
+  const enterprise = Object.hasOwn(enterpriseBuiltinTools, connection.provider);
   const result = connection.provider === 'mcp'
     ? await callMcp(connection, await readCredential(org, connectionId), name, args)
-    : await callBuiltin(connection.provider, await accessToken(org, connectionId, connection), name, args);
+    : enterprise
+      ? await callEnterpriseBuiltin(
+          connection.provider,
+          await readCredential(org, connectionId),
+          name,
+          args,
+        )
+      : await callBuiltin(
+          connection.provider,
+          await accessToken(org, connectionId, connection),
+          name,
+          args,
+        );
   return boundedJson(result);
+}
+
+async function executeTool(org, connectionId, name, args) {
+  return executeAutomationConnectionTool(org, connectionId, name, args);
 }
 async function validateWorkflowConnections(org, workflow) {
   if (workflow.steps.some(step => step.kind === 'code')) await requirePremium(org);
