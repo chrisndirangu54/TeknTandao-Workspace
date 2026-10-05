@@ -201,6 +201,14 @@ class _AutomationStudioState extends State<AutomationStudio> {
         });
         secretKeys.add('access_token');
         break;
+      case 'microsoft365':
+        fields.addAll({'access_token': 'Microsoft Graph access token'});
+        secretKeys.add('access_token');
+        break;
+      case 'powerbi':
+        fields.addAll({'access_token': 'Power BI access token'});
+        secretKeys.add('access_token');
+        break;
       case 'odoo':
         fields.addAll({
           'base_url': 'Odoo base URL',
@@ -855,6 +863,29 @@ class _AutomationStudioState extends State<AutomationStudio> {
         OutlinedButton(
           onPressed: _busy ? null : () => _enterpriseConnection('zoho'),
           child: const Text('Connect Zoho'),
+        ),
+      ],
+    ),
+
+    _card(
+      'Microsoft 365 · PowerPoint / Excel / Word',
+      'Connect Microsoft Graph so generated PPTX, XLSX, DOCX, PDF and CSV exports can be published directly into OneDrive.',
+      [
+        OutlinedButton(
+          onPressed:
+              _busy ? null : () => _enterpriseConnection('microsoft365'),
+          child: const Text('Connect Microsoft 365'),
+        ),
+      ],
+    ),
+    _card(
+      'Power BI',
+      'List workspaces and semantic models, inspect refresh history, trigger refreshes, and push governed KPI rows into a push semantic-model table.',
+      [
+        OutlinedButton(
+          onPressed:
+              _busy ? null : () => _enterpriseConnection('powerbi'),
+          child: const Text('Connect Power BI'),
         ),
       ],
     ),
