@@ -31,6 +31,8 @@ class _AutomationStudioState extends State<AutomationStudio> {
   bool get _premium => _data?['premium'] == true;
   List<Map<String, dynamic>> get _connections => _rows(_data?['connections']);
   List<Map<String, dynamic>> get _workflows => _rows(_data?['workflows']);
+  List<Map<String, dynamic>> get _exchangeRules => _rows(_data?['exchange']?['rules']);
+  List<Map<String, dynamic>> get _exchangeRuns => _rows(_data?['exchange']?['runs']);
 
   @override
   void initState() {
@@ -40,7 +42,11 @@ class _AutomationStudioState extends State<AutomationStudio> {
 
   Future<void> _load() async {
     try {
-      final data = await widget.store.call('getAutomationStudio');
+      final values = await Future.wait([
+        widget.store.call('getAutomationStudio'),
+        widget.store.call('getDataExchange'),
+      ]);
+      final data = <String, dynamic>{...values[0], 'exchange': values[1]};
       if (mounted) {
         setState(() {
           _data = data;
@@ -165,6 +171,279 @@ class _AutomationStudioState extends State<AutomationStudio> {
       await _action('connectBusinessTool', {
         'connection': {...values, 'provider': provider},
       });
+    }
+  }
+
+
+  Future<void> _enterpriseConnection(String provider) async {
+    final fields = <String, String>{'name': 'Connection name'};
+    final secretKeys = <String>{};
+    switch (provider) {
+      case 'salesforce':
+        fields.addAll({
+          'instance_url': 'Salesforce instance URL',
+          'access_token': 'Access token',
+        });
+        secretKeys.add('access_token');
+        break;
+      case 'atlassian':
+        fields.addAll({
+          'site_url': 'Atlassian site URL',
+          'email': 'Atlassian account email',
+          'api_token': 'API token',
+        });
+        secretKeys.add('api_token');
+        break;
+      case 'zoho':
+        fields.addAll({
+          'api_domain': 'Zoho API domain',
+          'access_token': 'OAuth access token',
+        });
+        secretKeys.add('access_token');
+        break;
+      case 'odoo':
+        fields.addAll({
+          'base_url': 'Odoo base URL',
+          'database': 'Database (optional if host selects it)',
+          'api_key': 'API key',
+        });
+        secretKeys.add('api_key');
+        break;
+    }
+    final values = await _textDialog(
+      context,
+      'Connect ' + provider,
+      fields,
+      secretKeys: secretKeys,
+    );
+    if (values == null) return;
+    final name = values.remove('name') ?? provider;
+    await _action('connectEnterpriseTool', {
+      'connection': {
+        'provider': provider,
+        'name': name,
+        'credential': values,
+      },
+    });
+  }
+
+  Future<void> _newExchangeRule() async {
+    final connected = _connections
+        .where((connection) => connection['status'] == 'connected')
+        .toList();
+    if (connected.isEmpty) {
+      setState(
+        () => _error =
+            'Connect a provider before creating a data exchange rule.',
+      );
+      return;
+    }
+    var connectionId = connected.first['id'].toString();
+    var tools = _rows(connected.first['tools']);
+    var toolName = tools.isEmpty ? '' : tools.first['name'].toString();
+    var target = 'crm';
+    var schedule = 'manual';
+
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final connection = connected.firstWhere(
+            (item) => item['id'].toString() == connectionId,
+          );
+          tools = _rows(connection['tools']);
+          if (tools.isNotEmpty &&
+              !tools.any((item) => item['name'].toString() == toolName)) {
+            toolName = tools.first['name'].toString();
+          }
+          return AlertDialog(
+            title: const Text('New governed data exchange'),
+            content: SizedBox(
+              width: 620,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: connectionId,
+                    decoration:
+                        const InputDecoration(labelText: 'Source connection'),
+                    items: [
+                      for (final item in connected)
+                        DropdownMenuItem(
+                          value: item['id'].toString(),
+                          child: Text(
+                            item['name'].toString() +
+                                ' · ' +
+                                item['provider'].toString(),
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setDialogState(() {
+                      if (value != null) connectionId = value;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: toolName.isEmpty ? null : toolName,
+                    decoration:
+                        const InputDecoration(labelText: 'Read/list tool'),
+                    items: [
+                      for (final item in tools)
+                        DropdownMenuItem(
+                          value: item['name'].toString(),
+                          child: Text(item['name'].toString()),
+                        ),
+                    ],
+                    onChanged: (value) => setDialogState(() {
+                      if (value != null) toolName = value;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: target,
+                    decoration:
+                        const InputDecoration(labelText: 'TeknTandao target'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'crm',
+                        child: Text('CRM contacts'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'inventory',
+                        child: Text('Inventory'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'helpdesk',
+                        child: Text('Support tickets'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'projects',
+                        child: Text('Projects'),
+                      ),
+                    ],
+                    onChanged: (value) => setDialogState(() {
+                      if (value != null) target = value;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: schedule,
+                    decoration: const InputDecoration(labelText: 'Schedule'),
+                    items: const [
+                      DropdownMenuItem(value: 'manual', child: Text('Manual only')),
+                      DropdownMenuItem(value: 'hourly', child: Text('Every hour')),
+                      DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                    ],
+                    onChanged: (value) => setDialogState(() {
+                      if (value != null) schedule = value;
+                    }),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'The source tool is sampled first. AI proposes field mappings; nothing syncs until you review and enable the rule.',
+                    style: TextStyle(color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: toolName.isEmpty
+                    ? null
+                    : () => Navigator.pop(dialogContext, true),
+                child: const Text('Suggest mapping'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (approved != true) return;
+
+    final suggestion = await _action('suggestDataExchangeMapping', {
+      'connectionId': connectionId,
+      'tool': toolName,
+      'target': target,
+      'args': <String, dynamic>{},
+    });
+    if (suggestion == null || !mounted) return;
+    final nameValues = await _textDialog(
+      context,
+      'Review AI mapping',
+      const {
+        'name': 'Rule name',
+        'sourceIdPath': 'Stable external ID path',
+        'mappings': 'Mapping JSON array',
+      },
+      initial: {
+        'name': target.toUpperCase() + ' sync',
+        'sourceIdPath': suggestion['sourceIdPath'].toString(),
+        'mappings': _pretty.convert(suggestion['mappings']),
+      },
+      multilineKeys: const {'mappings'},
+    );
+    if (nameValues == null) return;
+    try {
+      final mappings = jsonDecode(nameValues['mappings'] ?? '[]');
+      await _action('saveDataExchangeRule', {
+        'rule': {
+          'name': nameValues['name'],
+          'connectionId': connectionId,
+          'sourceTool': toolName,
+          'sourceArgs': <String, dynamic>{},
+          'sourceIdPath': nameValues['sourceIdPath'],
+          'target': target,
+          'mappings': mappings,
+          'enabled': false,
+          'conflictPolicy': 'skip_conflicts',
+          'schedule': schedule,
+        },
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Invalid mapping JSON: ' + error.toString());
+    }
+  }
+
+  Future<void> _toggleExchangeRule(Map<String, dynamic> rule) async {
+    final enable = rule['enabled'] != true;
+    if (enable &&
+        !await _confirm(
+          context,
+          'Enable ' + rule['name'].toString() + '?',
+          'External records can update TeknTandao ' +
+              rule['target'].toString() +
+              ' data. Conflicts default to review instead of overwriting manually edited records.',
+        )) {
+      return;
+    }
+    await _action('saveDataExchangeRule', {
+      'id': rule['id'],
+      'rule': {
+        'name': rule['name'],
+        'connectionId': rule['connectionId'],
+        'sourceTool': rule['sourceTool'],
+        'sourceArgs': Map<String, dynamic>.from(
+          rule['sourceArgs'] as Map? ?? const {},
+        ),
+        'sourceIdPath': rule['sourceIdPath'],
+        'target': rule['target'],
+        'mappings': rule['mappings'],
+        'enabled': enable,
+        'conflictPolicy': rule['conflictPolicy'] ?? 'skip_conflicts',
+        'schedule': rule['schedule'] ?? 'manual',
+      },
+    });
+  }
+
+  Future<void> _runExchangeRule(Map<String, dynamic> rule) async {
+    final result =
+        await _action('runDataExchangeRule', {'id': rule['id']});
+    if (result != null) {
+      await _showResult('Data exchange result', result);
     }
   }
 
@@ -385,7 +664,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: 5,
+    length: 6,
     child: Scaffold(
       appBar: AppBar(
         title: const Text('Automation Studio'),
@@ -400,6 +679,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
           isScrollable: true,
           tabs: [
             Tab(text: 'Connections'),
+            Tab(text: 'Data Exchange'),
             Tab(text: 'Workflows'),
             Tab(text: 'Customization'),
             Tab(text: 'Run history'),
@@ -438,6 +718,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
                     child: TabBarView(
                       children: [
                         _connectionTab(),
+                        _exchangeTab(),
                         _workflowTab(),
                         _featureTab(),
                         _historyTab(),
@@ -544,6 +825,49 @@ class _AutomationStudioState extends State<AutomationStudio> {
         ),
       ],
     ),
+
+    _card(
+      'Salesforce',
+      'Accounts, contacts and opportunities with governed contact upserts. Use an OAuth access token plus your Salesforce instance URL.',
+      [
+        OutlinedButton(
+          onPressed:
+              _busy ? null : () => _enterpriseConnection('salesforce'),
+          child: const Text('Connect Salesforce'),
+        ),
+      ],
+    ),
+    _card(
+      'Atlassian / Jira',
+      'Search issues and projects, create issues and add comments using an Atlassian API token.',
+      [
+        OutlinedButton(
+          onPressed:
+              _busy ? null : () => _enterpriseConnection('atlassian'),
+          child: const Text('Connect Jira'),
+        ),
+      ],
+    ),
+    _card(
+      'Zoho CRM',
+      'Read contacts and deals, and upsert contacts through Zoho CRM APIs.',
+      [
+        OutlinedButton(
+          onPressed: _busy ? null : () => _enterpriseConnection('zoho'),
+          child: const Text('Connect Zoho'),
+        ),
+      ],
+    ),
+    _card(
+      'Odoo',
+      'Read contacts, products and sale orders, and create contacts through Odoo JSON-RPC using a scoped API key.',
+      [
+        OutlinedButton(
+          onPressed: _busy ? null : () => _enterpriseConnection('odoo'),
+          child: const Text('Connect Odoo'),
+        ),
+      ],
+    ),
     _card(
       'Stripe MCP',
       'Use the remote MCP connection with https://mcp.stripe.com and a scoped Stripe agent API key. Review the tools before enabling payment workflows.',
@@ -564,13 +888,33 @@ class _AutomationStudioState extends State<AutomationStudio> {
     for (final connection in _connections)
       _card(
         connection['name'].toString(),
-        '${connection['status']} · ${_rows(connection['tools']).length} tools',
+        connection['status'].toString() +
+            ' · ' +
+            (connection['health'] ?? 'unchecked').toString() +
+            ' · ' +
+            _rows(connection['tools']).length.toString() +
+            ' tools',
         [
           TextButton(
             onPressed: () =>
                 _showResult('Available tools', connection['tools']),
             child: const Text('View tools'),
           ),
+          if (connection['status'] == 'connected')
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final result = await _action('checkToolConnection', {
+                        'id': connection['id'],
+                      });
+                      if (result != null) {
+                        await _showResult('Connection health', result);
+                      }
+                    },
+              icon: const Icon(Icons.monitor_heart_outlined),
+              label: const Text('Check health'),
+            ),
           if (connection['status'] == 'connected')
             TextButton(
               onPressed: _busy
@@ -589,6 +933,102 @@ class _AutomationStudioState extends State<AutomationStudio> {
               child: const Text('Disconnect'),
             ),
         ],
+      ),
+  ]);
+
+
+  Widget _exchangeTab() => _page([
+    const Text(
+      'Intelligent Data Exchange',
+      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+    ),
+    const SizedBox(height: 8),
+    const Text(
+      'Map external CRM, ERP and helpdesk data into canonical TeknTandao records. AI can suggest mappings from a live sample, but rules stay disabled until you explicitly review them.',
+    ),
+    const SizedBox(height: 16),
+    Align(
+      alignment: Alignment.centerLeft,
+      child: FilledButton.icon(
+        onPressed: _busy ? null : _newExchangeRule,
+        icon: const Icon(Icons.sync_alt_rounded),
+        label: const Text('New exchange rule'),
+      ),
+    ),
+    if (_exchangeRules.isEmpty)
+      const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text('No data exchange rules yet.'),
+      ),
+    for (final rule in _exchangeRules)
+      _card(
+        rule['name'].toString(),
+        (rule['enabled'] == true ? 'Enabled' : 'Draft') +
+            ' · ' +
+            rule['target'].toString() +
+            ' · ' +
+            rule['sourceTool'].toString() +
+            ' · ' +
+            (rule['schedule'] ?? 'manual').toString() +
+            '\nConflict policy: ' +
+            (rule['conflictPolicy'] ?? 'skip_conflicts').toString(),
+        [
+          TextButton(
+            onPressed: () => _showResult('Exchange rule', rule),
+            child: const Text('View mapping'),
+          ),
+          OutlinedButton(
+            onPressed:
+                _busy ? null : () => _toggleExchangeRule(rule),
+            child: Text(
+              rule['enabled'] == true
+                  ? 'Disable'
+                  : 'Review & enable',
+            ),
+          ),
+          FilledButton(
+            onPressed: _busy || rule['enabled'] != true
+                ? null
+                : () => _runExchangeRule(rule),
+            child: const Text('Sync now'),
+          ),
+        ],
+      ),
+    const SizedBox(height: 24),
+    const Text(
+      'Recent sync receipts',
+      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+    ),
+    if (_exchangeRuns.isEmpty)
+      const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('No sync runs yet.'),
+      ),
+    for (final run in _exchangeRuns.take(20))
+      ListTile(
+        leading: Icon(
+          (run['conflicts'] ?? 0) == 0
+              ? Icons.check_circle_outline_rounded
+              : Icons.warning_amber_rounded,
+        ),
+        title: Text((run['ruleName'] ?? run['ruleId']).toString()),
+        subtitle: Text(
+          run['provider'].toString() +
+              ' · read ' +
+              (run['rowsRead'] ?? 0).toString() +
+              ' · created ' +
+              (run['created'] ?? 0).toString() +
+              ' · updated ' +
+              (run['updated'] ?? 0).toString() +
+              ' · skipped ' +
+              (run['skipped'] ?? 0).toString() +
+              ' · conflicts ' +
+              (run['conflicts'] ?? 0).toString(),
+        ),
+        trailing: TextButton(
+          onPressed: () => _showResult('Sync receipt', run),
+          child: const Text('Details'),
+        ),
       ),
   ]);
 

@@ -33,6 +33,7 @@ import 'modules/generic_module_screen.dart';
 import 'modules/automation_studio.dart';
 import 'modules/reseller_studio.dart';
 import 'modules/smart_intake.dart';
+import 'modules/executive_intelligence.dart';
 
 class Dashboard extends StatefulWidget {
   final SuiteStore store;
@@ -714,35 +715,6 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildReportsTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Executive Cross-Module Analytics',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        const Text(
-          'Bounded consolidated operational metrics from the shared tenant data fabric.',
-          style: TextStyle(color: Color(0xFF64748B)),
-        ),
-        const SizedBox(height: 20),
-        FutureBuilder<Map<String, dynamic>>(
-          future: store.call('generateReport', {'useAi': false}),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const CircularProgressIndicator();
-            return Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  snapshot.data!['narrative'] ?? '',
-                  style: const TextStyle(fontSize: 16, height: 1.6),
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
+  Widget _buildReportsTab() =>
+      ExecutiveIntelligencePanel(store: store);
 }
