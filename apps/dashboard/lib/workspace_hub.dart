@@ -30,6 +30,7 @@ class _WorkspaceHubState extends State<WorkspaceHub> {
   String? _activeWorkspaceId;
   bool _creating = false;
   bool _isSuperAdmin = false;
+  bool _isBootstrapAdmin = false;
 
   @override
   void initState() {
@@ -39,8 +40,13 @@ class _WorkspaceHubState extends State<WorkspaceHub> {
   }
 
   Future<void> _resolveSuperAdmin() async {
-    final allowed = await SuperAdminGate.resolve();
-    if (mounted) setState(() => _isSuperAdmin = allowed);
+    final context = await SuperAdminGate.context();
+    if (mounted) {
+      setState(() {
+        _isSuperAdmin = context['isSuperAdmin'] == true;
+        _isBootstrapAdmin = context['isBootstrap'] == true;
+      });
+    }
   }
 
   Future<void> _createWorkspace() async {
@@ -99,6 +105,7 @@ class _WorkspaceHubState extends State<WorkspaceHub> {
             initialModuleId: initialModuleId,
             workspaceName: workspace.name,
             isSuperAdmin: _isSuperAdmin,
+            canSeeReseller: _isBootstrapAdmin,
             onSwitchWorkspace: () => navigator.pushReplacement(
               MaterialPageRoute<void>(
                 builder: (_) => WorkspaceHub(
