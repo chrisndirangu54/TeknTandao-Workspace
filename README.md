@@ -130,3 +130,15 @@ flutter build web --release --dart-define-from-file=../../firebase-config.json -
 ```
 
 GitHub Actions runs these checks on pull requests.
+
+---
+
+## 🧠 Agentic Decision-Intelligence Layer
+
+The platform now includes benchmarkable primitives for **Planner → Executor → Critic** orchestration, temporal business memory, process mining/conformance, explainable predictive decision support, digital-twin simulation and agent observability.
+
+These capabilities are deliberately bounded by the existing Agent Control Center and do not turn generic agents into payment, tax or other regulated executors.
+
+A versioned BusinessOS benchmark suite lives in `benchmarks/businessos-v1.json` and measures safe success, policy violations, hallucinations, tool errors, human intervention, latency and cost. See `docs/AGENTIC_SOTA.md`.
+
+**Claim discipline:** TeknTandao uses “SOTA-oriented architecture” for these capabilities until reproducible benchmark evidence justifies a stronger claim.
