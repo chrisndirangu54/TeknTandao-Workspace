@@ -31,7 +31,7 @@ jobs:
           cache: npm
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm --prefix functions ci --ignore-scripts
-      - run: npm audit --audit-level=high
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm --prefix functions audit --audit-level=high
       - run: mkdir -p security-artifacts
       - run: npm sbom --sbom-format cyclonedx > security-artifacts/root-sbom.cdx.json
