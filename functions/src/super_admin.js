@@ -1,5 +1,5 @@
 import './index.js';
-import {randomBytes} from 'node:crypto';
+import {randomBytes, randomUUID} from 'node:crypto';
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue, getFirestore} from 'firebase-admin/firestore';
 import {HttpsError, onCall} from 'firebase-functions/v2/https';
@@ -151,6 +151,22 @@ export const revokeSuperAdmin=callable(async request=>{
   return {ok:true};
 });
 
+export const createWorkspaceAsSuperAdmin=callable(async request=>{
+  const actor=await requireSuperAdmin(request);
+  const input=z.object({name:z.string().trim().min(1).max(120),ownerEmail:emailSchema}).strict().parse(request.data);
+  const owner=await auth.getUserByEmail(input.ownerEmail);
+  const workspaceId=randomUUID();
+  const org=db.doc(`organizations/${workspaceId}`);
+  const batch=db.batch();
+  batch.create(org,{name:input.name,createdAt:stamp(),owner:owner.uid,currency:'KES',createdBySuperAdmin:actor.uid});
+  batch.create(org.collection('members').doc(owner.uid),{role:'owner',apps:[]});
+  batch.set(db.doc(`users/${owner.uid}/workspaces/${workspaceId}`),{workspaceId,name:input.name,role:'owner',joinedAt:stamp()});
+  batch.set(db.doc(`users/${owner.uid}`),{orgId:workspaceId,updatedAt:stamp()},{merge:true});
+  await batch.commit();
+  await db.collection('platformAudit').add({action:'workspace.create',workspaceId,targetUid:owner.uid,actorUid:actor.uid,createdAt:stamp()});
+  return {workspaceId};
+});
+
 export const updateWorkspaceAsSuperAdmin=callable(async request=>{
   const actor=await requireSuperAdmin(request);
   const input=z.object({
@@ -164,6 +180,12 @@ export const updateWorkspaceAsSuperAdmin=callable(async request=>{
   if(input.name!==undefined)updates.name=input.name;
   if(input.archived!==undefined)updates.archived=input.archived;
   await ref.set(updates,{merge:true});
+  if(input.name!==undefined){
+    const members=await ref.collection('members').limit(500).get();
+    const batch=db.batch();
+    for(const member of members.docs) batch.set(db.doc(`users/${member.id}/workspaces/${input.workspaceId}`),{name:input.name},{merge:true});
+    if(members.docs.length) await batch.commit();
+  }
   await db.collection('platformAudit').add({action:'workspace.update',workspaceId:input.workspaceId,actorUid:actor.uid,changes:Object.keys(input).filter(k=>k!=='workspaceId'),createdAt:stamp()});
   return {ok:true};
 });
@@ -177,6 +199,7 @@ export const addWorkspaceMemberAsSuperAdmin=callable(async request=>{
   if(!orgSnap.exists)throw new Error('Workspace not found');
   if(input.role==='owner' && orgSnap.data()?.owner!==target.uid) throw new Error('Use owner transfer workflow before assigning owner role');
   await org.collection('members').doc(target.uid).set({role:input.role,apps:[...new Set(input.apps)],updatedAt:stamp(),updatedBy:actor.uid},{merge:true});
+  await db.doc(`users/${target.uid}/workspaces/${input.workspaceId}`).set({workspaceId:input.workspaceId,name:orgSnap.data()?.name||'Workspace',role:input.role,joinedAt:stamp()},{merge:true});
   await db.collection('platformAudit').add({action:'workspace.member.add',workspaceId:input.workspaceId,targetUid:target.uid,actorUid:actor.uid,createdAt:stamp()});
   return {uid:target.uid};
 });
@@ -189,6 +212,7 @@ export const removeWorkspaceMemberAsSuperAdmin=callable(async request=>{
   if(!orgData)throw new Error('Workspace not found');
   if(orgData.owner===input.uid)throw new Error('Workspace owner cannot be removed; transfer ownership first');
   await org.collection('members').doc(input.uid).delete();
+  await db.doc(`users/${input.uid}/workspaces/${input.workspaceId}`).delete();
   await db.collection('platformAudit').add({action:'workspace.member.remove',workspaceId:input.workspaceId,targetUid:input.uid,actorUid:actor.uid,createdAt:stamp()});
   return {ok:true};
 });
