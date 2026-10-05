@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   enterpriseBuiltinTools,
+  enterpriseBaseUrl,
   validateEnterpriseCredential,
 } from '../src/enterprise_connectors.js';
 
@@ -63,4 +64,20 @@ test('enterprise credentials are provider-specific and reject malformed input', 
 
 test('enterprise connector credentials reject unknown provider', () => {
   assert.throws(() => validateEnterpriseCredential('unknown', {}), /Unsupported/);
+});
+
+
+test('enterprise base URLs reject private networks and unsafe schemes', () => {
+  for (const url of [
+    'http://example.com',
+    'https://localhost',
+    'https://127.0.0.1',
+    'https://10.0.0.1',
+    'https://169.254.169.254',
+    'https://example.com:8443',
+    'https://user:pass@example.com',
+  ]) {
+    assert.throws(() => enterpriseBaseUrl(url), url);
+  }
+  assert.equal(enterpriseBaseUrl('https://example.com/'), 'https://example.com');
 });
