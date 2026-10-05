@@ -114,7 +114,15 @@ const schemas = {
 async function salesforce(credential,name,args){
   const base=cleanBase(credential.instance_url);
   const headers={Authorization:`Bearer ${credential.access_token}`,'Content-Type':'application/json'};
-  const query=async soql=>http(`${base}/services/data/v61.0/query?q=${encodeURIComponent(soql)}`,{headers});
+  let version=credential.api_version;
+  if(!version){
+    const versions=await http(`${base}/services/data/`,{headers});
+    const latest=Array.isArray(versions)?versions.at(-1):null;
+    version=latest?.version?`v${latest.version}`:'v65.0';
+  }
+  if(!/^v[0-9]+\.[0-9]+$/.test(version)) throw new Error('Invalid Salesforce API version');
+  const api=`${base}/services/data/${version}`;
+  const query=async soql=>http(`${api}/query?q=${encodeURIComponent(soql)}`,{headers});
   if(name==='salesforce_accounts') return query(`SELECT Id,Name,Industry,Phone,Website,LastModifiedDate FROM Account ORDER BY LastModifiedDate DESC LIMIT ${args.limit}`);
   if(name==='salesforce_contacts') return query(`SELECT Id,FirstName,LastName,Email,Phone,AccountId,LastModifiedDate FROM Contact ORDER BY LastModifiedDate DESC LIMIT ${args.limit}`);
   if(name==='salesforce_opportunities') return query(`SELECT Id,Name,Amount,StageName,CloseDate,AccountId,LastModifiedDate FROM Opportunity ORDER BY LastModifiedDate DESC LIMIT ${args.limit}`);
@@ -122,10 +130,10 @@ async function salesforce(credential,name,args){
     const found=await query(`SELECT Id FROM Contact WHERE Email='${args.email.replaceAll("'","\\'")}' LIMIT 1`);
     const body=JSON.stringify({FirstName:args.firstName||'',LastName:args.lastName||args.email,Email:args.email,Phone:args.phone||null,AccountId:args.accountId||null});
     if(found.records?.[0]?.Id){
-      await http(`${base}/services/data/v61.0/sobjects/Contact/${encodeURIComponent(found.records[0].Id)}`,{method:'PATCH',headers,body});
+      await http(`${api}/sobjects/Contact/${encodeURIComponent(found.records[0].Id)}`,{method:'PATCH',headers,body});
       return {id:found.records[0].Id,updated:true};
     }
-    return http(`${base}/services/data/v61.0/sobjects/Contact`,{method:'POST',headers,body});
+    return http(`${api}/sobjects/Contact`,{method:'POST',headers,body});
   }
   throw new Error('Unknown Salesforce tool');
 }
@@ -162,12 +170,12 @@ async function atlassian(credential,name,args){
 async function zoho(credential,name,args){
   const base=cleanBase(credential.api_domain||'https://www.zohoapis.com');
   const headers={Authorization:`Zoho-oauthtoken ${credential.access_token}`,'Content-Type':'application/json'};
-  if(name==='zoho_contacts') return http(`${base}/crm/v7/Contacts?page=${args.page}&per_page=${args.perPage}`,{headers});
-  if(name==='zoho_deals') return http(`${base}/crm/v7/Deals?page=${args.page}&per_page=${args.perPage}`,{headers});
+  if(name==='zoho_contacts') return http(`${base}/crm/v8/Contacts?page=${args.page}&per_page=${args.perPage}`,{headers});
+  if(name==='zoho_deals') return http(`${base}/crm/v8/Deals?page=${args.page}&per_page=${args.perPage}`,{headers});
   if(name==='zoho_upsert_contact'){
     const data={Email:args.email,First_Name:args.firstName||'',Last_Name:args.lastName||args.email,Phone:args.phone||''};
     if(args.accountName) data.Account_Name={name:args.accountName};
-    return http(`${base}/crm/v7/Contacts/upsert`,{
+    return http(`${base}/crm/v8/Contacts/upsert`,{
       method:'POST',headers,
       body:JSON.stringify({data:[data],duplicate_check_fields:['Email']})
     });
@@ -175,34 +183,35 @@ async function zoho(credential,name,args){
   throw new Error('Unknown Zoho tool');
 }
 
-async function odooRpc(credential,model,method,args=[],kwargs={}){
+async function odooJson2(credential,model,method,body={}){
   const base=cleanBase(credential.base_url);
-  const payload={
-    jsonrpc:'2.0',method:'call',id:Date.now(),
-    params:{
-      service:'object',method:'execute_kw',
-      args:[credential.database,Number(credential.uid),credential.api_key,model,method,args,kwargs],
-    },
+  const headers={
+    Authorization:`Bearer ${credential.api_key}`,
+    'Content-Type':'application/json',
+    'User-Agent':'TeknTandao-Workspace/1.0',
+    ...(credential.database?{'X-Odoo-Database':credential.database}:{}),
   };
-  const result=await http(`${base}/jsonrpc`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(result.error) throw new Error('Odoo rejected the request');
-  return boundedJson(result.result);
+  return http(`${base}/json/2/${model}/${method}`,{
+    method:'POST',
+    headers,
+    body:JSON.stringify(body),
+  });
 }
 
 async function odoo(credential,name,args){
-  if(name==='odoo_contacts') return odooRpc(credential,'res.partner','search_read',[[]],{fields:['id','name','email','phone','company_type','write_date'],limit:args.limit,order:'write_date desc'});
-  if(name==='odoo_sale_orders') return odooRpc(credential,'sale.order','search_read',[[]],{fields:['id','name','partner_id','amount_total','state','date_order','write_date'],limit:args.limit,order:'write_date desc'});
-  if(name==='odoo_products') return odooRpc(credential,'product.product','search_read',[[]],{fields:['id','display_name','default_code','list_price','qty_available','write_date'],limit:args.limit,order:'write_date desc'});
-  if(name==='odoo_create_contact') return {id:await odooRpc(credential,'res.partner','create',[[{name:args.name,email:args.email||false,phone:args.phone||false,company_type:args.companyType}]])};
+  if(name==='odoo_contacts') return odooJson2(credential,'res.partner','search_read',{domain:[],fields:['id','name','email','phone','company_type','write_date'],limit:args.limit,order:'write_date desc'});
+  if(name==='odoo_sale_orders') return odooJson2(credential,'sale.order','search_read',{domain:[],fields:['id','name','partner_id','amount_total','state','date_order','write_date'],limit:args.limit,order:'write_date desc'});
+  if(name==='odoo_products') return odooJson2(credential,'product.product','search_read',{domain:[],fields:['id','display_name','default_code','list_price','qty_available','write_date'],limit:args.limit,order:'write_date desc'});
+  if(name==='odoo_create_contact') return {id:await odooJson2(credential,'res.partner','create',{vals:{name:args.name,email:args.email||false,phone:args.phone||false,company_type:args.companyType}})};
   throw new Error('Unknown Odoo tool');
 }
 
 export function validateEnterpriseCredential(provider,raw){
   const credential = {
-    salesforce:z.object({access_token:z.string().min(10).max(8000),instance_url:z.string().url().max(1000)}).strict(),
+    salesforce:z.object({access_token:z.string().min(10).max(8000),instance_url:z.string().url().max(1000),api_version:z.string().regex(/^v[0-9]+\.[0-9]+$/).optional()}).strict(),
     atlassian:z.object({email:z.string().email().max(254),api_token:z.string().min(10).max(8000),site_url:z.string().url().max(1000)}).strict(),
     zoho:z.object({access_token:z.string().min(10).max(8000),api_domain:z.string().url().max(1000).default('https://www.zohoapis.com')}).strict(),
-    odoo:z.object({base_url:z.string().url().max(1000),database:z.string().min(1).max(120),uid:z.number().int().positive(),api_key:z.string().min(8).max(8000)}).strict(),
+    odoo:z.object({base_url:z.string().url().max(1000),database:z.string().max(120).default(''),api_key:z.string().min(8).max(8000)}).strict(),
   }[provider]?.parse(raw);
   if(!credential) throw new Error('Unsupported enterprise provider');
   return credential;
