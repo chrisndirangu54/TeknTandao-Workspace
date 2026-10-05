@@ -28,20 +28,6 @@ class SuperAdminGate {
     return data['isBootstrap'] == true;
   }
 
-  static Future<bool> _legacyResolve() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return false;
-    try {
-      final result = await FirebaseFunctions.instanceFor(region: 'europe-west1')
-          .httpsCallable('getSuperAdminContext')
-          .call();
-      final data = Map<String, dynamic>.from(result.data as Map);
-      if (data['refreshToken'] == true) await user.getIdToken(true);
-      return data['isSuperAdmin'] == true;
-    } catch (_) {
-      return false;
-    }
-  }
 }
 
 class SuperAdminConsole extends StatefulWidget {
