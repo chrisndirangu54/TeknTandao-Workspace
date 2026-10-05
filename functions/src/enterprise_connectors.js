@@ -37,6 +37,16 @@ export const enterpriseBuiltinTools = Object.freeze({
       email:string,firstName:string,lastName:string,phone:string,accountName:string
     },['email']),
   ],
+  microsoft365:[
+    tool('m365_drive_files','List files in the connected OneDrive root',{limit:number}),
+  ],
+  powerbi:[
+    tool('powerbi_workspaces','List Power BI workspaces',{limit:number}),
+    tool('powerbi_datasets','List semantic models in a workspace',{groupId:string}),
+    tool('powerbi_refresh_history','Read semantic-model refresh history',{groupId:string,datasetId:string,top:number},['datasetId']),
+    tool('powerbi_refresh_dataset','Trigger a semantic-model refresh',{groupId:string,datasetId:string},['datasetId']),
+    tool('powerbi_push_rows','Push rows into a Power BI push semantic model table',{groupId:string,datasetId:string,tableName:string,rows:array({type:'object'})},['datasetId','tableName','rows']),
+  ],
   odoo:[
     tool('odoo_contacts','List Odoo contacts',{limit:number}),
     tool('odoo_sale_orders','List Odoo sale orders',{limit:number}),
@@ -121,6 +131,12 @@ const schemas = {
     phone:z.string().max(80).optional(),
     accountName:z.string().max(160).optional(),
   }).strict(),
+  m365_drive_files:z.object({limit:commonLimit}).strict(),
+  powerbi_workspaces:z.object({limit:commonLimit}).strict(),
+  powerbi_datasets:z.object({groupId:z.string().uuid().optional()}).strict(),
+  powerbi_refresh_history:z.object({groupId:z.string().uuid().optional(),datasetId:z.string().uuid(),top:z.number().int().min(1).max(60).default(20)}).strict(),
+  powerbi_refresh_dataset:z.object({groupId:z.string().uuid().optional(),datasetId:z.string().uuid()}).strict(),
+  powerbi_push_rows:z.object({groupId:z.string().uuid().optional(),datasetId:z.string().uuid(),tableName:z.string().min(1).max(200),rows:z.array(z.record(z.union([z.string().max(4000),z.number().finite(),z.boolean(),z.null()]))).min(1).max(1000)}).strict(),
   odoo_contacts:z.object({limit:commonLimit}).strict(),
   odoo_sale_orders:z.object({limit:commonLimit}).strict(),
   odoo_products:z.object({limit:commonLimit}).strict(),
@@ -204,6 +220,36 @@ async function zoho(credential,name,args){
   throw new Error('Unknown Zoho tool');
 }
 
+
+async function microsoft365(credential,name,args){
+  const headers={Authorization:`Bearer ${credential.access_token}`,'Content-Type':'application/json'};
+  if(name==='m365_drive_files'){
+    return http(`https://graph.microsoft.com/v1.0/me/drive/root/children?$top=${args.limit}&$select=id,name,size,webUrl,lastModifiedDateTime,file,folder`,{headers});
+  }
+  throw new Error('Unknown Microsoft 365 tool');
+}
+
+async function powerbi(credential,name,args){
+  const headers={Authorization:`Bearer ${credential.access_token}`,'Content-Type':'application/json'};
+  const groupPrefix=args.groupId?`/groups/${encodeURIComponent(args.groupId)}`:'';
+  const base='https://api.powerbi.com/v1.0/myorg';
+  if(name==='powerbi_workspaces') return http(`${base}/groups?$top=${args.limit}`,{headers});
+  if(name==='powerbi_datasets') return http(`${base}${groupPrefix}/datasets`,{headers});
+  if(name==='powerbi_refresh_history') return http(`${base}${groupPrefix}/datasets/${encodeURIComponent(args.datasetId)}/refreshes?$top=${args.top}`,{headers});
+  if(name==='powerbi_refresh_dataset'){
+    const response=await http(`${base}${groupPrefix}/datasets/${encodeURIComponent(args.datasetId)}/refreshes`,{
+      method:'POST',headers,body:JSON.stringify({notifyOption:'NoNotification'})
+    });
+    return response;
+  }
+  if(name==='powerbi_push_rows'){
+    return http(`${base}${groupPrefix}/datasets/${encodeURIComponent(args.datasetId)}/tables/${encodeURIComponent(args.tableName)}/rows`,{
+      method:'POST',headers,body:JSON.stringify({rows:args.rows})
+    });
+  }
+  throw new Error('Unknown Power BI tool');
+}
+
 async function odooJson2(credential,model,method,body={}){
   const base=enterpriseBaseUrl(credential.base_url);
   const headers={
@@ -232,6 +278,8 @@ export function validateEnterpriseCredential(provider,raw){
     salesforce:z.object({access_token:z.string().min(10).max(8000),instance_url:z.string().url().max(1000),api_version:z.string().regex(/^v[0-9]+\.[0-9]+$/).optional()}).strict(),
     atlassian:z.object({email:z.string().email().max(254),api_token:z.string().min(10).max(8000),site_url:z.string().url().max(1000)}).strict(),
     zoho:z.object({access_token:z.string().min(10).max(8000),api_domain:z.string().url().max(1000).default('https://www.zohoapis.com')}).strict(),
+    microsoft365:z.object({access_token:z.string().min(20).max(12000)}).strict(),
+    powerbi:z.object({access_token:z.string().min(20).max(12000)}).strict(),
     odoo:z.object({base_url:z.string().url().max(1000),database:z.string().max(120).default(''),api_key:z.string().min(8).max(8000)}).strict(),
   }[provider]?.parse(raw);
   if(!credential) throw new Error('Unsupported enterprise provider');
@@ -243,6 +291,8 @@ export async function validateEnterpriseConnection(provider,credential){
     salesforce:['salesforce_accounts',{limit:1}],
     atlassian:['jira_projects',{}],
     zoho:['zoho_contacts',{page:1,perPage:1}],
+    microsoft365:['m365_drive_files',{limit:1}],
+    powerbi:['powerbi_workspaces',{limit:1}],
     odoo:['odoo_contacts',{limit:1}],
   }[provider];
   return callEnterpriseBuiltin(provider,credential,first[0],first[1]);
@@ -254,6 +304,8 @@ export async function callEnterpriseBuiltin(provider,credential,name,raw){
   if(provider==='salesforce') return salesforce(credential,name,args);
   if(provider==='atlassian') return atlassian(credential,name,args);
   if(provider==='zoho') return zoho(credential,name,args);
+  if(provider==='microsoft365') return microsoft365(credential,name,args);
+  if(provider==='powerbi') return powerbi(credential,name,args);
   if(provider==='odoo') return odoo(credential,name,args);
   throw new Error('Unsupported enterprise connector');
 }
