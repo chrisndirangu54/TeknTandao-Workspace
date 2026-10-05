@@ -5,6 +5,7 @@ import {FieldValue, Timestamp, getFirestore} from 'firebase-admin/firestore';
 import {getStorage} from 'firebase-admin/storage';
 import {defineSecret} from 'firebase-functions/params';
 import {HttpsError, onCall, onRequest} from 'firebase-functions/v2/https';
+import {onSchedule} from 'firebase-functions/v2/scheduler';
 import {catalog, canAccess, identifier} from './domain.js';
 import {
   commitShape,
@@ -278,7 +279,12 @@ export const analyzeBusinessIntakeUpload = callable(async request => {
       retainedUntil: Date.now() + 30 * 86400000,
     },
   );
-  await ref.set({state: 'analyzed', proposalId: proposal.id, analyzedAt: stamp()}, {merge: true});
+  await ref.set({
+    state: 'analyzed',
+    proposalId: proposal.id,
+    analyzedAt: stamp(),
+    retainedUntil: Timestamp.fromMillis(Date.now() + 30 * 86400000),
+  }, {merge: true});
   return proposal;
 }, [geminiKey]);
 
@@ -329,7 +335,7 @@ function targetRef(org, proposalId, index, shape, record) {
   if (shape.kind === 'inventory') return org.collection('products').doc(deterministicId);
   if (shape.kind === 'support_ticket') return org.collection('tickets').doc(deterministicId);
   if (shape.kind === 'asset') return org.collection('assets').doc(deterministicId);
-  if (shape.kind === 'expense_draft') return org.collection('expenseDrafts').doc(deterministicId);
+  if (shape.kind === 'expense_draft') return org.collection('expenses').doc(deterministicId);
   if (shape.kind === 'sale_draft') return org.collection('saleDrafts').doc(deterministicId);
   return org.collection('modules').doc(record.appId).collection('records').doc(deterministicId);
 }
@@ -537,6 +543,33 @@ export const businessIngestionWebhook = onRequest(
       response.status(202).json({proposalId: proposal.id, state: 'review'});
     } catch (error) {
       response.status(401).json({error: String(error?.message || 'Ingestion failed').slice(0, 300)});
+    }
+  },
+);
+
+
+export const purgeExpiredBusinessIntakeSources = onSchedule(
+  {schedule: 'every 24 hours', region, timeZone: 'UTC'},
+  async () => {
+    const expired = await db.collectionGroup('businessIntakeUploads')
+      .where('retainedUntil', '<=', Timestamp.now())
+      .limit(200)
+      .get();
+    for (const doc of expired.docs) {
+      try {
+        const data = doc.data();
+        if (data.storagePath) {
+          await intakeBucket().file(data.storagePath).delete({ignoreNotFound: true});
+        }
+        await doc.ref.set({
+          state: 'source_purged',
+          storagePath: null,
+          purgedAt: stamp(),
+          retainedUntil: FieldValue.delete(),
+        }, {merge: true});
+      } catch (error) {
+        console.error('Smart Intake source purge failed', doc.ref.path, error);
+      }
     }
   },
 );
