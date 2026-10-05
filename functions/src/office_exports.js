@@ -245,7 +245,7 @@ function googleSlidesRequests(slides){
         requests.push({createShape:{objectId:labelId,shapeType:'TEXT_BOX',elementProperties:{pageObjectId:slideId,size:{width:{magnitude:150,unit:'PT'},height:{magnitude:28,unit:'PT'}},transform:{scaleX:1,scaleY:1,translateX:45,translateY:y,unit:'PT'}}}});
         requests.push({insertText:{objectId:labelId,text:String(item.label)}});
         requests.push({createShape:{objectId:barId,shapeType:'RECTANGLE',elementProperties:{pageObjectId:slideId,size:{width:{magnitude:Math.max(20,(Number(item.value)||0)/max*430),unit:'PT'},height:{magnitude:20,unit:'PT'}},transform:{scaleX:1,scaleY:1,translateX:205,translateY:y+2,unit:'PT'}}}});
-        requests.push({updateShapeProperties:{objectId:barId,shapeProperties:{shapeBackgroundFill:{solidFill:{color:{rgbColor:{red:0.145,green:0.388,blue:0.922}},alpha:1}},outline:{propertyState:'NOT_RENDERED'}},fields:'shapeBackgroundFill.solidFill,outline.propertyState'}});
+        requests.push({updateShapeProperties:{objectId:barId,shapeProperties:{shapeBackgroundFill:{solidFill:{color:{rgbColor:{red:0.145,green:0.388,blue:0.922}},alpha:1}},outline:{propertyState:'NOT_RENDERED'}},fields:'shapeBackgroundFill.solidFill.color,shapeBackgroundFill.solidFill.alpha,outline.propertyState'}});
         requests.push({createShape:{objectId:valueId,shapeType:'TEXT_BOX',elementProperties:{pageObjectId:slideId,size:{width:{magnitude:100,unit:'PT'},height:{magnitude:28,unit:'PT'}},transform:{scaleX:1,scaleY:1,translateX:650,translateY:y,unit:'PT'}}}});
         requests.push({insertText:{objectId:valueId,text:String(item.value)}});
       });
