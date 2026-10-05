@@ -275,6 +275,7 @@ export const analyzeBusinessIntakeUpload = callable(async request => {
       size: actualSize,
       md5Hash: metadata.md5Hash || null,
       storagePath: upload.storagePath,
+      retainedUntil: Date.now() + 30 * 86400000,
     },
   );
   await ref.set({state: 'analyzed', proposalId: proposal.id, analyzedAt: stamp()}, {merge: true});
@@ -403,6 +404,13 @@ export const commitBusinessIntakeProposal = callable(async request => {
   return {ok: true, proposalId, committedIndexes: selected};
 });
 
+function ingestionWebhookUrl() {
+  const projectId = getApp().options.projectId || process.env.GCLOUD_PROJECT;
+  return projectId
+    ? `https://${region}-${projectId}.cloudfunctions.net/businessIngestionWebhook`
+    : null;
+}
+
 export const createBusinessIngestionKey = callable(async request => {
   const {org, user} = await authorize(request, {ownerOnly: true});
   const name = String(request.data.name || 'IoT / API ingestion').trim().slice(0, 120);
@@ -427,13 +435,14 @@ export const createBusinessIngestionKey = callable(async request => {
       createdAt: stamp(),
     }),
   ]);
-  return {keyId, name, token};
+  return {keyId, name, token, webhookUrl: ingestionWebhookUrl()};
 });
 
 export const listBusinessIngestionKeys = callable(async request => {
   const {org} = await authorize(request, {ownerOnly: true});
   const snapshots = await org.collection('businessIngestionKeys').orderBy('createdAt', 'desc').limit(50).get();
   return {
+    webhookUrl: ingestionWebhookUrl(),
     keys: snapshots.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -452,6 +461,22 @@ export const revokeBusinessIngestionKey = callable(async request => {
   return {ok: true};
 });
 
+async function consumeIngestionQuota(keyId) {
+  const day = new Date().toISOString().slice(0, 10);
+  const ref = db.doc(`businessIngestionUsage/${keyId}_${day}`);
+  await db.runTransaction(async (tx) => {
+    const count = Number((await tx.get(ref)).data()?.count || 0);
+    if (count >= 5000) throw new Error('Daily ingestion-key request limit reached');
+    tx.set(ref, {
+      count: count + 1,
+      keyId,
+      day,
+      expiresAt: Timestamp.fromMillis(Date.now() + 14 * 86400000),
+      updatedAt: stamp(),
+    }, {merge: true});
+  });
+}
+
 async function authenticateIngestionRequest(request) {
   const auth = String(request.get('authorization') || '');
   const match = /^Bearer (ti_(ing_[A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+)$/.exec(auth);
@@ -463,6 +488,7 @@ async function authenticateIngestionRequest(request) {
   if (!data?.active || !verifyIngestionKey(token, data.keyHash)) {
     throw new Error('Invalid or revoked ingestion key');
   }
+  await consumeIngestionQuota(keyId);
   return {keyId, data, org: orgRoot(data.orgId)};
 }
 
