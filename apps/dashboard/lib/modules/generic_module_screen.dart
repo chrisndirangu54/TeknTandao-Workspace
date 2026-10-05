@@ -337,6 +337,7 @@ class _GenericEnterpriseModuleScreenState
           ],
         ),
       ],
+      ),
     );
   }
 
