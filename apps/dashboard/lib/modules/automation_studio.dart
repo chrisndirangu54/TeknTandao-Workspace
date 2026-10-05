@@ -107,7 +107,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
     });
     if (result == null || !mounted) return;
     final name = switch (provider) {
-      'google' => 'Google',
+      'google' => 'Google Workspace',
       'notion' => 'Notion',
       'microsoft' => 'Microsoft 365',
       'powerbi' => 'Power BI',
@@ -780,7 +780,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
     ),
     _card(
       'Google Workspace',
-      'Gmail, Drive, Calendar and Sheets: send mail, manage files, schedule events and update spreadsheets. Reconnect existing Google accounts to authorize the new tools.',
+      'Gmail, Drive, Calendar, Sheets, Docs and Slides: send mail, manage files, schedule events, automate spreadsheets, create reports and publish presentations. Reconnect existing Google accounts to authorize the expanded scopes.',
       [
         FilledButton.icon(
           onPressed: _busy ? null : () => _connect('google'),
