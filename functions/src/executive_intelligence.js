@@ -86,7 +86,7 @@ function anomaliesFromSeries(series){
     .map(item=>({period:item.period,value:item.value,severity:Math.abs(item.z)>=2.5?'high':'medium',z:Number(item.z.toFixed(2))}));
 }
 
-function deterministicRecommendations(facts){
+export function deterministicRecommendations(facts){
   const out=[];
   if(facts.inventory.lowStock>0)out.push({
     priority:facts.inventory.outOfStock>0?'high':'medium',
