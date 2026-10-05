@@ -149,6 +149,65 @@ export const connectRemoteMcp = callable(async request => {
   return {id, toolCount: tools.length};
 }, [encryptionKey]);
 
+
+function healthProbe(connection) {
+  return ({
+    google:['drive_search',{query:'trashed = false'}],
+    notion:['notion_search',{query:''}],
+    slack:['slack_channels',{}],
+    hubspot:['hubspot_contacts',{}],
+    salesforce:['salesforce_accounts',{limit:1}],
+    atlassian:['jira_projects',{}],
+    zoho:['zoho_contacts',{page:1,perPage:1}],
+    odoo:['odoo_contacts',{limit:1}],
+  })[connection.provider] || null;
+}
+
+async function probeToolConnection(org,id) {
+  const connection=await getConnection(org,id);
+  try{
+    if(connection.provider==='mcp'){
+      await discoverMcp(connection,await readCredential(org,id));
+    }else{
+      const probe=healthProbe(connection);
+      if(!probe) throw new Error('No health probe is configured for this provider');
+      await executeAutomationConnectionTool(org,id,probe[0],probe[1]);
+    }
+    await org.collection('toolConnections').doc(id).set({
+      health:'healthy',lastHealthAt:stamp(),lastHealthError:FieldValue.delete()
+    },{merge:true});
+    return {id,health:'healthy'};
+  }catch(error){
+    await org.collection('toolConnections').doc(id).set({
+      health:'degraded',lastHealthAt:stamp(),lastHealthError:safeError(error)
+    },{merge:true});
+    return {id,health:'degraded',error:safeError(error)};
+  }
+}
+
+export const checkToolConnection = callable(async request => {
+  const {org}=await authorize(request);
+  return probeToolConnection(org,automationId.parse(request.data.id));
+}, [encryptionKey,oauthConfig]);
+
+export const refreshConnectorHealth = onSchedule({
+  schedule:'every 60 minutes',
+  region,
+  secrets:[encryptionKey,oauthConfig],
+  timeoutSeconds:540,
+  memory:'512MiB',
+}, async ()=>{
+  const connections=await db.collectionGroup('toolConnections')
+    .where('status','==','connected')
+    .limit(100)
+    .get();
+  for(const doc of connections.docs){
+    const org=doc.ref.parent.parent;
+    if(!org) continue;
+    try{await probeToolConnection(org,doc.id);}catch{}
+  }
+});
+
 export const disconnectToolConnection = callable(async request => {
   const {org} = await authorize(request);
   const id = automationId.parse(request.data.id);
