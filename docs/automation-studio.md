@@ -49,7 +49,8 @@ Configure these Firebase Secret Manager secrets:
 ```json
 {
   "google": {"clientId": "GOOGLE_CLIENT_ID", "clientSecret": "GOOGLE_CLIENT_SECRET"},
-  "notion": {"clientId": "NOTION_CLIENT_ID", "clientSecret": "NOTION_CLIENT_SECRET"}
+  "notion": {"clientId": "NOTION_CLIENT_ID", "clientSecret": "NOTION_CLIENT_SECRET"},
+  "microsoft": {"clientId": "ENTRA_CLIENT_ID", "clientSecret": "ENTRA_CLIENT_SECRET", "tenant": "common"}
 }
 ```
 
@@ -64,9 +65,10 @@ in both provider OAuth applications:
 https://europe-west1-tekntandaoworkspace.cloudfunctions.net/automationOAuthCallback
 ```
 
+Microsoft setup: register the same callback URI in a Microsoft Entra web application. Microsoft 365 uses delegated `offline_access User.Read Files.ReadWrite`; Power BI uses a separate consent/token audience with `offline_access https://analysis.windows.net/powerbi/api/Dataset.ReadWrite.All`. The Power BI connection reuses the `microsoft` client configuration unless an explicit `powerbi` entry is supplied. See [Office & Power BI exports](OFFICE_POWERBI_EXPORTS.md).
+
 Google setup: create a Web application OAuth client, configure its consent
-screen and permitted test users or production publishing, enable Gmail API and
-Google Drive, Calendar and Sheets APIs, and request these scopes:
+screen and permitted test users or production publishing, enable Gmail API and the Google Drive, Calendar, Sheets, Docs and Slides APIs, and request these scopes:
 
 ```text
 https://www.googleapis.com/auth/gmail.readonly
@@ -74,6 +76,8 @@ https://www.googleapis.com/auth/gmail.send
 https://www.googleapis.com/auth/drive.file
 https://www.googleapis.com/auth/calendar.events
 https://www.googleapis.com/auth/spreadsheets
+https://www.googleapis.com/auth/documents
+https://www.googleapis.com/auth/presentations
 ```
 
 Google may require verification for production use of Gmail scopes. `drive.file`

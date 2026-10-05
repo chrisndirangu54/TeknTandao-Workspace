@@ -64,335 +64,161 @@ class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>
   }
 
 
-  Future<Map<String,dynamic>?> createExport(String format) async {
-    try {
-      final result = await widget.store.call(
-        'exportExecutiveIntelligence',
-        {'format': format},
-      );
-      if (!mounted) return result;
-      final opened = await launchUrl(
-        Uri.parse(result['url'].toString()),
-        webOnlyWindowName: '_blank',
-      );
-      if (!opened) {
-        throw StateError('Could not open the generated export.');
-      }
-      return result;
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+  Future<Map<String,dynamic>?> _selectConnection(String provider) async{
+    final studio=await widget.store.call('getAutomationStudio');
+    final connections=_rows(studio['connections'])
+        .where((item)=>item['provider']==provider&&item['status']=='connected')
+        .toList();
+    if(connections.isEmpty){
+      if(mounted)setState(()=>error='Connect '+(provider=='powerbi'?'Power BI':'Microsoft 365')+' in Automation Studio first.');
       return null;
     }
+    if(connections.length==1)return connections.first;
+    if(!mounted)return null;
+    return showDialog<Map<String,dynamic>>(context:context,builder:(ctx)=>SimpleDialog(
+      title:const Text('Choose connection'),
+      children:[
+        for(final item in connections)SimpleDialogOption(
+          onPressed:()=>Navigator.pop(ctx,item),
+          child:ListTile(
+            leading:const Icon(Icons.link_rounded),
+            title:Text((item['name']??provider).toString()),
+            subtitle:Text((item['health']??'unchecked').toString()),
+          ),
+        ),
+      ],
+    ));
   }
 
-  Future<void> exportMenu() async {
-    final format = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            const ListTile(
-              title: Text(
-                'Export Executive Intelligence',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              subtitle: Text(
-                'Generate from the same bounded facts shown in this dashboard.',
-              ),
-            ),
-            for (final item in const [
-              ('pptx', 'PowerPoint (.pptx)', Icons.slideshow_rounded),
-              ('xlsx', 'Excel (.xlsx)', Icons.table_chart_rounded),
-              ('csv', 'CSV (.csv)', Icons.grid_on_rounded),
-              ('pdf', 'PDF (.pdf)', Icons.picture_as_pdf_rounded),
-              ('docx', 'Word (.docx)', Icons.description_rounded),
-            ])
-              ListTile(
-                leading: Icon(item.$3),
-                title: Text(item.$2),
-                onTap: () => Navigator.pop(ctx, item.$1),
-              ),
-          ],
+  Future<String?> _chooseFormat({bool includePowerBi=false}) async{
+    if(!mounted)return null;
+    return showDialog<String>(context:context,builder:(ctx)=>SimpleDialog(
+      title:const Text('Export Executive Intelligence'),
+      children:[
+        for(final entry in const [
+          ['pptx','PowerPoint (.pptx)'],
+          ['xlsx','Excel (.xlsx)'],
+          ['csv','CSV (.csv)'],
+          ['pdf','PDF (.pdf)'],
+          ['docx','Word (.docx)'],
+        ])SimpleDialogOption(
+          onPressed:()=>Navigator.pop(ctx,entry[0]),
+          child:ListTile(
+            leading:Icon(entry[0]=='pptx'?Icons.slideshow_rounded:entry[0]=='xlsx'?Icons.grid_on_rounded:entry[0]=='pdf'?Icons.picture_as_pdf_rounded:entry[0]=='docx'?Icons.description_rounded:Icons.table_rows_rounded),
+            title:Text(entry[1]),
+          ),
         ),
-      ),
-    );
-    if (format != null) await createExport(format);
+        if(includePowerBi)SimpleDialogOption(
+          onPressed:()=>Navigator.pop(ctx,'powerbi'),
+          child:const ListTile(leading:Icon(Icons.analytics_rounded),title:Text('Power BI semantic model')),
+        ),
+      ],
+    ));
   }
 
-  Future<void> publishToMicrosoft365() async {
-    final available = connections
-        .where((item) =>
-            item['status'] == 'connected' &&
-            item['provider'] == 'microsoft365')
-        .toList();
-    if (available.isEmpty) {
-      setState(
-        () => error =
-            'Connect Microsoft 365 in Automation Studio before publishing Office exports.',
-      );
-      return;
-    }
-    var connectionId = available.first['id'].toString();
-    var format = 'pptx';
-    final folderController =
-        TextEditingController(text: 'TeknTandao Exports');
-    final approved = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Publish to Microsoft 365'),
-          content: SizedBox(
-            width: 520,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: connectionId,
-                  decoration:
-                      const InputDecoration(labelText: 'Microsoft connection'),
-                  items: [
-                    for (final item in available)
-                      DropdownMenuItem(
-                        value: item['id'].toString(),
-                        child: Text(item['name'].toString()),
-                      ),
-                  ],
-                  onChanged: (value) => setDialogState(() {
-                    if (value != null) connectionId = value;
-                  }),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: format,
-                  decoration:
-                      const InputDecoration(labelText: 'Export format'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'pptx',
-                      child: Text('PowerPoint (.pptx)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'xlsx',
-                      child: Text('Excel (.xlsx)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'docx',
-                      child: Text('Word (.docx)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'pdf',
-                      child: Text('PDF (.pdf)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'csv',
-                      child: Text('CSV (.csv)'),
-                    ),
-                  ],
-                  onChanged: (value) => setDialogState(() {
-                    if (value != null) format = value;
-                  }),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: folderController,
-                  decoration:
-                      const InputDecoration(labelText: 'OneDrive folder'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Generate & publish'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (approved != true) {
-      folderController.dispose();
-      return;
-    }
+  Future<void> exportReport() async{
+    final mode=await showDialog<String>(context:context,builder:(ctx)=>AlertDialog(
+      title:const Text('Export & publish'),
+      content:const Text('Download a file, send it to OneDrive, or publish the analytics dataset to Power BI.'),
+      actions:[
+        TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
+        TextButton(onPressed:()=>Navigator.pop(ctx,'download'),child:const Text('Download')),
+        TextButton(onPressed:()=>Navigator.pop(ctx,'onedrive'),child:const Text('OneDrive')),
+        TextButton(onPressed:()=>Navigator.pop(ctx,'google'),child:const Text('Google Workspace')),
+        FilledButton(onPressed:()=>Navigator.pop(ctx,'powerbi'),child:const Text('Power BI')),
+      ],
+    ));
+    if(mode==null)return;
+    try{
+      if(mode=='download'){
+        final format=await _chooseFormat();
+        if(format==null)return;
+        final result=await widget.store.call('exportExecutiveReport',{'format':format});
+        final url=(result['url']??'').toString();
+        if(url.isEmpty)throw StateError('Export URL was not returned.');
+        final opened=await launchUrl(Uri.parse(url),webOnlyWindowName:'_blank');
+        if(!opened)throw StateError('Unable to open the generated export.');
+        return;
+      }
 
-    try {
-      final created = await widget.store.call(
-        'exportExecutiveIntelligence',
-        {'format': format},
-      );
-      final result = await widget.store.call(
-        'publishAnalyticsExportToMicrosoft365',
-        {
-          'connectionId': connectionId,
-          'exportId': created['id'],
-          'folder': folderController.text.trim(),
-        },
-      );
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Published to Microsoft 365'),
-          content: SelectableText(
-            (result['webUrl'] ?? result['name'] ?? 'Published').toString(),
-          ),
-          actions: [
-            if ((result['webUrl'] ?? '').toString().isNotEmpty)
-              FilledButton(
-                onPressed: () async {
-                  await launchUrl(
-                    Uri.parse(result['webUrl'].toString()),
-                    webOnlyWindowName: '_blank',
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-                child: const Text('Open file'),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
+      if(mode=='google'){
+        final connection=await _selectConnection('google');
+        if(connection==null)return;
+        final target=await showDialog<String>(context:context,builder:(ctx)=>SimpleDialog(
+          title:const Text('Publish to Google Workspace'),
+          children:[
+            SimpleDialogOption(
+              onPressed:()=>Navigator.pop(ctx,'slides'),
+              child:const ListTile(leading:Icon(Icons.slideshow_rounded),title:Text('Google Slides')),
+            ),
+            SimpleDialogOption(
+              onPressed:()=>Navigator.pop(ctx,'sheets'),
+              child:const ListTile(leading:Icon(Icons.grid_on_rounded),title:Text('Google Sheets')),
+            ),
+            SimpleDialogOption(
+              onPressed:()=>Navigator.pop(ctx,'docs'),
+              child:const ListTile(leading:Icon(Icons.description_rounded),title:Text('Google Docs')),
+            ),
+            SimpleDialogOption(
+              onPressed:()=>Navigator.pop(ctx,'drive'),
+              child:const ListTile(leading:Icon(Icons.add_to_drive_rounded),title:Text('Google Drive file')),
             ),
           ],
-        ),
-      );
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString());
-    } finally {
-      folderController.dispose();
-    }
-  }
-
-  Future<void> publishToPowerBi() async {
-    final available = connections
-        .where((item) =>
-            item['status'] == 'connected' &&
-            item['provider'] == 'powerbi')
-        .toList();
-    if (available.isEmpty) {
-      setState(
-        () => error =
-            'Connect Power BI in Automation Studio before publishing KPI snapshots.',
-      );
-      return;
-    }
-    var connectionId = available.first['id'].toString();
-    final dataset = TextEditingController();
-    final group = TextEditingController();
-    final table = TextEditingController(text: 'TeknTandaoKPI');
-    final approved = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Publish KPI snapshot to Power BI'),
-          content: SizedBox(
-            width: 540,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: connectionId,
-                  decoration:
-                      const InputDecoration(labelText: 'Power BI connection'),
-                  items: [
-                    for (final item in available)
-                      DropdownMenuItem(
-                        value: item['id'].toString(),
-                        child: Text(item['name'].toString()),
-                      ),
-                  ],
-                  onChanged: (value) => setDialogState(() {
-                    if (value != null) connectionId = value;
-                  }),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: dataset,
-                  decoration: const InputDecoration(
-                    labelText: 'Semantic model / dataset UUID',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: group,
-                  decoration: const InputDecoration(
-                    labelText: 'Workspace UUID (optional)',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: table,
-                  decoration: const InputDecoration(
-                    labelText: 'Push table name',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Expected table columns: Metric (text), Value (number), GeneratedAt (text/date).',
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Publish'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (approved == true) {
-      try {
-        final result = await widget.store.call(
-          'publishExecutiveSnapshotToPowerBi',
-          {
-            'connectionId': connectionId,
-            'datasetId': dataset.text.trim(),
-            if (group.text.trim().isNotEmpty)
-              'groupId': group.text.trim(),
-            'tableName': table.text.trim(),
-          },
-        );
-        if (mounted) {
-          await showDialog<void>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Published to Power BI'),
-              content: Text(
-                'Pushed ' +
-                    result['rowCount'].toString() +
-                    ' KPI rows at ' +
-                    result['generatedAt'].toString() +
-                    '.',
-              ),
-              actions: [
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Done'),
-                ),
-              ],
-            ),
+        ));
+        if(target==null)return;
+        String? format;
+        if(target=='drive'){
+          format=await _chooseFormat();
+          if(format==null)return;
+        }
+        final result=await widget.store.call('exportExecutiveReportToGoogleWorkspace',{
+          'connectionId':connection['id'],
+          'target':target,
+          if(format!=null)'format':format,
+        });
+        final url=(result['webUrl']??'').toString();
+        if(url.isNotEmpty)await launchUrl(Uri.parse(url),webOnlyWindowName:'_blank');
+        if(mounted){
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content:Text('Published to '+(result['format']??'Google Workspace').toString()+'.')),
           );
         }
-      } catch (e) {
-        if (mounted) setState(() => error = e.toString());
+        return;
       }
+      if(mode=='onedrive'){
+        final connection=await _selectConnection('microsoft');
+        if(connection==null)return;
+        final format=await _chooseFormat();
+        if(format==null)return;
+        final result=await widget.store.call('exportExecutiveReportToOneDrive',{
+          'format':format,
+          'connectionId':connection['id'],
+        });
+        final url=(result['webUrl']??'').toString();
+        if(url.isNotEmpty)await launchUrl(Uri.parse(url),webOnlyWindowName:'_blank');
+        if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Export saved to OneDrive.')));
+        return;
+      }
+      final connection=await _selectConnection('powerbi');
+      if(connection==null)return;
+      final result=await widget.store.call('publishExecutiveDataToPowerBi',{
+        'connectionId':connection['id'],
+        'datasetName':'TeknTandao Executive Intelligence',
+      });
+      if(mounted){
+        await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(
+          title:const Text('Published to Power BI'),
+          content:SelectableText(
+            'Semantic model: '+(result['datasetName']??'').toString()+
+            '\nDataset ID: '+(result['datasetId']??'').toString()+
+            '\nCreated new model: '+(result['created']??false).toString(),
+          ),
+          actions:[FilledButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Done'))],
+        ));
+      }
+    }catch(e){
+      if(mounted)setState(()=>error=e.toString());
     }
-    dataset.dispose();
-    group.dispose();
-    table.dispose();
   }
 
   @override Widget build(BuildContext context){
@@ -430,9 +256,7 @@ class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>
               icon:aiBusy?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.auto_awesome_rounded),
               label:Text(aiBusy?'Generating…':'AI management brief'),
             ),
-            OutlinedButton.icon(style:OutlinedButton.styleFrom(foregroundColor:Colors.white),onPressed:exportMenu,icon:const Icon(Icons.download_rounded),label:const Text('Export')),
-            OutlinedButton.icon(style:OutlinedButton.styleFrom(foregroundColor:Colors.white),onPressed:publishToMicrosoft365,icon:const Icon(Icons.cloud_upload_outlined),label:const Text('Microsoft 365')),
-            OutlinedButton.icon(style:OutlinedButton.styleFrom(foregroundColor:Colors.white),onPressed:publishToPowerBi,icon:const Icon(Icons.bar_chart_rounded),label:const Text('Power BI')),
+            OutlinedButton.icon(style:OutlinedButton.styleFrom(foregroundColor:Colors.white),onPressed:exportReport,icon:const Icon(Icons.ios_share_rounded),label:const Text('Export / publish')),
             OutlinedButton.icon(style:OutlinedButton.styleFrom(foregroundColor:Colors.white),onPressed:load,icon:const Icon(Icons.refresh),label:const Text('Refresh')),
           ]),
         ),

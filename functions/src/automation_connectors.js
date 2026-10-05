@@ -91,12 +91,25 @@ export const builtinTools = {
     tool('drive_create_text', 'Create a text file in Google Drive', {name: string, content: string}, ['name', 'content']),
     tool('calendar_list_events', 'List upcoming calendar events', {calendarId: string, timeMin: string}),
     tool('calendar_create_event', 'Create a calendar appointment', {calendarId: string, summary: string, start: string, end: string}, ['summary', 'start', 'end']),
+    tool('sheets_create', 'Create a Google Sheet', {title: string}, ['title']),
     tool('sheets_read', 'Read a spreadsheet range', {spreadsheetId: string, range: string}, ['spreadsheetId', 'range']),
     tool('sheets_append', 'Append literal values to a spreadsheet', {spreadsheetId: string, range: string, values: {type: 'array', items: {type: 'array', items: {type: ['string', 'number', 'boolean']}}}}, ['spreadsheetId', 'range', 'values']),
+    tool('docs_create', 'Create a Google Doc with plain text content', {title: string, content: string}, ['title', 'content']),
+    tool('docs_get', 'Read Google Doc metadata and structural content', {documentId: string}, ['documentId']),
+    tool('slides_create', 'Create a Google Slides presentation', {title: string}, ['title']),
+    tool('slides_get', 'Read Google Slides presentation structure', {presentationId: string}, ['presentationId']),
   ],
   notion: [
     tool('notion_search', 'Search pages shared with this connection', {query: string}),
     tool('notion_create_page', 'Create a child page under a shared page', {parentId: string, title: string, content: string}, ['parentId', 'title', 'content']),
+  ],
+  microsoft: [
+    tool('onedrive_list', 'List files in the connected Microsoft OneDrive root', {}),
+    tool('onedrive_search', 'Search files in the connected Microsoft OneDrive', {query: string}, ['query']),
+  ],
+  powerbi: [
+    tool('powerbi_datasets', 'List Power BI semantic models in My workspace', {}),
+    tool('powerbi_dataset_tables', 'List tables in a Power BI push semantic model', {datasetId: string}, ['datasetId']),
   ],
   slack: [
     tool('slack_channels', 'List public channels accessible to the bot', {}),
@@ -118,10 +131,19 @@ const schemas = {
   drive_create_text: z.object({name: z.string().min(1).max(200), content: text}).strict(),
   notion_search: z.object({query: text.optional()}).strict(),
   notion_create_page: z.object({parentId: z.string().regex(/^[a-fA-F0-9-]{32,36}$/), title: z.string().min(1).max(200), content: z.string().max(2000)}).strict(),
+  onedrive_list: z.object({}).strict(),
+  onedrive_search: z.object({query: z.string().min(1).max(500)}).strict(),
+  powerbi_datasets: z.object({}).strict(),
+  powerbi_dataset_tables: z.object({datasetId: z.string().regex(/^[A-Za-z0-9-]{10,100}$/)}).strict(),
   calendar_list_events: z.object({calendarId: z.string().max(254).default('primary'), timeMin: z.string().datetime({offset: true}).optional()}).strict(),
   calendar_create_event: z.object({calendarId: z.string().max(254).default('primary'), summary: z.string().min(1).max(200), start: z.string().datetime({offset: true}), end: z.string().datetime({offset: true})}).strict().refine(value => Date.parse(value.end) > Date.parse(value.start), 'End must follow start'),
+  sheets_create: z.object({title: z.string().min(1).max(200)}).strict(),
   sheets_read: z.object({spreadsheetId: z.string().regex(/^[\w-]{10,150}$/), range: z.string().min(1).max(200)}).strict(),
   sheets_append: z.object({spreadsheetId: z.string().regex(/^[\w-]{10,150}$/), range: z.string().min(1).max(200), values: z.array(z.array(z.union([z.string().max(4000), z.number().finite(), z.boolean()])).max(30)).min(1).max(50)}).strict(),
+  docs_create: z.object({title: z.string().min(1).max(200), content: z.string().max(50000)}).strict(),
+  docs_get: z.object({documentId: z.string().regex(/^[\w-]{10,200}$/)}).strict(),
+  slides_create: z.object({title: z.string().min(1).max(200)}).strict(),
+  slides_get: z.object({presentationId: z.string().regex(/^[\w-]{10,200}$/)}).strict(),
   slack_channels: z.object({}).strict(), slack_history: z.object({channel: z.string().regex(/^[CG][A-Z0-9]{5,30}$/)}).strict(),
   slack_post_message: z.object({channel: z.string().regex(/^[CG][A-Z0-9]{5,30}$/), text: z.string().min(1).max(4000)}).strict(),
   hubspot_contacts: z.object({}).strict(), hubspot_deals: z.object({}).strict(),
@@ -157,6 +179,7 @@ export async function callBuiltin(provider, accessToken, name, raw) {
   switch (name) {
     case 'calendar_list_events': return google(`calendar/v3/calendars/${encodeURIComponent(args.calendarId)}/events?maxResults=20&singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(args.timeMin || new Date().toISOString())}`);
     case 'calendar_create_event': return google(`calendar/v3/calendars/${encodeURIComponent(args.calendarId)}/events`, {method: 'POST', body: JSON.stringify({summary: args.summary, start: {dateTime: args.start}, end: {dateTime: args.end}})});
+    case 'sheets_create': return providerJson('https://sheets.googleapis.com/v4/spreadsheets', {method: 'POST', headers, body: JSON.stringify({properties: {title: args.title}})});
     case 'sheets_read': return providerJson(`https://sheets.googleapis.com/v4/spreadsheets/${args.spreadsheetId}/values/${encodeURIComponent(args.range)}`, {headers});
     case 'sheets_append': return providerJson(`https://sheets.googleapis.com/v4/spreadsheets/${args.spreadsheetId}/values/${encodeURIComponent(args.range)}:append?valueInputOption=RAW`, {method: 'POST', headers, body: JSON.stringify({values: args.values})});
     case 'slack_channels': return slack('conversations.list', {limit: 50, types: 'public_channel'});
@@ -165,6 +188,20 @@ export async function callBuiltin(provider, accessToken, name, raw) {
     case 'hubspot_contacts': return providerJson('https://api.hubapi.com/crm/v3/objects/contacts?limit=20&properties=email,firstname,lastname', {headers});
     case 'hubspot_deals': return providerJson('https://api.hubapi.com/crm/v3/objects/deals?limit=20&properties=dealname,amount,dealstage', {headers});
     case 'hubspot_create_contact': return providerJson('https://api.hubapi.com/crm/v3/objects/contacts', {method: 'POST', headers, body: JSON.stringify({properties: {email: args.email, firstname: args.firstName || '', lastname: args.lastName || ''}})});
+    case 'onedrive_list': return providerJson('https://graph.microsoft.com/v1.0/me/drive/root/children?$top=50&$select=id,name,size,webUrl,file,folder,lastModifiedDateTime', {headers});
+    case 'onedrive_search': return providerJson(`https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(args.query)}')?$top=50&$select=id,name,size,webUrl,file,folder,lastModifiedDateTime`, {headers});
+    case 'powerbi_datasets': return providerJson('https://api.powerbi.com/v1.0/myorg/datasets', {headers});
+    case 'powerbi_dataset_tables': return providerJson(`https://api.powerbi.com/v1.0/myorg/datasets/${encodeURIComponent(args.datasetId)}/tables`, {headers});
+    case 'docs_create': {
+      const created = await providerJson('https://docs.googleapis.com/v1/documents', {method:'POST', headers, body:JSON.stringify({title:args.title})});
+      if (args.content && created.documentId) {
+        await providerJson(`https://docs.googleapis.com/v1/documents/${created.documentId}:batchUpdate`, {method:'POST', headers, body:JSON.stringify({requests:[{insertText:{location:{index:1},text:args.content}}]})});
+      }
+      return created;
+    }
+    case 'docs_get': return providerJson(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(args.documentId)}`, {headers});
+    case 'slides_create': return providerJson('https://slides.googleapis.com/v1/presentations', {method:'POST', headers, body:JSON.stringify({title:args.title})});
+    case 'slides_get': return providerJson(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(args.presentationId)}`, {headers});
     case 'gmail_search': return google(`gmail/v1/users/me/messages?maxResults=20&q=${encodeURIComponent(args.query)}`);
     case 'gmail_read': return google(`gmail/v1/users/me/messages/${args.messageId}?format=full`);
     case 'gmail_send': {
