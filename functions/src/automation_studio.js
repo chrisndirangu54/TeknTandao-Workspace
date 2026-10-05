@@ -5,6 +5,7 @@ import {getAuth} from 'firebase-admin/auth';
 import {defineSecret} from 'firebase-functions/params';
 import {onCall, onRequest, HttpsError} from 'firebase-functions/v2/https';
 import {onDocumentCreated} from 'firebase-functions/v2/firestore';
+import {onSchedule} from 'firebase-functions/v2/scheduler';
 import {Server} from '@modelcontextprotocol/sdk/server/index.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {CallToolRequestSchema, ListToolsRequestSchema} from '@modelcontextprotocol/sdk/types.js';
@@ -345,6 +346,7 @@ const exchangeRuleSchema = z.object({
   mappings:z.array(mappingSchema).min(1).max(40),
   enabled:z.boolean().default(false),
   conflictPolicy:z.enum(['external_wins','tekntandao_wins','skip_conflicts']).default('skip_conflicts'),
+  schedule:z.enum(['manual','hourly','daily']).default('manual'),
 }).strict();
 
 export const previewAutomationConnectionTool = callable(async request => {
@@ -428,11 +430,7 @@ export const getDataExchange = callable(async request => {
   return {rules:rules.docs.map(publicDoc),runs:runs.docs.map(publicDoc)};
 });
 
-export const runDataExchangeRule = callable(async request => {
-  const {org, uid} = await authorize(request);
-  const id = automationId.parse(request.data.id);
-  const ref = org.collection('dataExchangeRules').doc(id);
-  const rule = (await ref.get()).data();
+async function performDataExchange(org, id, rule, startedBy) {
   if (!rule?.enabled || !rule.approvedBy) throw new Error('Enable and approve the exchange rule before running it');
   await owner(org,rule.approvedBy);
   await consumeQuota(org,'sync',200);
@@ -489,11 +487,51 @@ export const runDataExchangeRule = callable(async request => {
   await runRef.set({
     ruleId:id,ruleName:rule.name,provider:connection.provider,
     rowsRead:rows.length,created,updated,skipped,conflicts,status:'succeeded',
-    startedBy:uid,createdAt:stamp(),updatedAt:stamp(),
+    startedBy,createdAt:stamp(),updatedAt:stamp(),
   });
-  await ref.set({lastRunAt:stamp(),lastRunId:runId,lastSummary:{rowsRead:rows.length,created,updated,skipped,conflicts}},{merge:true});
+  await org.collection('dataExchangeRules').doc(id).set({
+    lastRunAt:stamp(),lastRunId:runId,lastSummary:{rowsRead:rows.length,created,updated,skipped,conflicts}
+  },{merge:true});
   return {id:runId,rowsRead:rows.length,created,updated,skipped,conflicts};
+}
+
+export const runDataExchangeRule = callable(async request => {
+  const {org, uid} = await authorize(request);
+  const id = automationId.parse(request.data.id);
+  const rule = (await org.collection('dataExchangeRules').doc(id).get()).data();
+  return performDataExchange(org,id,rule,uid);
 }, [encryptionKey, oauthConfig]);
+
+export const runScheduledDataExchange = onSchedule({
+  schedule:'every 60 minutes',
+  region,
+  secrets:[encryptionKey,oauthConfig],
+  timeoutSeconds:540,
+  memory:'512MiB',
+}, async ()=>{
+  const rules=await db.collectionGroup('dataExchangeRules').where('enabled','==',true).limit(100).get();
+  const now=Date.now();
+  for(const doc of rules.docs){
+    try{
+      const rule=doc.data();
+      if(!['hourly','daily'].includes(rule.schedule)) continue;
+      const last=rule.lastRunAt?.toMillis?.()||0;
+      const dueMs=rule.schedule==='daily'?23*60*60*1000:50*60*1000;
+      if(now-last<dueMs) continue;
+      const org=doc.ref.parent.parent;
+      if(!org) continue;
+      await performDataExchange(org,doc.id,rule,'scheduler');
+    }catch(error){
+      const org=doc.ref.parent.parent;
+      if(org){
+        await org.collection('dataExchangeRuns').add({
+          ruleId:doc.id,ruleName:doc.data().name||doc.id,status:'failed',
+          error:safeError(error),startedBy:'scheduler',createdAt:stamp(),updatedAt:stamp()
+        });
+      }
+    }
+  }
+});
 
 export const saveToolWorkflow = callable(async request => {
   const {org, uid} = await authorize(request);
