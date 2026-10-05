@@ -888,13 +888,33 @@ class _AutomationStudioState extends State<AutomationStudio> {
     for (final connection in _connections)
       _card(
         connection['name'].toString(),
-        '${connection['status']} · ${_rows(connection['tools']).length} tools',
+        connection['status'].toString() +
+            ' · ' +
+            (connection['health'] ?? 'unchecked').toString() +
+            ' · ' +
+            _rows(connection['tools']).length.toString() +
+            ' tools',
         [
           TextButton(
             onPressed: () =>
                 _showResult('Available tools', connection['tools']),
             child: const Text('View tools'),
           ),
+          if (connection['status'] == 'connected')
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final result = await _action('checkToolConnection', {
+                        'id': connection['id'],
+                      });
+                      if (result != null) {
+                        await _showResult('Connection health', result);
+                      }
+                    },
+              icon: const Icon(Icons.monitor_heart_outlined),
+              label: const Text('Check health'),
+            ),
           if (connection['status'] == 'connected')
             TextButton(
               onPressed: _busy
