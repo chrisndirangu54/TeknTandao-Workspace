@@ -204,8 +204,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
       case 'odoo':
         fields.addAll({
           'base_url': 'Odoo base URL',
-          'database': 'Database',
-          'uid': 'User ID',
+          'database': 'Database (optional if host selects it)',
           'api_key': 'API key',
         });
         secretKeys.add('api_key');
@@ -219,24 +218,6 @@ class _AutomationStudioState extends State<AutomationStudio> {
     );
     if (values == null) return;
     final name = values.remove('name') ?? provider;
-    if (provider == 'odoo') {
-      final uid = int.tryParse(values['uid'] ?? '');
-      if (uid == null || uid <= 0) {
-        if (mounted) {
-          setState(() => _error = 'Odoo User ID must be a positive integer.');
-        }
-        return;
-      }
-      values.remove('uid');
-      await _action('connectEnterpriseTool', {
-        'connection': {
-          'provider': provider,
-          'name': name,
-          'credential': {...values, 'uid': uid},
-        },
-      });
-      return;
-    }
     await _action('connectEnterpriseTool', {
       'connection': {
         'provider': provider,
