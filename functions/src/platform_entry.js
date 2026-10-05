@@ -51,3 +51,5 @@ export * from './super_admin.js';
 export * from './platform_security.js';
 
 export * from './business_ingestion.js';
+
+export * from './executive_intelligence.js';
