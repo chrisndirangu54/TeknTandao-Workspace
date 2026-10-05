@@ -13,6 +13,17 @@ const db = getFirestore();
 const auth = getAuth();
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
+const deploymentBoundSecrets = new Set([
+  'PAYSTACK_SECRET_KEY',
+  'MPESA_CONFIG',
+  'GEMINI_API_KEY',
+  'AUTOMATION_ENCRYPTION_KEY',
+  'AUTOMATION_OAUTH_CONFIG',
+  'NAMECHEAP_CONFIG',
+  'WEBSITE_ANALYTICS_SIGNING_KEY',
+  'CLOUDFLARE_API_TOKEN',
+  'TURNSTILE_SECRET_KEY',
+]);
 const secretId = z.string().trim().min(1).max(255).regex(/^[A-Za-z0-9_-]+$/);
 const versionId = z.string().trim().regex(/^[0-9]+$/);
 const projectId = () =>
@@ -131,6 +142,7 @@ export const getPlatformSecretVault = callable(async request => {
       latestVersion: versions[0] || null,
       versions: versions.slice(0, 20),
       replication: item.replication?.automatic ? 'automatic' : 'user-managed',
+      deploymentBound: deploymentBoundSecrets.has(id),
     });
   }
   rows.sort((a, b) => a.id.localeCompare(b.id));
@@ -139,6 +151,7 @@ export const getPlatformSecretVault = callable(async request => {
     secrets: rows,
     valuesVisible: false,
     policy: 'Secret values are write-only in the admin console and are never returned by this API.',
+    deploymentNote: 'Secrets bound with Firebase defineSecret require a Functions redeploy/revision refresh after rotation.',
   };
 });
 
