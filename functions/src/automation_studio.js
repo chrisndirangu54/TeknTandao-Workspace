@@ -243,7 +243,7 @@ export const startAutomationOAuth = callable(async request => {
   const url = new URL(authUrl);
   const params = {client_id: config.clientId, redirect_uri: callbackUrl(), response_type: 'code', state};
   if (provider === 'google') {
-    Object.assign(params, {access_type: 'offline', prompt: 'consent', scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets'});
+    Object.assign(params, {access_type: 'offline', prompt: 'consent', scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/presentations'});
   } else if (provider === 'notion') {
     params.owner = 'user';
   } else if (provider === 'microsoft') {
@@ -300,7 +300,7 @@ export const automationOAuthCallback = onRequest({region, secrets: [encryptionKe
     if (!token.access_token) throw new Error('Missing access token');
     if (google) {
       const granted = new Set((token.scope || '').split(' '));
-      if (!['gmail.readonly', 'gmail.send', 'drive.file', 'calendar.events', 'spreadsheets'].every(scope => granted.has(`https://www.googleapis.com/auth/${scope}`))) throw new Error('Required scopes were not granted');
+      if (!['gmail.readonly', 'gmail.send', 'drive.file', 'calendar.events', 'spreadsheets', 'documents', 'presentations'].every(scope => granted.has(`https://www.googleapis.com/auth/${scope}`))) throw new Error('Required Google Workspace scopes were not granted');
     }
     const id = randomUUID();
     const batch = db.batch();
