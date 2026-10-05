@@ -241,6 +241,7 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
   Future<void> manageIoTKeys() async {
     await run(() async {
       final result = await widget.store.call('listBusinessIngestionKeys');
+      final webhookUrl = (result['webhookUrl'] ?? '').toString();
       final keys = (result['keys'] as List? ?? const [])
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
@@ -258,6 +259,12 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
                 child: ListView(
                   shrinkWrap: true,
                   children: [
+                    if (webhookUrl.isNotEmpty) ...[
+                      const Text('Webhook endpoint', style: TextStyle(fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 6),
+                      SelectableText(webhookUrl),
+                      const SizedBox(height: 12),
+                    ],
                     Align(
                       alignment: Alignment.centerLeft,
                       child: FilledButton.icon(
@@ -281,8 +288,9 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
                               builder: (ctx) => AlertDialog(
                                 title: const Text('Copy this key now'),
                                 content: SelectableText(
-                                  'This token is shown only once. Store it in the IoT gateway or integration secret store.\n\n' +
-                                      created['token'].toString(),
+                                  'This token is shown only once. Store it in the IoT gateway or integration secret store.\n\nToken:\n' +
+                                      created['token'].toString() +
+                                      ((created['webhookUrl'] ?? '').toString().isEmpty ? '' : '\n\nWebhook:\n' + created['webhookUrl'].toString()),
                                 ),
                                 actions: [
                                   FilledButton(
