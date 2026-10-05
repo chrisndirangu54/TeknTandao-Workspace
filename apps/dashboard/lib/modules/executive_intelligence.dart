@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../suite.dart';
 
 class ExecutiveIntelligencePanel extends StatefulWidget {
@@ -53,6 +54,118 @@ class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>
     finally{if(mounted)setState(()=>aiBusy=false);}
   }
 
+
+  Future<Map<String,dynamic>?> _selectConnection(String provider) async{
+    final studio=await widget.store.call('getAutomationStudio');
+    final connections=_rows(studio['connections'])
+        .where((item)=>item['provider']==provider&&item['status']=='connected')
+        .toList();
+    if(connections.isEmpty){
+      if(mounted)setState(()=>error='Connect '+(provider=='powerbi'?'Power BI':'Microsoft 365')+' in Automation Studio first.');
+      return null;
+    }
+    if(connections.length==1)return connections.first;
+    if(!mounted)return null;
+    return showDialog<Map<String,dynamic>>(context:context,builder:(ctx)=>SimpleDialog(
+      title:const Text('Choose connection'),
+      children:[
+        for(final item in connections)SimpleDialogOption(
+          onPressed:()=>Navigator.pop(ctx,item),
+          child:ListTile(
+            leading:const Icon(Icons.link_rounded),
+            title:Text((item['name']??provider).toString()),
+            subtitle:Text((item['health']??'unchecked').toString()),
+          ),
+        ),
+      ],
+    ));
+  }
+
+  Future<String?> _chooseFormat({bool includePowerBi=false}) async{
+    if(!mounted)return null;
+    return showDialog<String>(context:context,builder:(ctx)=>SimpleDialog(
+      title:const Text('Export Executive Intelligence'),
+      children:[
+        for(final entry in const [
+          ['pptx','PowerPoint (.pptx)'],
+          ['xlsx','Excel (.xlsx)'],
+          ['csv','CSV (.csv)'],
+          ['pdf','PDF (.pdf)'],
+          ['docx','Word (.docx)'],
+        ])SimpleDialogOption(
+          onPressed:()=>Navigator.pop(ctx,entry[0]),
+          child:ListTile(
+            leading:Icon(entry[0]=='pptx'?Icons.slideshow_rounded:entry[0]=='xlsx'?Icons.grid_on_rounded:entry[0]=='pdf'?Icons.picture_as_pdf_rounded:entry[0]=='docx'?Icons.description_rounded:Icons.table_rows_rounded),
+            title:Text(entry[1]),
+          ),
+        ),
+        if(includePowerBi)SimpleDialogOption(
+          onPressed:()=>Navigator.pop(ctx,'powerbi'),
+          child:const ListTile(leading:Icon(Icons.analytics_rounded),title:Text('Power BI semantic model')),
+        ),
+      ],
+    ));
+  }
+
+  Future<void> exportReport() async{
+    final mode=await showDialog<String>(context:context,builder:(ctx)=>AlertDialog(
+      title:const Text('Export & publish'),
+      content:const Text('Download a file, send it to OneDrive, or publish the analytics dataset to Power BI.'),
+      actions:[
+        TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
+        TextButton(onPressed:()=>Navigator.pop(ctx,'download'),child:const Text('Download')),
+        TextButton(onPressed:()=>Navigator.pop(ctx,'onedrive'),child:const Text('OneDrive')),
+        FilledButton(onPressed:()=>Navigator.pop(ctx,'powerbi'),child:const Text('Power BI')),
+      ],
+    ));
+    if(mode==null)return;
+    try{
+      if(mode=='download'){
+        final format=await _chooseFormat();
+        if(format==null)return;
+        final result=await widget.store.call('exportExecutiveReport',{'format':format});
+        final url=(result['url']??'').toString();
+        if(url.isEmpty)throw StateError('Export URL was not returned.');
+        final opened=await launchUrl(Uri.parse(url),webOnlyWindowName:'_blank');
+        if(!opened)throw StateError('Unable to open the generated export.');
+        return;
+      }
+      if(mode=='onedrive'){
+        final connection=await _selectConnection('microsoft');
+        if(connection==null)return;
+        final format=await _chooseFormat();
+        if(format==null)return;
+        final result=await widget.store.call('exportExecutiveReportToOneDrive',{
+          'format':format,
+          'connectionId':connection['id'],
+        });
+        final url=(result['webUrl']??'').toString();
+        if(url.isNotEmpty)await launchUrl(Uri.parse(url),webOnlyWindowName:'_blank');
+        if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Export saved to OneDrive.')));
+        return;
+      }
+      final connection=await _selectConnection('powerbi');
+      if(connection==null)return;
+      final result=await widget.store.call('publishExecutiveDataToPowerBi',{
+        'connectionId':connection['id'],
+        'datasetName':'TeknTandao Executive Intelligence',
+      });
+      if(mounted){
+        await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(
+          title:const Text('Published to Power BI'),
+          content:SelectableText(
+            'Semantic model: '+(result['datasetName']??'').toString()+
+            '\nDataset ID: '+(result['datasetId']??'').toString()+
+            '\nCreated new model: '+(result['created']??false).toString(),
+          ),
+          actions:[FilledButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Done'))],
+        ));
+      }
+    }catch(e){
+      if(mounted)setState(()=>error=e.toString());
+    }
+  }
+
   @override Widget build(BuildContext context){
     if(busy)return const Center(child:Padding(padding:EdgeInsets.all(32),child:CircularProgressIndicator()));
     if(error!=null&&data==null)return Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -88,6 +201,7 @@ class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>
               icon:aiBusy?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.auto_awesome_rounded),
               label:Text(aiBusy?'Generating…':'AI management brief'),
             ),
+            OutlinedButton.icon(style:OutlinedButton.styleFrom(foregroundColor:Colors.white),onPressed:exportReport,icon:const Icon(Icons.ios_share_rounded),label:const Text('Export / publish')),
             OutlinedButton.icon(style:OutlinedButton.styleFrom(foregroundColor:Colors.white),onPressed:load,icon:const Icon(Icons.refresh),label:const Text('Refresh')),
           ]),
         ),

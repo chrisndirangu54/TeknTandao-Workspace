@@ -106,7 +106,13 @@ class _AutomationStudioState extends State<AutomationStudio> {
       'provider': provider,
     });
     if (result == null || !mounted) return;
-    final name = provider == 'google' ? 'Google' : 'Notion';
+    final name = switch (provider) {
+      'google' => 'Google',
+      'notion' => 'Notion',
+      'microsoft' => 'Microsoft 365',
+      'powerbi' => 'Power BI',
+      _ => provider,
+    };
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -791,6 +797,28 @@ class _AutomationStudioState extends State<AutomationStudio> {
           onPressed: _busy ? null : () => _connect('notion'),
           icon: const Icon(Icons.login),
           label: const Text('Connect Notion'),
+        ),
+      ],
+    ),
+    _card(
+      'Microsoft 365 / PowerPoint',
+      'Connect Microsoft 365 to deliver generated PowerPoint, Excel, Word, PDF and CSV exports into OneDrive.',
+      [
+        FilledButton.icon(
+          onPressed: _busy ? null : () => _connect('microsoft'),
+          icon: const Icon(Icons.login),
+          label: const Text('Connect Microsoft 365'),
+        ),
+      ],
+    ),
+    _card(
+      'Power BI',
+      'Publish bounded Executive Intelligence data into a Power BI push semantic model using a separate audience-scoped Microsoft connection.',
+      [
+        FilledButton.icon(
+          onPressed: _busy ? null : () => _connect('powerbi'),
+          icon: const Icon(Icons.analytics_outlined),
+          label: const Text('Connect Power BI'),
         ),
       ],
     ),

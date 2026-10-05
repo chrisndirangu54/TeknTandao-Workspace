@@ -98,6 +98,14 @@ export const builtinTools = {
     tool('notion_search', 'Search pages shared with this connection', {query: string}),
     tool('notion_create_page', 'Create a child page under a shared page', {parentId: string, title: string, content: string}, ['parentId', 'title', 'content']),
   ],
+  microsoft: [
+    tool('onedrive_list', 'List files in the connected Microsoft OneDrive root', {}),
+    tool('onedrive_search', 'Search files in the connected Microsoft OneDrive', {query: string}, ['query']),
+  ],
+  powerbi: [
+    tool('powerbi_datasets', 'List Power BI semantic models in My workspace', {}),
+    tool('powerbi_dataset_tables', 'List tables in a Power BI push semantic model', {datasetId: string}, ['datasetId']),
+  ],
   slack: [
     tool('slack_channels', 'List public channels accessible to the bot', {}),
     tool('slack_history', 'Read recent messages in a channel', {channel: string}, ['channel']),
@@ -118,6 +126,10 @@ const schemas = {
   drive_create_text: z.object({name: z.string().min(1).max(200), content: text}).strict(),
   notion_search: z.object({query: text.optional()}).strict(),
   notion_create_page: z.object({parentId: z.string().regex(/^[a-fA-F0-9-]{32,36}$/), title: z.string().min(1).max(200), content: z.string().max(2000)}).strict(),
+  onedrive_list: z.object({}).strict(),
+  onedrive_search: z.object({query: z.string().min(1).max(500)}).strict(),
+  powerbi_datasets: z.object({}).strict(),
+  powerbi_dataset_tables: z.object({datasetId: z.string().regex(/^[A-Za-z0-9-]{10,100}$/)}).strict(),
   calendar_list_events: z.object({calendarId: z.string().max(254).default('primary'), timeMin: z.string().datetime({offset: true}).optional()}).strict(),
   calendar_create_event: z.object({calendarId: z.string().max(254).default('primary'), summary: z.string().min(1).max(200), start: z.string().datetime({offset: true}), end: z.string().datetime({offset: true})}).strict().refine(value => Date.parse(value.end) > Date.parse(value.start), 'End must follow start'),
   sheets_read: z.object({spreadsheetId: z.string().regex(/^[\w-]{10,150}$/), range: z.string().min(1).max(200)}).strict(),
@@ -165,6 +177,10 @@ export async function callBuiltin(provider, accessToken, name, raw) {
     case 'hubspot_contacts': return providerJson('https://api.hubapi.com/crm/v3/objects/contacts?limit=20&properties=email,firstname,lastname', {headers});
     case 'hubspot_deals': return providerJson('https://api.hubapi.com/crm/v3/objects/deals?limit=20&properties=dealname,amount,dealstage', {headers});
     case 'hubspot_create_contact': return providerJson('https://api.hubapi.com/crm/v3/objects/contacts', {method: 'POST', headers, body: JSON.stringify({properties: {email: args.email, firstname: args.firstName || '', lastname: args.lastName || ''}})});
+    case 'onedrive_list': return providerJson('https://graph.microsoft.com/v1.0/me/drive/root/children?$top=50&$select=id,name,size,webUrl,file,folder,lastModifiedDateTime', {headers});
+    case 'onedrive_search': return providerJson(`https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(args.query)}')?$top=50&$select=id,name,size,webUrl,file,folder,lastModifiedDateTime`, {headers});
+    case 'powerbi_datasets': return providerJson('https://api.powerbi.com/v1.0/myorg/datasets', {headers});
+    case 'powerbi_dataset_tables': return providerJson(`https://api.powerbi.com/v1.0/myorg/datasets/${encodeURIComponent(args.datasetId)}/tables`, {headers});
     case 'gmail_search': return google(`gmail/v1/users/me/messages?maxResults=20&q=${encodeURIComponent(args.query)}`);
     case 'gmail_read': return google(`gmail/v1/users/me/messages/${args.messageId}?format=full`);
     case 'gmail_send': {
