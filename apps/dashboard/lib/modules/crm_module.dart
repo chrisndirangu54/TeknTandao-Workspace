@@ -2,143 +2,135 @@ import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
 
-class CrmModuleScreen extends StatelessWidget {
+class CrmModuleScreen extends StatefulWidget {
   final SuiteStore store;
-
   const CrmModuleScreen({super.key, required this.store});
+  @override State<CrmModuleScreen> createState()=>_CrmModuleScreenState();
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.people_alt_rounded, color: Color(0xFF3B82F6)),
-            SizedBox(width: 10),
-            Text('Sales & CRM Hub'),
-          ],
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _buildStatCard('Active Deals Pipeline', 'KES 16,500,000.00', Icons.trending_up_rounded, const Color(0xFF3B82F6)),
-                const SizedBox(width: 16),
-                _buildStatCard('Total CRM Customers', '3 Active Accounts', Icons.groups_rounded, const Color(0xFF10B981)),
-                const SizedBox(width: 16),
-                _buildStatCard('WhatsApp Leads Sent', '14 Workflows', Icons.chat_rounded, const Color(0xFF25D366)),
-              ],
-            ),
-            const SizedBox(height: 28),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('ORGANIZATION SHARED CUSTOMERS & LEADS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    final details = await recordForm(context, 'Add CRM Customer', ['Company / Person Name', 'Email', 'Phone Number', 'Location']);
-                    if (details != null && details[0].isNotEmpty) {
-                      await store.call('saveRecord', {
-                        'appId': 'crm',
-                        'record': {
-                          'name': details[0],
-                          'email': details[1],
-                          'phone': details[2],
-                          'location': details[3],
-                          'type': 'Lead',
-                          'balanceKes': 0,
-                        }
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.person_add_rounded, size: 16),
-                  label: const Text('Add record'),
-                )
-              ],
-            ),
-            const SizedBox(height: 12),
-            StreamBuilder<List<Map<String, dynamic>>>(
-              stream: store.watch('contacts'),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const CircularProgressIndicator();
-                final contacts = snapshot.data!;
-                return Card(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: contacts.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
-                    itemBuilder: (context, idx) {
-                      final c = contacts[idx];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFF3B82F6).withValues(alpha: 0.1),
-                          child: Text(c['name'][0], style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
-                        ),
-                        title: Text(c['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${c['email']} · ${c['phone']} · ${c['location'] ?? 'Nairobi'}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Chip(label: Text(c['type'] ?? 'Customer'), backgroundColor: const Color(0xFFEFF6FF)),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF25D366)),
-                              tooltip: 'Send WhatsApp Follow-up',
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('WhatsApp automated message sent to ${c['phone']}')),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+class _CrmModuleScreenState extends State<CrmModuleScreen>{
+  String query='';
+  bool saving=false;
+
+  Future<void> addContact() async{
+    final details=await recordForm(context,'Add CRM Customer',['Company / Person Name','Email','Phone Number','Location']);
+    if(details==null||details.isEmpty||details[0].trim().isEmpty)return;
+    setState(()=>saving=true);
+    try{
+      await widget.store.call('saveRecord',{'appId':'crm','record':{
+        'name':details[0].trim(),'email':details.length>1?details[1].trim():'',
+        'phone':details.length>2?details[2].trim():'','location':details.length>3?details[3].trim():'',
+        'type':'Lead','balanceKes':0,
+      }});
+    }catch(e){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Could not save contact: $e'),backgroundColor:Colors.red.shade700));
+    }finally{if(mounted)setState(()=>saving=false);}
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
+  @override Widget build(BuildContext context)=>Scaffold(
+    backgroundColor:const Color(0xFFF5F7FB),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')])),
+    floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
+    body:StreamBuilder<List<Map<String,dynamic>>>(
+      stream:widget.store.watch('contacts'),
+      builder:(context,snapshot){
+        if(snapshot.connectionState==ConnectionState.waiting&&!snapshot.hasData)return const Center(child:CircularProgressIndicator());
+        if(snapshot.hasError)return _StateCard(icon:Icons.cloud_off_rounded,title:'CRM data unavailable',message:snapshot.error.toString());
+        final contacts=snapshot.data??const [];
+        final normalized=query.trim().toLowerCase();
+        final visible=normalized.isEmpty?contacts:contacts.where((c)=>c.values.any((v)=>v.toString().toLowerCase().contains(normalized))).toList();
+        final leads=contacts.where((c)=>(c['type']??'Lead').toString().toLowerCase()=='lead').length;
+        final customers=contacts.length-leads;
+        return ListView(
+          padding:const EdgeInsets.fromLTRB(24,24,24,100),
+          children:[
             Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                  const SizedBox(height: 4),
-                  Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ],
+              padding:const EdgeInsets.all(24),
+              decoration:BoxDecoration(
+                gradient:const LinearGradient(colors:[Color(0xFF0F172A),Color(0xFF1D4ED8)]),
+                borderRadius:BorderRadius.circular(24),
+                boxShadow:const [BoxShadow(color:Color(0x220F172A),blurRadius:30,offset:Offset(0,12))],
               ),
+              child:Wrap(spacing:28,runSpacing:18,crossAxisAlignment:WrapCrossAlignment.center,children:[
+                const SizedBox(width:260,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                  Text('Customer intelligence at a glance',style:TextStyle(color:Colors.white,fontSize:22,fontWeight:FontWeight.w800)),
+                  SizedBox(height:6),
+                  Text('Shared customer records, leads and follow-up context across the workspace.',style:TextStyle(color:Color(0xFFBFDBFE),height:1.4)),
+                ])),
+                _Metric(label:'Total contacts',value:contacts.length.toString(),icon:Icons.groups_rounded),
+                _Metric(label:'Leads',value:leads.toString(),icon:Icons.track_changes_rounded),
+                _Metric(label:'Customers',value:customers.toString(),icon:Icons.handshake_rounded),
+              ]),
             ),
+            const SizedBox(height:20),
+            TextField(
+              decoration:const InputDecoration(prefixIcon:Icon(Icons.search_rounded),hintText:'Search name, email, phone or location'),
+              onChanged:(v)=>setState(()=>query=v),
+            ),
+            const SizedBox(height:16),
+            if(contacts.isEmpty)
+              const _StateCard(icon:Icons.people_outline_rounded,title:'No contacts yet',message:'Add your first lead or customer to start building the shared CRM.')
+            else if(visible.isEmpty)
+              const _StateCard(icon:Icons.search_off_rounded,title:'No matching contacts',message:'Try a broader search term.')
+            else
+              LayoutBuilder(builder:(context,constraints){
+                final wide=constraints.maxWidth>900;
+                if(!wide)return Column(children:[for(final c in visible)...[_ContactCard(contact:c),const SizedBox(height:10)]]);
+                return Wrap(spacing:12,runSpacing:12,children:[for(final c in visible)SizedBox(width:(constraints.maxWidth-12)/2,child:_ContactCard(contact:c))]);
+              }),
           ],
-        ),
-      ),
+        );
+      },
+    ),
+  );
+}
+
+class _Metric extends StatelessWidget{
+  final String label,value;final IconData icon;
+  const _Metric({required this.label,required this.value,required this.icon});
+  @override Widget build(BuildContext context)=>Container(
+    padding:const EdgeInsets.symmetric(horizontal:16,vertical:14),
+    decoration:BoxDecoration(color:Colors.white.withValues(alpha:.09),borderRadius:BorderRadius.circular(16),border:Border.all(color:Colors.white.withValues(alpha:.12))),
+    child:Row(mainAxisSize:MainAxisSize.min,children:[Icon(icon,color:Colors.white),const SizedBox(width:10),Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(value,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w800,fontSize:20)),Text(label,style:const TextStyle(color:Color(0xFFDBEAFE),fontSize:12))])]),
+  );
+}
+
+class _ContactCard extends StatelessWidget{
+  final Map<String,dynamic> contact;
+  const _ContactCard({required this.contact});
+  @override Widget build(BuildContext context){
+    final name=(contact['name']??'Unnamed contact').toString().trim();
+    final safeName=name.isEmpty?'Unnamed contact':name;
+    final email=(contact['email']??'').toString().trim();
+    final phone=(contact['phone']??'').toString().trim();
+    final location=(contact['location']??'').toString().trim();
+    final type=(contact['type']??'Lead').toString();
+    return Container(
+      padding:const EdgeInsets.all(18),
+      decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(18),border:Border.all(color:const Color(0xFFE5E7EB)),boxShadow:const [BoxShadow(color:Color(0x0D0F172A),blurRadius:18,offset:Offset(0,6))]),
+      child:Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        CircleAvatar(backgroundColor:const Color(0xFFDBEAFE),child:Text(safeName[0].toUpperCase(),style:const TextStyle(color:Color(0xFF1D4ED8),fontWeight:FontWeight.w800))),
+        const SizedBox(width:14),
+        Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Row(children:[Expanded(child:Text(safeName,style:const TextStyle(fontWeight:FontWeight.w800,fontSize:16))),Chip(label:Text(type))]),
+          if(email.isNotEmpty)Text(email,overflow:TextOverflow.ellipsis),
+          const SizedBox(height:4),
+          Wrap(spacing:12,runSpacing:4,children:[
+            if(phone.isNotEmpty)Text(phone,style:const TextStyle(color:Color(0xFF64748B))),
+            if(location.isNotEmpty)Text(location,style:const TextStyle(color:Color(0xFF64748B))),
+          ]),
+        ])),
+      ]),
     );
   }
+}
+
+class _StateCard extends StatelessWidget{
+  final IconData icon;final String title,message;
+  const _StateCard({required this.icon,required this.title,required this.message});
+  @override Widget build(BuildContext context)=>Center(child:Container(
+    constraints:const BoxConstraints(maxWidth:560),padding:const EdgeInsets.all(28),
+    decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(20),border:Border.all(color:const Color(0xFFE5E7EB))),
+    child:Column(mainAxisSize:MainAxisSize.min,children:[Icon(icon,size:44,color:const Color(0xFF64748B)),const SizedBox(height:12),Text(title,style:const TextStyle(fontWeight:FontWeight.w800,fontSize:18)),const SizedBox(height:6),Text(message,textAlign:TextAlign.center,style:const TextStyle(color:Color(0xFF64748B)))]),
+  ));
 }
