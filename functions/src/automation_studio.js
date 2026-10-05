@@ -156,6 +156,8 @@ function healthProbe(connection) {
     notion:['notion_search',{query:''}],
     slack:['slack_channels',{}],
     hubspot:['hubspot_contacts',{}],
+    microsoft:['onedrive_list',{}],
+    powerbi:['powerbi_datasets',{}],
     salesforce:['salesforce_accounts',{limit:1}],
     atlassian:['jira_projects',{}],
     zoho:['zoho_contacts',{page:1,perPage:1}],
@@ -225,15 +227,29 @@ function configFor(provider) {
 }
 export const startAutomationOAuth = callable(async request => {
   const {org, uid} = await authorize(request);
-  const provider = z.enum(['google', 'notion']).parse(request.data.provider);
+  const provider = z.enum(['google', 'notion', 'microsoft', 'powerbi']).parse(request.data.provider);
   const config = configFor(provider);
   await consumeQuota(org, 'oauth', 30);
   const state = randomBytes(32).toString('base64url');
   await db.doc(`workspaceAutomationOAuth/${digest(state)}`).set({orgId: org.id, uid, provider, expiresAt: Timestamp.fromMillis(Date.now() + 600000)});
-  const url = new URL(provider === 'google' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://api.notion.com/v1/oauth/authorize');
+  const microsoft = provider === 'microsoft' || provider === 'powerbi';
+  const tenant = microsoft ? (config.tenant || 'common') : null;
+  const authUrl = provider === 'google'
+    ? 'https://accounts.google.com/o/oauth2/v2/auth'
+    : provider === 'notion'
+      ? 'https://api.notion.com/v1/oauth/authorize'
+      : `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/authorize`;
+  const url = new URL(authUrl);
   const params = {client_id: config.clientId, redirect_uri: callbackUrl(), response_type: 'code', state};
-  if (provider === 'google') Object.assign(params, {access_type: 'offline', prompt: 'consent', scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets'});
-  else params.owner = 'user';
+  if (provider === 'google') {
+    Object.assign(params, {access_type: 'offline', prompt: 'consent', scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets'});
+  } else if (provider === 'notion') {
+    params.owner = 'user';
+  } else if (provider === 'microsoft') {
+    Object.assign(params, {response_mode:'query', prompt:'select_account', scope:'offline_access User.Read Files.ReadWrite'});
+  } else {
+    Object.assign(params, {response_mode:'query', prompt:'select_account', scope:'offline_access https://analysis.windows.net/powerbi/api/Dataset.ReadWrite.All'});
+  }
   url.search = new URLSearchParams(params).toString();
   return {url: url.toString()};
 }, [oauthConfig]);
@@ -258,10 +274,27 @@ export const automationOAuthCallback = onRequest({region, secrets: [encryptionKe
     await owner(org, pending.uid);
     const config = configFor(pending.provider);
     const google = pending.provider === 'google';
-    const token = await providerJson(google ? 'https://oauth2.googleapis.com/token' : 'https://api.notion.com/v1/oauth/token', {
+    const notion = pending.provider === 'notion';
+    const microsoft = pending.provider === 'microsoft' || pending.provider === 'powerbi';
+    const tenant = microsoft ? (config.tenant || 'common') : null;
+    const tokenUrl = google
+      ? 'https://oauth2.googleapis.com/token'
+      : notion
+        ? 'https://api.notion.com/v1/oauth/token'
+        : `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`;
+    const microsoftScope = pending.provider === 'microsoft'
+      ? 'offline_access User.Read Files.ReadWrite'
+      : 'offline_access https://analysis.windows.net/powerbi/api/Dataset.ReadWrite.All';
+    const token = await providerJson(tokenUrl, {
       method: 'POST',
-      headers: google ? {'Content-Type': 'application/x-www-form-urlencoded'} : {'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`},
-      body: google ? new URLSearchParams({code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: callbackUrl(), grant_type: 'authorization_code'}).toString() : JSON.stringify({code, redirect_uri: callbackUrl(), grant_type: 'authorization_code'}),
+      headers: google || microsoft
+        ? {'Content-Type': 'application/x-www-form-urlencoded'}
+        : {'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`},
+      body: google
+        ? new URLSearchParams({code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: callbackUrl(), grant_type: 'authorization_code'}).toString()
+        : notion
+          ? JSON.stringify({code, redirect_uri: callbackUrl(), grant_type: 'authorization_code'})
+          : new URLSearchParams({code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: callbackUrl(), grant_type: 'authorization_code', scope:microsoftScope}).toString(),
     });
     if (!token.access_token) throw new Error('Missing access token');
     if (google) {
@@ -271,7 +304,14 @@ export const automationOAuthCallback = onRequest({region, secrets: [encryptionKe
     const id = randomUUID();
     const batch = db.batch();
     batch.set(credentials(org, id), encryptCredential({...token, expiresAt: token.expires_in ? Date.now() + token.expires_in * 1000 : null}, encryptionKey.value(), `${org.id}/${id}`));
-    batch.set(org.collection('toolConnections').doc(id), {provider: pending.provider, name: google ? 'Gmail & Google Drive' : (token.workspace_name || 'Notion'), tools: builtinTools[pending.provider], status: 'connected', createdBy: pending.uid, createdAt: stamp()});
+    const connectionName = pending.provider === 'google'
+      ? 'Gmail & Google Drive'
+      : pending.provider === 'notion'
+        ? (token.workspace_name || 'Notion')
+        : pending.provider === 'microsoft'
+          ? 'Microsoft 365 / OneDrive'
+          : 'Power BI';
+    batch.set(org.collection('toolConnections').doc(id), {provider: pending.provider, name: connectionName, tools: builtinTools[pending.provider], status: 'connected', createdBy: pending.uid, createdAt: stamp()});
     await batch.commit();
     response.status(200).send('Connected successfully. Close this tab and refresh Connections in your workspace.');
   } catch {
@@ -294,10 +334,29 @@ async function accessToken(org, id, connection) {
     if (current.expiresAt > Date.now() + 60000) return current.access_token;
     const config = configFor(connection.provider);
     const google = connection.provider === 'google';
-    const updated = await providerJson(google ? 'https://oauth2.googleapis.com/token' : 'https://api.notion.com/v1/oauth/token', {
+    const notion = connection.provider === 'notion';
+    const microsoft = connection.provider === 'microsoft' || connection.provider === 'powerbi';
+    const tenant = microsoft ? (config.tenant || 'common') : null;
+    const refreshUrl = google
+      ? 'https://oauth2.googleapis.com/token'
+      : notion
+        ? 'https://api.notion.com/v1/oauth/token'
+        : `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`;
+    const scope = connection.provider === 'microsoft'
+      ? 'offline_access User.Read Files.ReadWrite'
+      : connection.provider === 'powerbi'
+        ? 'offline_access https://analysis.windows.net/powerbi/api/Dataset.ReadWrite.All'
+        : null;
+    const updated = await providerJson(refreshUrl, {
       method: 'POST',
-      headers: google ? {'Content-Type': 'application/x-www-form-urlencoded'} : {'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`},
-      body: google ? new URLSearchParams({grant_type: 'refresh_token', refresh_token: current.refresh_token, client_id: config.clientId, client_secret: config.clientSecret}).toString() : JSON.stringify({grant_type: 'refresh_token', refresh_token: current.refresh_token}),
+      headers: google || microsoft
+        ? {'Content-Type': 'application/x-www-form-urlencoded'}
+        : {'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`},
+      body: google
+        ? new URLSearchParams({grant_type: 'refresh_token', refresh_token: current.refresh_token, client_id: config.clientId, client_secret: config.clientSecret}).toString()
+        : notion
+          ? JSON.stringify({grant_type: 'refresh_token', refresh_token: current.refresh_token})
+          : new URLSearchParams({grant_type:'refresh_token', refresh_token:current.refresh_token, client_id:config.clientId, client_secret:config.clientSecret, scope}).toString(),
     });
     if (!updated.access_token) throw new Error('Token refresh failed');
     // Do not resurrect a credential removed during a refresh.
