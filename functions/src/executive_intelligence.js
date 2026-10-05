@@ -176,6 +176,8 @@ async function loadFacts(org){
     return due!=null&&due<now;
   });
   const connected=connections.docs.filter(doc=>doc.data().status==='connected').length;
+  const healthy=connections.docs.filter(doc=>doc.data().status==='connected'&&doc.data().health==='healthy').length;
+  const degraded=connections.docs.filter(doc=>doc.data().status==='connected'&&doc.data().health==='degraded').length;
   const syncConflicts=syncRuns.docs.reduce((n,doc)=>n+number(doc.data().conflicts),0);
   const syncCreated=syncRuns.docs.reduce((n,doc)=>n+number(doc.data().created),0);
   const syncUpdated=syncRuns.docs.reduce((n,doc)=>n+number(doc.data().updated),0);
@@ -223,6 +225,9 @@ async function loadFacts(org){
     connectors:{
       total:connections.size,
       connected,
+      healthy,
+      degraded,
+      unchecked:Math.max(0,connected-healthy-degraded),
       disconnected:Math.max(0,connections.size-connected),
       recentRuns:syncRuns.size,
       conflicts:syncConflicts,
