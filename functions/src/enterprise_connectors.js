@@ -77,7 +77,7 @@ const http = async (url, options={}) => {
   return boundedJson(payload);
 };
 
-const cleanBase = raw => {
+export const enterpriseBaseUrl = raw => {
   const url = new URL(String(raw));
   if(url.protocol !== 'https:' || url.username || url.password || url.hash || (url.port && url.port !== '443')) throw new Error('Connector URL must be public HTTPS on port 443');
   const host=url.hostname.replace(/^\[|\]$/g,'');
@@ -133,7 +133,7 @@ const schemas = {
 };
 
 async function salesforce(credential,name,args){
-  const base=cleanBase(credential.instance_url);
+  const base=enterpriseBaseUrl(credential.instance_url);
   const headers={Authorization:`Bearer ${credential.access_token}`,'Content-Type':'application/json'};
   let version=credential.api_version;
   if(!version){
@@ -160,7 +160,7 @@ async function salesforce(credential,name,args){
 }
 
 async function atlassian(credential,name,args){
-  const base=cleanBase(credential.site_url);
+  const base=enterpriseBaseUrl(credential.site_url);
   const auth=Buffer.from(`${credential.email}:${credential.api_token}`).toString('base64');
   const headers={Authorization:`Basic ${auth}`,'Content-Type':'application/json','Accept':'application/json'};
   if(name==='jira_projects') return http(`${base}/rest/api/3/project/search?maxResults=100`,{headers});
@@ -189,7 +189,7 @@ async function atlassian(credential,name,args){
 }
 
 async function zoho(credential,name,args){
-  const base=cleanBase(credential.api_domain||'https://www.zohoapis.com');
+  const base=enterpriseBaseUrl(credential.api_domain||'https://www.zohoapis.com');
   const headers={Authorization:`Zoho-oauthtoken ${credential.access_token}`,'Content-Type':'application/json'};
   if(name==='zoho_contacts') return http(`${base}/crm/v8/Contacts?page=${args.page}&per_page=${args.perPage}`,{headers});
   if(name==='zoho_deals') return http(`${base}/crm/v8/Deals?page=${args.page}&per_page=${args.perPage}`,{headers});
@@ -205,7 +205,7 @@ async function zoho(credential,name,args){
 }
 
 async function odooJson2(credential,model,method,body={}){
-  const base=cleanBase(credential.base_url);
+  const base=enterpriseBaseUrl(credential.base_url);
   const headers={
     Authorization:`Bearer ${credential.api_key}`,
     'Content-Type':'application/json',
