@@ -374,7 +374,12 @@ class _DashboardState extends State<Dashboard> {
                   onPressed: widget.onSwitchWorkspace,
                   icon: const Icon(Icons.business_rounded),
                 ),
-                IconButton(tooltip: 'Reseller platform', onPressed: _openResellerStudio, icon: const Icon(Icons.storefront_outlined)),
+              if (widget.isSuperAdmin)
+                IconButton(
+                  tooltip: 'Reseller platform',
+                  onPressed: _openResellerStudio,
+                  icon: const Icon(Icons.storefront_outlined),
+                ),
               if (compact) ...[
                 IconButton(
                   tooltip: 'Search apps',
