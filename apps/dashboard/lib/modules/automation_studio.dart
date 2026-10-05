@@ -261,6 +261,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
     var tools = _rows(connected.first['tools']);
     var toolName = tools.isEmpty ? '' : tools.first['name'].toString();
     var target = 'crm';
+    var schedule = 'manual';
 
     final approved = await showDialog<bool>(
       context: context,
@@ -343,6 +344,19 @@ class _AutomationStudioState extends State<AutomationStudio> {
                       if (value != null) target = value;
                     }),
                   ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: schedule,
+                    decoration: const InputDecoration(labelText: 'Schedule'),
+                    items: const [
+                      DropdownMenuItem(value: 'manual', child: Text('Manual only')),
+                      DropdownMenuItem(value: 'hourly', child: Text('Every hour')),
+                      DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                    ],
+                    onChanged: (value) => setDialogState(() {
+                      if (value != null) schedule = value;
+                    }),
+                  ),
                   const SizedBox(height: 10),
                   const Text(
                     'The source tool is sampled first. AI proposes field mappings; nothing syncs until you review and enable the rule.',
@@ -405,6 +419,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
           'mappings': mappings,
           'enabled': false,
           'conflictPolicy': 'skip_conflicts',
+          'schedule': schedule,
         },
       });
     } catch (error) {
@@ -438,6 +453,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
         'mappings': rule['mappings'],
         'enabled': enable,
         'conflictPolicy': rule['conflictPolicy'] ?? 'skip_conflicts',
+        'schedule': rule['schedule'] ?? 'manual',
       },
     });
   }
@@ -951,6 +967,8 @@ class _AutomationStudioState extends State<AutomationStudio> {
             rule['target'].toString() +
             ' · ' +
             rule['sourceTool'].toString() +
+            ' · ' +
+            (rule['schedule'] ?? 'manual').toString() +
             '\nConflict policy: ' +
             (rule['conflictPolicy'] ?? 'skip_conflicts').toString(),
         [
