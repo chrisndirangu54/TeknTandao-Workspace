@@ -144,6 +144,17 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
     catch (e) { toast('Could not add super admin: ' + e.toString(), bad: true); }
   }
 
+  Future<void> editUser(Map<String, dynamic> user) async {
+    final name = await prompt('Edit user', 'Display name');
+    if (name == null || name.isEmpty) return;
+    final email = await prompt('Edit user', 'Email');
+    if (email == null || email.isEmpty) return;
+    try {
+      await call('updatePlatformUser', {'uid': user['uid'], 'displayName': name, 'email': email});
+      await refresh();
+    } catch (e) { toast('Could not edit user: ' + e.toString(), bad: true); }
+  }
+
   Future<void> toggleUser(Map<String, dynamic> user) async {
     try {
       await call('updatePlatformUser', {'uid': user['uid'], 'disabled': user['disabled'] != true});
@@ -288,6 +299,7 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
             isThreeLine: true,
             trailing: Wrap(spacing: 4, children: [
               if (user['isSuperAdmin'] == true) const Chip(label: Text('Super admin')),
+              IconButton(onPressed: () => editUser(user), icon: const Icon(Icons.edit_outlined)),
               IconButton(onPressed: () => toggleUser(user), icon: Icon(user['disabled'] == true ? Icons.play_circle_outline : Icons.block_rounded)),
               IconButton(onPressed: () => deleteUser(user), icon: const Icon(Icons.delete_outline_rounded)),
             ]),
