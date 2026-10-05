@@ -1,8 +1,11 @@
 import './index.js';
 import {getFirestore, Timestamp} from 'firebase-admin/firestore';
+import {getStorage} from 'firebase-admin/storage';
+import {randomUUID} from 'node:crypto';
 import {defineSecret} from 'firebase-functions/params';
 import {HttpsError, onCall} from 'firebase-functions/v2/https';
 import {identifier} from './domain.js';
+import {exportFile, exportTypes} from './analytics_exports.js';
 
 const db=getFirestore();
 const region='europe-west1';
@@ -86,7 +89,7 @@ function anomaliesFromSeries(series){
     .map(item=>({period:item.period,value:item.value,severity:Math.abs(item.z)>=2.5?'high':'medium',z:Number(item.z.toFixed(2))}));
 }
 
-function deterministicRecommendations(facts){
+export function deterministicRecommendations(facts){
   const out=[];
   if(facts.inventory.lowStock>0)out.push({
     priority:facts.inventory.outOfStock>0?'high':'medium',
@@ -133,7 +136,7 @@ function deterministicRecommendations(facts){
   return out.slice(0,8);
 }
 
-async function loadFacts(org){
+export async function loadExecutiveFacts(org){
   const [
     sales,products,contacts,tickets,projects,expenses,connections,syncRuns,apps
   ]=await Promise.all([
@@ -246,7 +249,7 @@ async function loadFacts(org){
 
 export const getExecutiveIntelligence=publicCallable(async request=>{
   const {org}=await authorize(request);
-  const facts=await loadFacts(org);
+  const facts=await loadExecutiveFacts(org);
   const recommendations=deterministicRecommendations(facts);
   return {
     generatedAt:Date.now(),
@@ -260,9 +263,54 @@ export const getExecutiveIntelligence=publicCallable(async request=>{
   };
 });
 
+
+function exportBucket(){
+  const bucket=getStorage().bucket();
+  if(!bucket?.name)throw new Error('Configure the Firebase Storage bucket before exporting reports');
+  return bucket;
+}
+
+export const exportExecutiveIntelligence=publicCallable(async request=>{
+  const {org,user}=await authorize(request);
+  const format=String(request.data?.format||'').toLowerCase();
+  if(!Object.hasOwn(exportTypes,format))throw new Error('Unsupported export format');
+  const facts=await loadExecutiveFacts(org);
+  const intelligence={
+    generatedAt:Date.now(),
+    facts,
+    recommendations:deterministicRecommendations(facts),
+  };
+  const file=exportFile(intelligence,format);
+  const id=randomUUID();
+  const filename=`tekntandao-executive-intelligence-${new Date().toISOString().slice(0,10)}.${file.ext}`;
+  const path=`analytics-exports/${org.id}/${id}/${filename}`;
+  const object=exportBucket().file(path);
+  await object.save(file.data,{
+    resumable:false,
+    contentType:file.mime,
+    metadata:{
+      cacheControl:'private, max-age=0, no-store',
+      metadata:{
+        orgId:org.id,
+        createdBy:user,
+        sha256:file.sha256,
+        exportFormat:format,
+      },
+    },
+  });
+  const expiresAt=Date.now()+30*60*1000;
+  const [url]=await object.getSignedUrl({version:'v4',action:'read',expires:expiresAt});
+  await org.collection('analyticsExports').doc(id).set({
+    id,filename,format,mime:file.mime,size:file.data.length,storagePath:path,
+    sha256:file.sha256,createdBy:user,createdAt:Timestamp.now(),
+    expiresAt:Timestamp.fromMillis(Date.now()+7*86400000),
+  });
+  return {id,filename,format,mime:file.mime,size:file.data.length,url,expiresAt};
+});
+
 export const generateExecutiveBrief=publicCallable(async request=>{
   const {org}=await authorize(request);
-  const facts=await loadFacts(org);
+  const facts=await loadExecutiveFacts(org);
   const deterministic=deterministicRecommendations(facts);
   if(request.data?.useAi!==true){
     return {
