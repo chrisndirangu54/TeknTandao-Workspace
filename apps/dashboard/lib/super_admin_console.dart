@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'platform_security_panel.dart';
 
 class SuperAdminGate {
   static Future<Map<String, dynamic>> context() async {
@@ -263,6 +264,25 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
     }
   }
 
+  Future<void> revokeSessions(Map<String, dynamic> user) async {
+    try {
+      await call('revokePlatformUserSessions', {'uid': user['uid']});
+      toast('All refresh sessions revoked for ' + (user['email'] ?? user['uid']).toString() + '.');
+    } catch (e) { toast('Could not revoke sessions: ' + e.toString(), bad: true); }
+  }
+
+  Future<void> emergencyLock(Map<String, dynamic> user) async {
+    final identity = (user['email'] ?? user['uid']).toString();
+    final expected = 'LOCK ' + identity;
+    final confirmation = await prompt('Emergency account lock', 'Type exactly: ' + expected);
+    if (confirmation != expected) return;
+    try {
+      await call('emergencyDisablePlatformUser', {'uid': user['uid'], 'confirmation': confirmation});
+      toast('Account disabled and all sessions revoked.');
+      await refresh();
+    } catch (e) { toast('Could not lock account: ' + e.toString(), bad: true); }
+  }
+
   Future<void> editUser(Map<String, dynamic> user) async {
     final name = await prompt('Edit user', 'Display name');
     if (name == null || name.isEmpty) return;
@@ -367,6 +387,7 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                           ButtonSegment(value: 0, label: Text('Users'), icon: Icon(Icons.people_rounded)),
                           ButtonSegment(value: 1, label: Text('Workspaces'), icon: Icon(Icons.domain_rounded)),
                           ButtonSegment(value: 2, label: Text('Admins'), icon: Icon(Icons.shield_rounded)),
+                          ButtonSegment(value: 3, label: Text('Security'), icon: Icon(Icons.enhanced_encryption_rounded)),
                         ],
                         selected: {tab},
                         onSelectionChanged: (v) => setState(() => tab = v.first),
@@ -377,6 +398,7 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                       child: switch (tab) {
                         1 => workspaceList(workspaces),
                         2 => adminList(admins),
+                        3 => const PlatformSecurityPanel(),
                         _ => userList(users),
                       },
                     ),
@@ -420,6 +442,8 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
               if (user['isSuperAdmin'] == true) const Chip(label: Text('Super admin')),
               IconButton(tooltip: 'Edit user', onPressed: () => editUser(user), icon: const Icon(Icons.edit_outlined)),
               IconButton(tooltip: 'Password reset', onPressed: () => resetPassword(user), icon: const Icon(Icons.password_rounded)),
+              IconButton(tooltip: 'Revoke all sessions', onPressed: () => revokeSessions(user), icon: const Icon(Icons.logout_rounded)),
+              IconButton(tooltip: 'Emergency lock', onPressed: () => emergencyLock(user), icon: const Icon(Icons.lock_person_outlined)),
               IconButton(onPressed: () => toggleUser(user), icon: Icon(user['disabled'] == true ? Icons.play_circle_outline : Icons.block_rounded)),
               IconButton(onPressed: () => deleteUser(user), icon: const Icon(Icons.delete_outline_rounded)),
             ]),
