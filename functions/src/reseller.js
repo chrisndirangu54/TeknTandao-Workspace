@@ -28,10 +28,16 @@ function callable(work, secrets = [], network = false) {
     catch (error) { if (error instanceof HttpsError) throw error; throw new HttpsError('failed-precondition', error instanceof z.ZodError ? 'Invalid input. Check the required fields.' : String(error.message || 'Request failed').slice(0, 500)); }
   });
 }
+function isSuperAdminRequest(request) {
+  const email = String(request.auth?.token?.email || '').toLowerCase();
+  return request.auth?.token?.superAdmin === true ||
+    (email === 'chrisndirangu54@gmail.com' && request.auth?.token?.email_verified === true);
+}
 async function authorize(request, reseller = false) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first');
   const org = root(request.data.orgId), uid = request.auth.uid;
   if ((await org.collection('members').doc(uid).get()).data()?.role !== 'owner') throw new HttpsError('permission-denied', 'Workspace owner access required');
+  if (reseller && !isSuperAdminRequest(request)) throw new HttpsError('permission-denied', 'Super administrator access required');
   if (reseller && !(await db.doc(`resellerAccounts/${org.id}`).get()).data()?.enabled) throw new HttpsError('permission-denied', 'This workspace needs platform-approved reseller access');
   return {org, uid};
 }
@@ -41,11 +47,12 @@ async function pricing(org) {
   return resellerPricingSchema.parse(policy);
 }
 export const setResellerAccount = callable(async request => {
-  if (request.auth?.token?.platformAdmin !== true) throw new HttpsError('permission-denied', 'Platform administrator required');
+  if (!isSuperAdminRequest(request)) throw new HttpsError('permission-denied', 'Super administrator required');
   await db.doc(`resellerAccounts/${identifier(request.data.workspaceId)}`).set({enabled: request.data.enabled === true, updatedBy: request.auth.uid, updatedAt: stamp()});
   return {ok: true};
 });
 export const getResellerStudio = callable(async request => {
+  if (!isSuperAdminRequest(request)) throw new HttpsError('permission-denied', 'Super administrator required');
   const {org} = await authorize(request);
   const [account, policy, library, projects, sold, bought, invoices, usage, costs] = await Promise.all([
     db.doc(`resellerAccounts/${org.id}`).get(), org.collection('resellerSettings').doc('pricing').get(),
