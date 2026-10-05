@@ -155,6 +155,109 @@ async function refreshMicrosoftToken(org,id,provider,credential){
   await credentials(org,id).set(encryptCredential(merged,encryptionKey.value(),org.id+'/'+id));
   return merged.access_token;
 }
+
+async function googleToken(org,id){
+  const connection=(await org.collection('toolConnections').doc(automationId.parse(id)).get()).data();
+  if(!connection||connection.status!=='connected'||connection.provider!=='google')throw new Error('Select a connected Google Workspace connection');
+  const credential=await readCredential(org,id);
+  if(!credential.expiresAt||credential.expiresAt>Date.now()+60000)return credential.access_token;
+  if(!credential.refresh_token)throw new Error('Google Workspace connection expired; reconnect');
+  const config=oauthConfigFor('google');
+  const updated=await providerJson('https://oauth2.googleapis.com/token',{
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({
+      grant_type:'refresh_token',
+      refresh_token:credential.refresh_token,
+      client_id:config.clientId,
+      client_secret:config.clientSecret,
+    }).toString(),
+  });
+  const merged={...credential,...updated,expiresAt:Date.now()+(updated.expires_in||3600)*1000};
+  await credentials(org,id).set(encryptCredential(merged,encryptionKey.value(),org.id+'/'+id));
+  return merged.access_token;
+}
+async function googleApi(url,token,options={}){
+  const response=await fetch(url,{
+    ...options,
+    headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',...(options.headers||{})},
+    redirect:'error',
+    signal:AbortSignal.timeout(60000),
+  });
+  const text=await response.text();
+  let payload={};
+  try{payload=text?JSON.parse(text):{};}catch{payload={raw:text};}
+  if(!response.ok)throw new Error(payload?.error?.message||('Google Workspace API returned '+response.status));
+  return payload;
+}
+async function ensureGoogleExportFolder(token){
+  const q="name = 'TeknTandao Exports' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+  const found=await googleApi('https://www.googleapis.com/drive/v3/files?pageSize=10&fields=files(id,name)&q='+encodeURIComponent(q),token);
+  if(found.files?.[0]?.id)return found.files[0].id;
+  const created=await googleApi('https://www.googleapis.com/drive/v3/files?fields=id,name',token,{
+    method:'POST',
+    body:JSON.stringify({name:'TeknTandao Exports',mimeType:'application/vnd.google-apps.folder'}),
+  });
+  if(!created.id)throw new Error('Google Drive did not return the export folder id');
+  return created.id;
+}
+async function moveGoogleFileToFolder(token,fileId,folderId){
+  const meta=await googleApi('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId)+'?fields=parents',token);
+  const remove=(meta.parents||[]).join(',');
+  const params=new URLSearchParams({addParents:folderId,fields:'id,name,webViewLink'});
+  if(remove)params.set('removeParents',remove);
+  return googleApi('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId)+'?'+params.toString(),token,{method:'PATCH',body:'{}'});
+}
+function tableValues(rows){
+  if(!rows.length)return [['No data']];
+  const columns=[...new Set(rows.flatMap(row=>Object.keys(row)))];
+  return [columns,...rows.map(row=>columns.map(column=>{
+    const value=row[column];
+    if(value===null||value===undefined)return '';
+    if(typeof value==='number'||typeof value==='boolean')return value;
+    return String(value);
+  }))];
+}
+function googleDocText(title,data){
+  return [
+    title,
+    '',
+    ...sectionsFrom(data).flatMap(section=>[
+      section.heading,
+      ...section.lines.map(line=>'• '+line),
+      '',
+    ]),
+  ].join('\n');
+}
+function googleSlidesRequests(slides){
+  const requests=[];
+  slides.forEach((slide,index)=>{
+    const slideId='tt_slide_'+index;
+    requests.push({createSlide:{objectId:slideId,slideLayoutReference:{predefinedLayout:'BLANK'}}});
+    const titleId='tt_title_'+index;
+    requests.push({createShape:{objectId:titleId,shapeType:'TEXT_BOX',elementProperties:{pageObjectId:slideId,size:{width:{magnitude:780,unit:'PT'},height:{magnitude:55,unit:'PT'}},transform:{scaleX:1,scaleY:1,translateX:45,translateY:28,unit:'PT'}}}});
+    requests.push({insertText:{objectId:titleId,text:slide.title}});
+    requests.push({updateTextStyle:{objectId:titleId,textRange:{type:'ALL'},style:{bold:true,fontSize:{magnitude:26,unit:'PT'},foregroundColor:{opaqueColor:{rgbColor:{red:0.0588,green:0.0902,blue:0.1647}}}},fields:'bold,fontSize,foregroundColor'}});
+    if(slide.bars?.length){
+      const max=Math.max(1,...slide.bars.map(item=>Number(item.value)||0));
+      slide.bars.slice(0,6).forEach((item,i)=>{
+        const y=115+i*58,labelId='tt_label_'+index+'_'+i,barId='tt_bar_'+index+'_'+i,valueId='tt_value_'+index+'_'+i;
+        requests.push({createShape:{objectId:labelId,shapeType:'TEXT_BOX',elementProperties:{pageObjectId:slideId,size:{width:{magnitude:150,unit:'PT'},height:{magnitude:28,unit:'PT'}},transform:{scaleX:1,scaleY:1,translateX:45,translateY:y,unit:'PT'}}}});
+        requests.push({insertText:{objectId:labelId,text:String(item.label)}});
+        requests.push({createShape:{objectId:barId,shapeType:'RECTANGLE',elementProperties:{pageObjectId:slideId,size:{width:{magnitude:Math.max(20,(Number(item.value)||0)/max*430),unit:'PT'},height:{magnitude:20,unit:'PT'}},transform:{scaleX:1,scaleY:1,translateX:205,translateY:y+2,unit:'PT'}}}});
+        requests.push({updateShapeProperties:{objectId:barId,shapeProperties:{shapeBackgroundFill:{solidFill:{color:{rgbColor:{red:0.145,green:0.388,blue:0.922}},alpha:1}},outline:{propertyState:'NOT_RENDERED'}},fields:'shapeBackgroundFill.solidFill,outline.propertyState'}});
+        requests.push({createShape:{objectId:valueId,shapeType:'TEXT_BOX',elementProperties:{pageObjectId:slideId,size:{width:{magnitude:100,unit:'PT'},height:{magnitude:28,unit:'PT'}},transform:{scaleX:1,scaleY:1,translateX:650,translateY:y,unit:'PT'}}}});
+        requests.push({insertText:{objectId:valueId,text:String(item.value)}});
+      });
+    }else{
+      const bodyId='tt_body_'+index;
+      requests.push({createShape:{objectId:bodyId,shapeType:'TEXT_BOX',elementProperties:{pageObjectId:slideId,size:{width:{magnitude:760,unit:'PT'},height:{magnitude:430,unit:'PT'}},transform:{scaleX:1,scaleY:1,translateX:60,translateY:105,unit:'PT'}}}});
+      requests.push({insertText:{objectId:bodyId,text:(slide.lines||[]).slice(0,12).map(line=>'• '+line).join('\n')}});
+      requests.push({updateTextStyle:{objectId:bodyId,textRange:{type:'ALL'},style:{fontSize:{magnitude:17,unit:'PT'},foregroundColor:{opaqueColor:{rgbColor:{red:0.2,green:0.2549,blue:0.3333}}}},fields:'fontSize,foregroundColor'}});
+    }
+  });
+  return requests;
+}
 async function microsoftToken(org,id,provider){
   const connection=(await org.collection('toolConnections').doc(automationId.parse(id)).get()).data();
   if(!connection||connection.status!=='connected'||connection.provider!==provider)throw new Error('Select a connected '+provider+' connection');
@@ -183,6 +286,100 @@ export const exportExecutiveReport=callable(async request=>{
   const filename=title+'.'+format;
   return savePrivateExport(org,user,filename,format,buffer);
 });
+
+
+export const exportExecutiveReportToGoogleWorkspace=callable(async request=>{
+  const {org,user}=await authorize(request,{ownerOnly:true});
+  const connectionId=automationId.parse(request.data.connectionId);
+  const target=z.enum(['drive','sheets','docs','slides']).parse(request.data.target);
+  const title=cleanFilename(request.data.title||'TeknTandao Executive Intelligence');
+  const token=await googleToken(org,connectionId);
+  const facts=await loadExecutiveFacts(org),data=reportData(facts);
+  const folderId=await ensureGoogleExportFolder(token);
+  let result;
+
+  if(target==='drive'){
+    const format=z.enum(['csv','xlsx','pptx','docx','pdf']).parse(request.data.format);
+    const buffer=render(format,data,title),filename=title+'.'+format,boundary='tekntandao_'+randomUUID();
+    const metadata={name:filename,parents:[folderId]};
+    const body=Buffer.concat([
+      Buffer.from('--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(metadata)+'\r\n--'+boundary+'\r\nContent-Type: '+mimeFor(format)+'\r\n\r\n','utf8'),
+      buffer,
+      Buffer.from('\r\n--'+boundary+'--','utf8'),
+    ]);
+    const response=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},
+      body,redirect:'error',signal:AbortSignal.timeout(60000),
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload?.error?.message||'Google Drive upload failed');
+    result={providerItemId:payload.id||null,webUrl:payload.webViewLink||null,filename,format};
+  }
+
+  if(target==='sheets'){
+    const tabs={
+      KPIs:data.kpis,
+      SalesTrend:data.salesTrend,
+      Inventory:data.inventoryHealth,
+      Support:data.supportStatus,
+      Connectors:data.connectorProviders,
+      Recommendations:data.recommendations,
+    };
+    const names=Object.keys(tabs);
+    const created=await googleApi('https://sheets.googleapis.com/v4/spreadsheets',token,{
+      method:'POST',
+      body:JSON.stringify({properties:{title},sheets:names.map(name=>({properties:{title:name}}))}),
+    });
+    const values=names.map(name=>({range:name+'!A1',majorDimension:'ROWS',values:tableValues(tabs[name])}));
+    await googleApi('https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(created.spreadsheetId)+'/values:batchUpdate',token,{
+      method:'POST',
+      body:JSON.stringify({valueInputOption:'RAW',data:values}),
+    });
+    const moved=await moveGoogleFileToFolder(token,created.spreadsheetId,folderId);
+    result={providerItemId:created.spreadsheetId,webUrl:moved.webViewLink||created.spreadsheetUrl||null,format:'google-sheets'};
+  }
+
+  if(target==='docs'){
+    const created=await googleApi('https://docs.googleapis.com/v1/documents',token,{method:'POST',body:JSON.stringify({title})});
+    const text=googleDocText(title,data);
+    await googleApi('https://docs.googleapis.com/v1/documents/'+encodeURIComponent(created.documentId)+':batchUpdate',token,{
+      method:'POST',
+      body:JSON.stringify({requests:[{insertText:{location:{index:1},text}}]}),
+    });
+    const moved=await moveGoogleFileToFolder(token,created.documentId,folderId);
+    result={providerItemId:created.documentId,webUrl:moved.webViewLink||('https://docs.google.com/document/d/'+created.documentId+'/edit'),format:'google-docs'};
+  }
+
+  if(target==='slides'){
+    const created=await googleApi('https://slides.googleapis.com/v1/presentations',token,{method:'POST',body:JSON.stringify({title})});
+    const requests=googleSlidesRequests(slidesFrom(data));
+    if(requests.length){
+      await googleApi('https://slides.googleapis.com/v1/presentations/'+encodeURIComponent(created.presentationId)+':batchUpdate',token,{
+        method:'POST',
+        body:JSON.stringify({requests}),
+      });
+    }
+    const moved=await moveGoogleFileToFolder(token,created.presentationId,folderId);
+    result={providerItemId:created.presentationId,webUrl:moved.webViewLink||('https://docs.google.com/presentation/d/'+created.presentationId+'/edit'),format:'google-slides'};
+  }
+
+  if(!result)throw new Error('Google Workspace export did not produce a result');
+  const id='export_'+randomUUID();
+  await org.collection('reportExports').doc(id).set({
+    id,
+    format:result.format,
+    destination:'google-workspace',
+    target,
+    connectionId,
+    providerItemId:result.providerItemId,
+    webUrl:result.webUrl||null,
+    filename:result.filename||null,
+    createdBy:user,
+    createdAt:stamp(),
+  });
+  return {id,...result,target};
+},[encryptionKey,oauthConfig]);
 
 export const exportExecutiveReportToOneDrive=callable(async request=>{
   const {org,user}=await authorize(request,{ownerOnly:true});
