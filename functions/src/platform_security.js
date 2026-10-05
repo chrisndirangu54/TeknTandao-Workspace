@@ -2,7 +2,7 @@ import './index.js';
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue, getFirestore} from 'firebase-admin/firestore';
 import {HttpsError, onCall} from 'firebase-functions/v2/https';
-import {SecretManagerServiceClient} from '@google-cloud/secret-manager';
+import {applicationDefault} from 'firebase-admin/app';
 import {z} from 'zod';
 import {
   isBootstrapSuperAdminToken,
@@ -11,7 +11,6 @@ import {
 
 const db = getFirestore();
 const auth = getAuth();
-const secrets = new SecretManagerServiceClient();
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
 const secretId = z.string().trim().min(1).max(255).regex(/^[A-Za-z0-9_-]+$/);
@@ -77,37 +76,58 @@ function lastSegment(name = '') {
   return name.split('/').filter(Boolean).at(-1) || '';
 }
 
+async function googleToken() {
+  const credential = applicationDefault();
+  const token = await credential.getAccessToken();
+  if (!token?.access_token) throw new Error('Unable to obtain Google Cloud access token');
+  return token.access_token;
+}
+
+async function secretManagerJson(path, {method = 'GET', body} = {}) {
+  const token = await googleToken();
+  const response = await fetch('https://secretmanager.googleapis.com/v1/' + path, {
+    method,
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    ...(body === undefined ? {} : {body: JSON.stringify(body)}),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload?.error?.message || ('Secret Manager request failed (' + response.status + ')');
+    const error = new Error(message);
+    error.code = response.status;
+    throw error;
+  }
+  return payload;
+}
+
 async function listVersionsFor(name) {
-  const [versions] = await secrets.listSecretVersions({parent: name});
-  return versions
+  const payload = await secretManagerJson(name + '/versions?pageSize=20');
+  return (payload.versions || [])
     .filter((v) => v.name && lastSegment(v.name) !== '0')
     .map((v) => ({
       version: lastSegment(v.name),
       state: v.state || 'STATE_UNSPECIFIED',
-      createTime: v.createTime?.seconds
-        ? new Date(Number(v.createTime.seconds) * 1000).toISOString()
-        : null,
-      destroyTime: v.destroyTime?.seconds
-        ? new Date(Number(v.destroyTime.seconds) * 1000).toISOString()
-        : null,
+      createTime: v.createTime || null,
+      destroyTime: v.destroyTime || null,
     }))
     .sort((a, b) => Number(b.version) - Number(a.version));
 }
 
 export const getPlatformSecretVault = callable(async request => {
   requireSuperAdmin(request);
-  const [items] = await secrets.listSecrets({parent: parent(), pageSize: 200});
+  const listed = await secretManagerJson(parent() + '/secrets?pageSize=200');
   const rows = [];
-  for (const item of items) {
+  for (const item of listed.secrets || []) {
     if (!item.name) continue;
     const id = lastSegment(item.name);
     const versions = await listVersionsFor(item.name);
     rows.push({
       id,
       labels: item.labels || {},
-      createTime: item.createTime?.seconds
-        ? new Date(Number(item.createTime.seconds) * 1000).toISOString()
-        : null,
+      createTime: item.createTime || null,
       latestVersion: versions[0] || null,
       versions: versions.slice(0, 20),
       replication: item.replication?.automatic ? 'automatic' : 'user-managed',
@@ -132,24 +152,20 @@ export const createPlatformSecret = callable(async request => {
 
   const name = resource(input.id);
   try {
-    await secrets.getSecret({name});
+    await secretManagerJson(name);
     throw new HttpsError('already-exists', 'Secret already exists; rotate it instead');
   } catch (error) {
     if (error instanceof HttpsError) throw error;
-    if (![5, '5', 'NOT_FOUND'].includes(error?.code)) throw error;
+    if (Number(error?.code) !== 404) throw error;
   }
 
-  await secrets.createSecret({
-    parent: parent(),
-    secretId: input.id,
-    secret: {
-      replication: {automatic: {}},
-      labels: input.labels,
-    },
+  await secretManagerJson(parent() + '/secrets?secretId=' + encodeURIComponent(input.id), {
+    method: 'POST',
+    body: {replication: {automatic: {}}, labels: input.labels},
   });
-  const [version] = await secrets.addSecretVersion({
-    parent: name,
-    payload: {data: Buffer.from(input.value, 'utf8')},
+  const version = await secretManagerJson(name + ':addVersion', {
+    method: 'POST',
+    body: {payload: {data: Buffer.from(input.value, 'utf8').toString('base64')}},
   });
   await audit(actor, 'secret.create', {
     secretId: input.id,
@@ -166,23 +182,23 @@ export const rotatePlatformSecret = callable(async request => {
     disablePrevious: z.boolean().default(false),
   }).strict().parse(request.data);
   const name = resource(input.id);
-  await secrets.getSecret({name});
+  await secretManagerJson(name);
 
-  const [before] = await secrets.listSecretVersions({parent: name});
-  const active = before
+  const before = await secretManagerJson(name + '/versions?pageSize=100');
+  const active = (before.versions || [])
     .filter(v => v.state === 'ENABLED' && lastSegment(v.name) !== '0')
     .sort((a, b) => Number(lastSegment(b.name)) - Number(lastSegment(a.name)));
 
-  const [created] = await secrets.addSecretVersion({
-    parent: name,
-    payload: {data: Buffer.from(input.value, 'utf8')},
+  const created = await secretManagerJson(name + ':addVersion', {
+    method: 'POST',
+    body: {payload: {data: Buffer.from(input.value, 'utf8').toString('base64')}},
   });
   const createdVersion = lastSegment(created.name);
 
   if (input.disablePrevious) {
     for (const previous of active) {
       if (!previous.name || lastSegment(previous.name) === createdVersion) continue;
-      await secrets.disableSecretVersion({name: previous.name});
+      await secretManagerJson(previous.name + ':disable', {method: 'POST', body: {}});
     }
   }
 
@@ -202,8 +218,8 @@ export const setPlatformSecretVersionState = callable(async request => {
     enabled: z.boolean(),
   }).strict().parse(request.data);
   const name = versionResource(input.id, input.version);
-  if (input.enabled) await secrets.enableSecretVersion({name});
-  else await secrets.disableSecretVersion({name});
+  if (input.enabled) await secretManagerJson(name + ':enable', {method: 'POST', body: {}});
+  else await secretManagerJson(name + ':disable', {method: 'POST', body: {}});
   await audit(actor, input.enabled ? 'secret.version.enable' : 'secret.version.disable', {
     secretId: input.id,
     version: input.version,
@@ -222,7 +238,7 @@ export const destroyPlatformSecretVersion = callable(async request => {
   if (input.confirmation !== expected) {
     throw new HttpsError('failed-precondition', `Type exactly: ${expected}`);
   }
-  await secrets.destroySecretVersion({name: versionResource(input.id, input.version)});
+  await secretManagerJson(versionResource(input.id, input.version) + ':destroy', {method: 'POST', body: {}});
   await audit(actor, 'secret.version.destroy', {
     secretId: input.id,
     version: input.version,
@@ -240,7 +256,7 @@ export const deletePlatformSecret = callable(async request => {
   if (input.confirmation !== expected) {
     throw new HttpsError('failed-precondition', `Type exactly: ${expected}`);
   }
-  await secrets.deleteSecret({name: resource(input.id)});
+  await secretManagerJson(resource(input.id), {method: 'DELETE'});
   await audit(actor, 'secret.delete', {secretId: input.id});
   return {ok: true};
 });
