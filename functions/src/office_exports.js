@@ -1,10 +1,11 @@
 import './index.js';
 import {randomUUID} from 'node:crypto';
 import {getApp} from 'firebase-admin/app';
-import {FieldValue, getFirestore} from 'firebase-admin/firestore';
+import {FieldValue, Timestamp, getFirestore} from 'firebase-admin/firestore';
 import {getStorage} from 'firebase-admin/storage';
 import {defineSecret} from 'firebase-functions/params';
 import {HttpsError, onCall} from 'firebase-functions/v2/https';
+import {onSchedule} from 'firebase-functions/v2/scheduler';
 import {z} from 'zod';
 import {automationId, decryptCredential, encryptCredential} from './automation_domain.js';
 import {providerJson} from './automation_connectors.js';
@@ -106,7 +107,14 @@ function slidesFrom(data){
   ];
 }
 function render(format,data,title){
-  if(format==='csv')return buildCsv(data.kpis);
+  if(format==='csv')return buildCsv([
+    ...data.kpis.map(row=>({section:'KPI',...row})),
+    ...data.salesTrend.map(row=>({section:'SalesTrend',metric:row.period,value:row.valueMinor,detail:'count='+row.count})),
+    ...data.inventoryHealth.map(row=>({section:'InventoryHealth',metric:row.status,value:row.count,detail:''})),
+    ...data.supportStatus.map(row=>({section:'SupportStatus',metric:row.status,value:row.count,detail:''})),
+    ...data.connectorProviders.map(row=>({section:'ConnectorProvider',metric:row.provider,value:row.count,detail:''})),
+    ...data.recommendations.map(row=>({section:'Recommendation',metric:row.title,value:row.priority,detail:row.reason+' Action: '+row.action})),
+  ]);
   if(format==='xlsx')return buildXlsx({KPIs:data.kpis,SalesTrend:data.salesTrend,Inventory:data.inventoryHealth,Support:data.supportStatus,Connectors:data.connectorProviders,Recommendations:data.recommendations});
   if(format==='docx')return buildDocx(title,sectionsFrom(data));
   if(format==='pptx')return buildPptx(slidesFrom(data));
@@ -123,7 +131,8 @@ async function readCredential(org,id){
   return decryptCredential(snapshot.data(),encryptionKey.value(),org.id+'/'+id);
 }
 function oauthConfigFor(provider){
-  const config=JSON.parse(oauthConfig.value()||'{}')[provider];
+  const all=JSON.parse(oauthConfig.value()||'{}');
+  const config=all[provider]||(provider==='powerbi'?all.microsoft:null);
   if(!config?.clientId||!config?.clientSecret)throw new Error('Configure '+provider+' OAuth credentials');
   return config;
 }
@@ -161,7 +170,7 @@ async function savePrivateExport(org,user,filename,format,buffer){
   const expires=Date.now()+15*60*1000;
   const [url]=await file.getSignedUrl({version:'v4',action:'read',expires});
   await org.collection('reportExports').doc(id).set({
-    id,filename,format,size:buffer.length,storagePath:path,createdBy:user,createdAt:stamp(),expiresAt:expires,destination:'download',
+    id,filename,format,size:buffer.length,storagePath:path,createdBy:user,createdAt:stamp(),expiresAt:expires,retainedUntil:Timestamp.fromMillis(Date.now()+7*86400000),destination:'download',
   });
   return {id,filename,format,size:buffer.length,url,expiresAt:expires};
 }
@@ -244,4 +253,32 @@ export const getReportExportHistory=callable(async request=>{
   const {org}=await authorize(request);
   const snapshots=await org.collection('reportExports').orderBy('createdAt','desc').limit(50).get();
   return {exports:snapshots.docs.map(doc=>{const data=doc.data();return {...data,id:doc.id,createdAt:data.createdAt?.toMillis?.()??null};})};
+});
+
+
+export const purgeExpiredReportExports=onSchedule({
+  schedule:'every 24 hours',
+  region,
+  timeZone:'UTC',
+  timeoutSeconds:300,
+  memory:'256MiB',
+},async()=>{
+  const expired=await db.collectionGroup('reportExports')
+    .where('retainedUntil','<=',Timestamp.now())
+    .limit(200)
+    .get();
+  for(const doc of expired.docs){
+    try{
+      const data=doc.data();
+      if(data.storagePath)await bucket().file(data.storagePath).delete({ignoreNotFound:true});
+      await doc.ref.set({
+        storagePath:null,
+        state:'source_purged',
+        purgedAt:stamp(),
+        retainedUntil:FieldValue.delete(),
+      },{merge:true});
+    }catch(error){
+      console.error('Report export purge failed',doc.ref.path,error);
+    }
+  }
 });
