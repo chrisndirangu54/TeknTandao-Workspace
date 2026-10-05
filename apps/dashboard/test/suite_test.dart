@@ -127,7 +127,7 @@ void main() {
     expect(store.records['apps']!.single['id'], 'crm');
     await tester.tap(find.byKey(const Key('open-crm')));
     await tester.pumpAndSettle();
-    expect(find.text('Add record'), findsOneWidget);
+    expect(find.text('Add customer'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
