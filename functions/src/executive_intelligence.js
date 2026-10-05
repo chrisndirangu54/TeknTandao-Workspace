@@ -89,7 +89,7 @@ function anomaliesFromSeries(series){
     .map(item=>({period:item.period,value:item.value,severity:Math.abs(item.z)>=2.5?'high':'medium',z:Number(item.z.toFixed(2))}));
 }
 
-function deterministicRecommendations(facts){
+export function deterministicRecommendations(facts){
   const out=[];
   if(facts.inventory.lowStock>0)out.push({
     priority:facts.inventory.outOfStock>0?'high':'medium',
@@ -136,7 +136,7 @@ function deterministicRecommendations(facts){
   return out.slice(0,8);
 }
 
-async function loadFacts(org){
+export async function loadExecutiveFacts(org){
   const [
     sales,products,contacts,tickets,projects,expenses,connections,syncRuns,apps
   ]=await Promise.all([
@@ -249,7 +249,7 @@ async function loadFacts(org){
 
 export const getExecutiveIntelligence=publicCallable(async request=>{
   const {org}=await authorize(request);
-  const facts=await loadFacts(org);
+  const facts=await loadExecutiveFacts(org);
   const recommendations=deterministicRecommendations(facts);
   return {
     generatedAt:Date.now(),
@@ -274,7 +274,7 @@ export const exportExecutiveIntelligence=publicCallable(async request=>{
   const {org,user}=await authorize(request);
   const format=String(request.data?.format||'').toLowerCase();
   if(!Object.hasOwn(exportTypes,format))throw new Error('Unsupported export format');
-  const facts=await loadFacts(org);
+  const facts=await loadExecutiveFacts(org);
   const intelligence={
     generatedAt:Date.now(),
     facts,
@@ -310,7 +310,7 @@ export const exportExecutiveIntelligence=publicCallable(async request=>{
 
 export const generateExecutiveBrief=publicCallable(async request=>{
   const {org}=await authorize(request);
-  const facts=await loadFacts(org);
+  const facts=await loadExecutiveFacts(org);
   const deterministic=deterministicRecommendations(facts);
   if(request.data?.useAi!==true){
     return {
