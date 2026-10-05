@@ -2,6 +2,7 @@ import './index.js';
 import {createHash, randomBytes, randomUUID} from 'node:crypto';
 import {getFirestore, FieldValue, Timestamp} from 'firebase-admin/firestore';
 import {getAuth} from 'firebase-admin/auth';
+import {getStorage} from 'firebase-admin/storage';
 import {defineSecret} from 'firebase-functions/params';
 import {onCall, onRequest, HttpsError} from 'firebase-functions/v2/https';
 import {onDocumentCreated} from 'firebase-functions/v2/firestore';
@@ -13,6 +14,7 @@ import {z} from 'zod';
 import {automationId, boundedJson, decryptCredential, encryptCredential, featureInput, featureSchema, hasPaidSubscription, resolveArguments, runCustomCode, workflowSchema} from './automation_domain.js';
 import {builtinTools, callBuiltin, callMcp, discoverMcp, providerJson, remoteUrl} from './automation_connectors.js';
 import {enterpriseBuiltinTools, callEnterpriseBuiltin, validateEnterpriseConnection, validateEnterpriseCredential} from './enterprise_connectors.js';
+import {loadExecutiveFacts} from './executive_intelligence.js';
 
 const db = getFirestore();
 const region = 'europe-west1';
@@ -108,7 +110,7 @@ export const connectBusinessTool = callable(async request => {
 export const connectEnterpriseTool = callable(async request => {
   const {org, uid} = await authorize(request);
   const input = z.object({
-    provider: z.enum(['salesforce', 'atlassian', 'zoho', 'odoo']),
+    provider: z.enum(['salesforce', 'atlassian', 'zoho', 'odoo', 'microsoft365', 'powerbi']),
     name: z.string().trim().min(1).max(120),
     credential: z.record(z.any()),
   }).strict().parse(request.data.connection);
@@ -161,6 +163,8 @@ function healthProbe(connection) {
     salesforce:['salesforce_accounts',{limit:1}],
     atlassian:['jira_projects',{}],
     zoho:['zoho_contacts',{page:1,perPage:1}],
+    microsoft365:['m365_drive_files',{limit:1}],
+    powerbi:['powerbi_workspaces',{limit:1}],
     odoo:['odoo_contacts',{limit:1}],
   })[connection.provider] || null;
 }
@@ -209,6 +213,87 @@ export const refreshConnectorHealth = onSchedule({
     try{await probeToolConnection(org,doc.id);}catch{}
   }
 });
+
+
+function safeFileName(value){
+  const name=String(value||'export').replace(/[\\/:*?"<>|]/g,'_').replace(/\.{2,}/g,'.').trim();
+  if(!name||name==='.'||name==='..')throw new Error('Invalid export filename');
+  return name.slice(0,180);
+}
+
+export const publishAnalyticsExportToMicrosoft365 = callable(async request => {
+  const {org,uid}=await authorize(request);
+  const connectionId=automationId.parse(request.data.connectionId);
+  const exportId=automationId.parse(request.data.exportId);
+  const folder=String(request.data.folder||'TeknTandao Exports').trim().slice(0,120) || 'TeknTandao Exports';
+  const connection=await getConnection(org,connectionId);
+  if(connection.provider!=='microsoft365') throw new Error('Choose a Microsoft 365 connection');
+  const credential=await readCredential(org,connectionId);
+  const exportDoc=(await org.collection('analyticsExports').doc(exportId).get()).data();
+  if(!exportDoc?.storagePath||!exportDoc?.filename) throw new Error('Analytics export not found');
+  const bucket=getStorage().bucket();
+  const [bytes]=await bucket.file(exportDoc.storagePath).download();
+  if(bytes.length>250*1024*1024) throw new Error('Microsoft Graph simple upload supports files up to 250 MB');
+  const filename=safeFileName(exportDoc.filename);
+  const path=[...folder.split('/').filter(Boolean).map(safeFileName),filename]
+    .map(segment=>encodeURIComponent(segment))
+    .join('/');
+  const response=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${path}:/content`,{
+    method:'PUT',
+    headers:{
+      Authorization:`Bearer ${credential.access_token}`,
+      'Content-Type':exportDoc.mime||'application/octet-stream',
+    },
+    body:bytes,
+    redirect:'error',
+    signal:AbortSignal.timeout(60000),
+  });
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(`Microsoft Graph upload failed (${response.status})`);
+  await org.collection('analyticsExports').doc(exportId).set({
+    microsoft365:{
+      connectionId,
+      itemId:payload.id||null,
+      webUrl:payload.webUrl||null,
+      publishedBy:uid,
+      publishedAt:stamp(),
+    }
+  },{merge:true});
+  return {ok:true,itemId:payload.id||null,webUrl:payload.webUrl||null,name:payload.name||filename};
+}, [encryptionKey]);
+
+export const publishExecutiveSnapshotToPowerBi = callable(async request => {
+  const {org,uid}=await authorize(request);
+  const connectionId=automationId.parse(request.data.connectionId);
+  const connection=await getConnection(org,connectionId);
+  if(connection.provider!=='powerbi') throw new Error('Choose a Power BI connection');
+  const credential=await readCredential(org,connectionId);
+  const datasetId=z.string().uuid().parse(request.data.datasetId);
+  const groupId=request.data.groupId?z.string().uuid().parse(request.data.groupId):undefined;
+  const tableName=z.string().trim().min(1).max(200).parse(request.data.tableName);
+  const facts=await loadExecutiveFacts(org);
+  const generatedAt=new Date().toISOString();
+  const rows=[
+    {Metric:'recorded_sales_minor',Value:Number(facts.sales?.valueMinor||0),GeneratedAt:generatedAt},
+    {Metric:'recorded_sales_count',Value:Number(facts.sales?.count||0),GeneratedAt:generatedAt},
+    {Metric:'inventory_skus',Value:Number(facts.inventory?.skuCount||0),GeneratedAt:generatedAt},
+    {Metric:'low_stock_skus',Value:Number(facts.inventory?.lowStock||0),GeneratedAt:generatedAt},
+    {Metric:'out_of_stock_skus',Value:Number(facts.inventory?.outOfStock||0),GeneratedAt:generatedAt},
+    {Metric:'crm_contacts',Value:Number(facts.customers?.contacts||0),GeneratedAt:generatedAt},
+    {Metric:'open_support_tickets',Value:Number(facts.support?.open||0),GeneratedAt:generatedAt},
+    {Metric:'overdue_projects',Value:Number(facts.projects?.overdue||0),GeneratedAt:generatedAt},
+    {Metric:'connected_systems',Value:Number(facts.connectors?.connected||0),GeneratedAt:generatedAt},
+    {Metric:'connector_conflicts',Value:Number(facts.connectors?.conflicts||0),GeneratedAt:generatedAt},
+  ];
+  await callEnterpriseBuiltin('powerbi',credential,'powerbi_push_rows',{
+    ...(groupId?{groupId}:{}),datasetId,tableName,rows
+  });
+  await org.collection('powerBiPublishes').add({
+    connectionId,datasetId,groupId:groupId||null,tableName,rowCount:rows.length,
+    createdBy:uid,createdAt:stamp(),
+  });
+  return {ok:true,rowCount:rows.length,generatedAt};
+}, [encryptionKey]);
 
 export const disconnectToolConnection = callable(async request => {
   const {org} = await authorize(request);
@@ -447,6 +532,7 @@ const dataExchangeReadTools = new Set([
   'notion_search','slack_channels','slack_history','hubspot_contacts','hubspot_deals',
   'salesforce_accounts','salesforce_contacts','salesforce_opportunities',
   'jira_search_issues','jira_projects','zoho_contacts','zoho_deals',
+  'm365_drive_files','powerbi_workspaces','powerbi_datasets','powerbi_refresh_history',
   'odoo_contacts','odoo_sale_orders','odoo_products',
 ]);
 

@@ -7,7 +7,7 @@ import {
 } from '../src/enterprise_connectors.js';
 
 test('enterprise connector catalog exposes bounded provider tools', () => {
-  for (const provider of ['salesforce','atlassian','zoho','odoo']) {
+  for (const provider of ['salesforce','atlassian','zoho','odoo','microsoft365','powerbi']) {
     assert.ok(Array.isArray(enterpriseBuiltinTools[provider]));
     assert.ok(enterpriseBuiltinTools[provider].length >= 3);
     for (const tool of enterpriseBuiltinTools[provider]) {
@@ -18,6 +18,8 @@ test('enterprise connector catalog exposes bounded provider tools', () => {
   assert.ok(enterpriseBuiltinTools.atlassian.some(tool => tool.name === 'jira_search_issues'));
   assert.ok(enterpriseBuiltinTools.zoho.some(tool => tool.name === 'zoho_deals'));
   assert.ok(enterpriseBuiltinTools.odoo.some(tool => tool.name === 'odoo_sale_orders'));
+  assert.ok(enterpriseBuiltinTools.microsoft365.some(tool => tool.name === 'm365_drive_files'));
+  assert.ok(enterpriseBuiltinTools.powerbi.some(tool => tool.name === 'powerbi_refresh_dataset'));
 });
 
 test('enterprise credentials are provider-specific and reject malformed input', () => {
@@ -51,6 +53,18 @@ test('enterprise credentials are provider-specific and reject malformed input', 
       api_domain:'https://www.zohoapis.com',
     }).api_domain,
     'https://www.zohoapis.com',
+  );
+  assert.equal(
+    validateEnterpriseCredential('microsoft365', {
+      access_token:'m'.repeat(30),
+    }).access_token.length,
+    30,
+  );
+  assert.equal(
+    validateEnterpriseCredential('powerbi', {
+      access_token:'p'.repeat(30),
+    }).access_token.length,
+    30,
   );
   assert.equal(
     validateEnterpriseCredential('odoo', {

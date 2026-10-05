@@ -11,6 +11,7 @@ class ExecutiveIntelligencePanel extends StatefulWidget {
 
 class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>{
   Map<String,dynamic>? data;
+  List<Map<String,dynamic>> connections=const [];
   bool busy=true, aiBusy=false;
   String? error;
 
@@ -19,8 +20,16 @@ class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>
   Future<void> load() async{
     setState((){busy=true;error=null;});
     try{
-      final next=await widget.store.call('getExecutiveIntelligence');
-      if(mounted)setState(()=>data=next);
+      final values=await Future.wait([
+        widget.store.call('getExecutiveIntelligence'),
+        widget.store.call('getAutomationStudio'),
+      ]);
+      final next=values[0];
+      final studio=values[1];
+      if(mounted)setState((){
+        data=next;
+        connections=_rows(studio['connections']);
+      });
     }catch(e){if(mounted)setState(()=>error=e.toString());}
     finally{if(mounted)setState(()=>busy=false);}
   }

@@ -214,3 +214,67 @@ The existing `scripts/deploy-automation.ps1` now includes:
 - Executive Intelligence callables
 
 No provider credentials belong in Git. Enter them only through Automation Studio or the existing Secret Manager configuration paths.
+
+
+## Microsoft 365, PowerPoint, Excel, Word and Power BI
+
+Executive Intelligence can now generate downloadable business artifacts directly from the measured analytics facts:
+
+- PowerPoint `.pptx`
+- Excel `.xlsx`
+- CSV `.csv`
+- PDF `.pdf`
+- Word `.docx`
+
+Exports are generated server-side and saved to private Firebase Storage. The client receives a short-lived signed download URL; export metadata stores the SHA-256 digest, MIME type, size, creator and source path.
+
+### Microsoft 365 delivery
+
+Connect the **Microsoft 365 · PowerPoint / Excel / Word** provider in Automation Studio using a Microsoft Graph bearer token with permission to write the signed-in user's OneDrive.
+
+From Executive Intelligence, **Microsoft 365** can:
+1. generate one of the supported export formats;
+2. upload it into a selected OneDrive folder;
+3. return the resulting Microsoft file URL.
+
+The upload uses Microsoft Graph simple file upload. The current export artifacts are intentionally small and remain below the Graph simple-upload size ceiling.
+
+### Power BI
+
+Connect **Power BI** using an Entra/OAuth access token authorized for the Power BI REST API.
+
+Built-in Power BI tools:
+- list workspaces;
+- list semantic models;
+- inspect refresh history;
+- trigger a semantic-model refresh;
+- push rows into a push semantic-model table.
+
+Executive Intelligence also exposes **Power BI** publishing. It sends a normalized KPI snapshot into a configured push table.
+
+Expected table columns:
+
+| Column | Type |
+| --- | --- |
+| `Metric` | text |
+| `Value` | number |
+| `GeneratedAt` | text/date-time |
+
+Example metrics include recorded sales value/count, inventory SKU health, CRM contacts, open tickets, overdue projects, connector count and sync conflicts.
+
+This does not silently create or redesign a Power BI semantic model. The target dataset/table must already exist with a compatible schema. Power BI refresh operations and push-row limits remain subject to the Microsoft capacity/license rules of the connected tenant.
+
+### Export consistency
+
+All Office/PDF/CSV exports are built from the same bounded Executive Intelligence facts used by the on-screen dashboard. The PowerPoint deck contains:
+- executive KPI snapshot;
+- recorded-sales trend visualization;
+- management recommendations.
+
+The Excel workbook contains:
+- Executive KPIs sheet;
+- Sales Trend sheet.
+
+Word/PDF exports contain the KPI summary and recommendations. CSV contains the flattened KPI table.
+
+The report generators use Open XML/PDF generation implemented inside the Functions codebase, avoiding a desktop Office dependency and avoiding additional npm runtime libraries.
