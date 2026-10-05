@@ -33,7 +33,13 @@ const projectId = () =>
   '';
 
 function callable(handler) {
-  return onCall({region, timeoutSeconds: 120, memory: '512MiB'}, async request => {
+  const serviceAccount = process.env.SECURITY_ADMIN_SERVICE_ACCOUNT?.trim();
+  return onCall({
+    region,
+    timeoutSeconds: 120,
+    memory: '512MiB',
+    ...(serviceAccount ? {serviceAccount} : {}),
+  }, async request => {
     try {
       return await handler(request);
     } catch (error) {
