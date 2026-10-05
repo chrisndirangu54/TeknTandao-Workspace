@@ -1,3 +1,6 @@
+import {lookup} from 'node:dns';
+import {Agent, fetch as httpFetch} from 'undici';
+import ipaddr from 'ipaddr.js';
 import {z} from 'zod';
 import {boundedJson} from './automation_domain.js';
 
@@ -44,9 +47,26 @@ export const enterpriseBuiltinTools = Object.freeze({
   ],
 });
 
+function publicIp(address){
+  try{return ipaddr.process(address).range()==='unicast';}catch{return false;}
+}
+const dispatcher=new Agent({connect:{lookup(hostname,options,callback){
+  lookup(hostname,{...options,all:true},(error,addresses)=>{
+    if(error)return callback(error);
+    if(!addresses.length||addresses.some(item=>!publicIp(item.address)))return callback(new Error('Private connector network address blocked'));
+    if(options.all)callback(null,addresses);
+    else callback(null,addresses[0].address,addresses[0].family);
+  });
+}}});
+
 const http = async (url, options={}) => {
-  const response = await fetch(url,{
+  const checked=new URL(String(url));
+  if(checked.protocol!=='https:'||checked.username||checked.password||checked.hash||(checked.port&&checked.port!=='443')) throw new Error('Connector request must use public HTTPS on port 443');
+  const host=checked.hostname.replace(/^\[|\]$/g,'');
+  if(host==='localhost'||!host.includes('.')||(ipaddr.isValid(host)&&!publicIp(host))) throw new Error('Private connector endpoint blocked');
+  const response = await httpFetch(checked,{
     ...options,
+    dispatcher,
     redirect:'error',
     signal:AbortSignal.timeout(20000),
   });
@@ -59,10 +79,11 @@ const http = async (url, options={}) => {
 
 const cleanBase = raw => {
   const url = new URL(String(raw));
-  if(url.protocol !== 'https:' || url.username || url.password) throw new Error('Connector URL must be public HTTPS');
+  if(url.protocol !== 'https:' || url.username || url.password || url.hash || (url.port && url.port !== '443')) throw new Error('Connector URL must be public HTTPS on port 443');
+  const host=url.hostname.replace(/^\[|\]$/g,'');
+  if(host==='localhost'||!host.includes('.')||(ipaddr.isValid(host)&&!publicIp(host))) throw new Error('Private connector endpoint blocked');
   url.pathname = url.pathname.replace(/\/+$/,'');
   url.search = '';
-  url.hash = '';
   return url.toString().replace(/\/$/,'');
 };
 
