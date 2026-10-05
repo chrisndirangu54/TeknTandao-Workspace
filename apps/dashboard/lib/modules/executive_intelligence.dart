@@ -101,7 +101,7 @@ class _ExecutiveIntelligencePanelState extends State<ExecutiveIntelligencePanel>
             _Kpi('Customers',_int(customers['contacts']).toString(),'CRM contacts',Icons.groups_rounded),
             _Kpi('Open support',_int(support['open']).toString(),_int(support['highPriorityOpen']).toString()+' high priority',Icons.support_agent_rounded),
             _Kpi('Overdue projects',_int(projects['overdue']).toString(),_int(projects['total']).toString()+' bounded records',Icons.flag_rounded),
-            _Kpi('Connected systems',_int(connectors['connected']).toString(),_int(connectors['conflicts']).toString()+' sync conflicts',Icons.hub_rounded),
+            _Kpi('Connected systems',_int(connectors['connected']).toString(),_int(connectors['healthy']).toString()+' healthy · '+_int(connectors['degraded']).toString()+' degraded',Icons.hub_rounded),
             _Kpi('Apps installed',_int(apps['installed']).toString(),_int(apps['paid']).toString()+' paid · '+_int(apps['trial']).toString()+' trial',Icons.apps_rounded),
             _Kpi('Sync impact',(_int(connectors['recordsCreated'])+_int(connectors['recordsUpdated'])).toString(),_int(connectors['recentRuns']).toString()+' recent runs',Icons.sync_alt_rounded),
           ];
