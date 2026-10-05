@@ -206,6 +206,7 @@ class _GenericEnterpriseModuleScreenState
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
         title: Row(
           children: [
@@ -303,13 +304,23 @@ class _GenericEnterpriseModuleScreenState
 
   Widget _buildHeader(int total, int completed) {
     final open = total - completed;
-    return Column(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [BoxShadow(color: Color(0x0D0F172A), blurRadius: 22, offset: Offset(0, 8))],
+      ),
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          module.description,
-          style: const TextStyle(color: Color(0xFF64748B), height: 1.45),
-        ),
+        Row(children:[
+          Container(padding:const EdgeInsets.all(12),decoration:BoxDecoration(color:module.color.withValues(alpha:.10),borderRadius:BorderRadius.circular(14)),child:Icon(module.icon,color:module.color)),
+          const SizedBox(width:12),
+          Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(module.name,style:const TextStyle(fontSize:20,fontWeight:FontWeight.w800)),const SizedBox(height:4),Text(module.description,style:const TextStyle(color:Color(0xFF64748B),height:1.4))])),
+        ]),
         const SizedBox(height: 18),
         Wrap(
           spacing: 12,
@@ -326,6 +337,7 @@ class _GenericEnterpriseModuleScreenState
           ],
         ),
       ],
+      ),
     );
   }
 
@@ -367,34 +379,47 @@ class _GenericEnterpriseModuleScreenState
         statusIndex >= 0 && statusIndex < blueprint.statuses.length - 1;
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       leading: CircleAvatar(
         backgroundColor: module.color.withValues(alpha: 0.1),
         child: Icon(module.icon, color: module.color),
       ),
       title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.bold),
+        title.trim().isEmpty ? blueprint.entityLabel : title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w800),
       ),
-      subtitle: detail.isEmpty ? Text(status) : Text('$status · $detail'),
-      trailing: PopupMenuButton<String>(
-        onSelected: (action) {
-          if (action == 'edit') _openEditor(item);
-          if (action == 'advance') _advance(item);
-          if (action == 'archive') _archive(item);
-        },
-        itemBuilder: (context) => [
-          const PopupMenuItem(value: 'edit', child: Text('Edit')),
-          if (canAdvance)
-            PopupMenuItem(
-              value: 'advance',
-              child: Text(
-                'Advance to ${blueprint.statuses[statusIndex + 1]}',
-              ),
-            ),
-          const PopupMenuItem(
-            value: 'archive',
-            child: Text('Close / archive'),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 5),
+        child: Text(
+          detail.isEmpty ? 'No additional details' : detail,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Chip(
+            label: Text(status, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+            backgroundColor: module.color.withValues(alpha: .09),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (action) {
+              if (action == 'edit') _openEditor(item);
+              if (action == 'advance') _advance(item);
+              if (action == 'archive') _archive(item);
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'edit', child: Text('Edit')),
+              if (canAdvance)
+                PopupMenuItem(
+                  value: 'advance',
+                  child: Text('Advance to ${blueprint.statuses[statusIndex + 1]}'),
+                ),
+              const PopupMenuItem(value: 'archive', child: Text('Close / archive')),
+            ],
           ),
         ],
       ),

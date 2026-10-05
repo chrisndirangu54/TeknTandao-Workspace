@@ -4,7 +4,7 @@ import {before, after, test} from 'node:test';
 import {createRequire} from 'node:module';
 const require = createRequire(import.meta.url);
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
-const {collection, doc, setDoc, getDoc, getDocs, Timestamp, serverTimestamp, writeBatch} = require('firebase/firestore');
+const {collection, doc, setDoc, updateDoc, getDoc, getDocs, Timestamp, serverTimestamp, writeBatch} = require('firebase/firestore');
 let env;
 test('time tracking reads require an active subscription and the matching member UID', async () => {
   await env.withSecurityRulesDisabled(async context => {

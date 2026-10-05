@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../suite.dart';
+import '../super_admin_console.dart';
 import 'website_builder_runtime.dart';
 import 'reseller_studio.dart';
 
@@ -140,7 +141,20 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
           ],
         ),
         actions: [
-          IconButton(tooltip: 'Reseller platform', icon: const Icon(Icons.storefront), onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ResellerStudioScreen(store: store)))),
+          FutureBuilder<bool>(
+            future: SuperAdminGate.isBootstrap(),
+            builder: (context, snapshot) => snapshot.data == true
+                ? IconButton(
+                    tooltip: 'Reseller platform',
+                    icon: const Icon(Icons.storefront),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => ResellerStudioScreen(store: store),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
           if (_busy)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),

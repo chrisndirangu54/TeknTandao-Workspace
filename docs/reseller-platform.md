@@ -1,6 +1,6 @@
 # Reseller platform
 
-Open the storefront icon on the dashboard or `/?module=reseller`. Website Studio also has a Reseller shortcut. Workspace owners can manage their library and client invoices. Selling bundles requires a platform administrator to enable that workspace with `setResellerAccount({workspaceId, enabled: true})`; the caller must have the server-issued `platformAdmin: true` Firebase Auth claim. Ordinary workspace owners cannot enable themselves or issue arbitrary app entitlements.
+The Reseller management platform is reserved for the verified bootstrap/root administrator account `chrisndirangu54@gmail.com`. Only that account sees the storefront entry points in the dashboard and Website Studio, and reseller-management callables independently enforce the same root identity on the server. Delegated super admins and ordinary workspace owners do not receive Reseller management access. Client-side invoice/payment flows remain separate from the management studio so customers can settle valid reseller invoices without becoming reseller administrators.
 
 ## Pricing and selling
 
