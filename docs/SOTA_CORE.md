@@ -114,3 +114,22 @@ Safe agent execution is deliberately narrower than agent policy vocabulary: an o
 This foundation materially improves TeknTandao's architecture, but it does **not** by itself make every one of the 653 catalogue products state-of-the-art. Specialist depth still has to be built and validated vertically, and regulated/provider-dependent integrations still require real credentials, certification, reconciliation and operational controls.
 
 The remaining hard external boundaries include production merchant M-Pesa operations, certified KRA eTIMS fiscal issuance, Airtel Money settlement, jurisdiction-specific tax engines and audited KMS/HSM-backed secret storage. Deep industry engines such as full EMR/FHIR, core banking, advanced MRP, SIEM/SOC, IoT protocol management and TerraForge-grade geoscience intelligence also remain separate implementation tranches.
+
+
+## 9. Agentic reasoning, temporal memory and evaluation
+
+The next platform layer adds storage-agnostic domain primitives for:
+
+- risk-tiered Planner → Executor → Critic orchestration;
+- dependency-aware step scheduling and bounded replanning;
+- evidence-based critic scoring and human escalation;
+- temporal business memory with recency/entity/tag relevance;
+- directly-follows process discovery, conformance fitness and bottleneck analysis;
+- explainable forecast, anomaly, reorder and scenario baselines;
+- bounded business digital-twin simulation;
+- benchmark aggregation and regression detection;
+- trace-span normalization for agent observability.
+
+The versioned scenario suite starts at `benchmarks/businessos-v1.json`. These additions do not relax the control-plane restrictions described above. Generic planning remains separate from dedicated financial, tax and other regulated execution paths.
+
+See `docs/AGENTIC_SOTA.md` for benchmark criteria and the policy governing SOTA claims.
