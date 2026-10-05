@@ -100,6 +100,18 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
     } catch (e) { toast('Could not create user: ' + e.toString(), bad: true); }
   }
 
+  Future<void> createWorkspace() async {
+    final name = await prompt('Create workspace', 'Workspace name');
+    if (name == null || name.isEmpty) return;
+    final ownerEmail = await prompt('Create workspace', 'Owner email');
+    if (ownerEmail == null || ownerEmail.isEmpty) return;
+    try {
+      await call('createWorkspaceAsSuperAdmin', {'name': name, 'ownerEmail': ownerEmail});
+      toast('Workspace created.');
+      await refresh();
+    } catch (e) { toast('Could not create workspace: ' + e.toString(), bad: true); }
+  }
+
   Future<void> addAdmin() async {
     final email = await prompt('Add super admin', 'Existing user email');
     if (email == null || email.isEmpty) return;
@@ -183,6 +195,7 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                           stat('Workspaces', workspaces.length, Icons.domain_rounded),
                           stat('Admins', admins.where((a) => a['active'] != false).length, Icons.shield_rounded),
                           FilledButton.icon(onPressed: createUser, icon: const Icon(Icons.person_add_rounded), label: const Text('Create user')),
+                          FilledButton.icon(onPressed: createWorkspace, icon: const Icon(Icons.add_business_rounded), label: const Text('Create workspace')),
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
                             onPressed: addAdmin,
