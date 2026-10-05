@@ -21,7 +21,7 @@ const db = getFirestore();
 const region = 'europe-west1';
 const geminiKey = defineSecret('GEMINI_API_KEY');
 const stamp = () => FieldValue.serverTimestamp();
-const orgRoot = (orgId) => db.doc(\`organizations/${identifier(orgId)}\`);
+const orgRoot = (orgId) => db.doc(`organizations/${identifier(orgId)}`);
 const uploadIdSchema = /^[A-Za-z0-9_-]{1,100}$/;
 
 function uid(request) {
@@ -81,7 +81,7 @@ function parseModelJson(text) {
 }
 
 function extractionPrompt(extra = '') {
-  return \`You are TeknTandao Smart Intake, a conservative business-record extraction engine.
+  return `You are TeknTandao Smart Intake, a conservative business-record extraction engine.
 Extract only information explicitly present in the provided input. Never invent IDs, prices, quantities, dates, vendors, customers, tax information, payment status, or ledger postings.
 
 Return JSON with this exact shape:
@@ -116,7 +116,7 @@ Rules:
 4. A receipt can produce an expense draft; an invoice or sale note can produce a sale draft.
 5. IoT readings should become generic records unless they clearly represent stock/assets.
 6. Return no more than 100 records.
-${extra}\`;
+${extra}`;
 }
 
 async function geminiExtract({text, bytes, contentType, context = ''}) {
@@ -136,7 +136,7 @@ async function geminiExtract({text, bytes, contentType, context = ''}) {
   }
 
   const response = await fetch(
-    \`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent\`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'x-goog-api-key': key},
@@ -149,7 +149,7 @@ async function geminiExtract({text, bytes, contentType, context = ''}) {
   );
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload?.error?.message || \`AI extraction failed (${response.status})\`);
+    throw new Error(payload?.error?.message || `AI extraction failed (${response.status})`);
   }
   const output = payload.candidates?.[0]?.content?.parts
     ?.map((part) => part.text || '')
@@ -165,11 +165,11 @@ async function ensureAccessibleApps(org, member, records) {
   );
   for (let i = 0; i < unique.length; i += 1) {
     const appId = unique[i];
-    if (!Object.hasOwn(catalog, appId)) throw new Error(\`Unknown target app: ${appId}\`);
+    if (!Object.hasOwn(catalog, appId)) throw new Error(`Unknown target app: ${appId}`);
     if (!canAccess(member, appId, installations[i].data())) {
       throw new HttpsError(
         'permission-denied',
-        \`Install/subscribe to ${appId} and grant access before importing into it\`,
+        `Install/subscribe to ${appId} and grant access before importing into it`,
       );
     }
   }
@@ -187,7 +187,7 @@ async function saveProposal(org, actorUid, source, extraction, sourceMeta = {}) 
     const doc = existing.docs[0];
     return {id: doc.id, ...doc.data(), duplicate: true};
   }
-  const id = identifier(\`intake_${randomUUID()}\`);
+  const id = identifier(`intake_${randomUUID()}`);
   const record = {
     source,
     sourceMeta,
@@ -212,9 +212,9 @@ export const createBusinessIntakeUpload = callable(async request => {
     contentType: request.data.contentType,
     size: Number(request.data.size),
   });
-  const uploadId = identifier(\`intake_upload_${randomUUID()}\`);
+  const uploadId = identifier(`intake_upload_${randomUUID()}`);
   const ext = extensionFor(input.contentType);
-  const path = \`business-intake/${org.id}/${uploadId}.${ext}\`;
+  const path = `business-intake/${org.id}/${uploadId}.${ext}`;
   const file = intakeBucket().file(path);
   const expiresAt = Date.now() + 15 * 60 * 1000;
   const [uploadUrl] = await file.getSignedUrl({
@@ -261,7 +261,7 @@ export const analyzeBusinessIntakeUpload = callable(async request => {
   const extraction = await geminiExtract({
     bytes,
     contentType: upload.contentType,
-    context: \`File name: ${upload.name}\`,
+    context: `File name: ${upload.name}`,
   });
   await ensureAccessibleApps(org, member, extraction.records);
   const proposal = await saveProposal(
@@ -331,7 +331,7 @@ function numberOrZero(value) {
 }
 
 function targetRef(org, proposalId, index, shape, record) {
-  const deterministicId = identifier(\`intake_${proposalId}_${index}\`);
+  const deterministicId = identifier(`intake_${proposalId}_${index}`);
   if (shape.kind === 'inventory') return org.collection('products').doc(deterministicId);
   if (shape.kind === 'support_ticket') return org.collection('tickets').doc(deterministicId);
   if (shape.kind === 'asset') return org.collection('assets').doc(deterministicId);
@@ -361,7 +361,7 @@ export const commitBusinessIntakeProposal = callable(async request => {
   if (!proposal) throw new Error('Smart Intake proposal not found');
   const records = Array.isArray(proposal.records) ? proposal.records : [];
   const chosen = selected.map((index) => {
-    if (!records[index]) throw new Error(\`Proposal record ${index} does not exist\`);
+    if (!records[index]) throw new Error(`Proposal record ${index} does not exist`);
     return {index, record: records[index]};
   });
   await ensureAccessibleApps(org, member, chosen.map((entry) => entry.record));
@@ -420,12 +420,12 @@ function ingestionWebhookUrl() {
 export const createBusinessIngestionKey = callable(async request => {
   const {org, user} = await authorize(request, {ownerOnly: true});
   const name = String(request.data.name || 'IoT / API ingestion').trim().slice(0, 120);
-  const keyId = identifier(\`ing_${randomUUID()}\`);
+  const keyId = identifier(`ing_${randomUUID()}`);
   const secret = randomBytes(32).toString('base64url');
-  const token = \`ti_${keyId}.${secret}\`;
+  const token = `ti_${keyId}.${secret}`;
   const keyHash = hashIngestionKey(token);
   await Promise.all([
-    db.doc(\`businessIngestionKeys/${keyId}\`).set({
+    db.doc(`businessIngestionKeys/${keyId}`).set({
       keyHash,
       orgId: org.id,
       name,
@@ -461,7 +461,7 @@ export const revokeBusinessIngestionKey = callable(async request => {
   const {org} = await authorize(request, {ownerOnly: true});
   const keyId = identifier(request.data.keyId);
   await Promise.all([
-    db.doc(\`businessIngestionKeys/${keyId}\`).set({active: false, revokedAt: stamp()}, {merge: true}),
+    db.doc(`businessIngestionKeys/${keyId}`).set({active: false, revokedAt: stamp()}, {merge: true}),
     org.collection('businessIngestionKeys').doc(keyId).set({active: false, revokedAt: stamp()}, {merge: true}),
   ]);
   return {ok: true};
@@ -489,7 +489,7 @@ async function authenticateIngestionRequest(request) {
   if (!match) throw new Error('Missing or invalid ingestion bearer token');
   const token = match[1];
   const keyId = match[2];
-  const snapshot = await db.doc(\`businessIngestionKeys/${keyId}\`).get();
+  const snapshot = await db.doc(`businessIngestionKeys/${keyId}`).get();
   const data = snapshot.data();
   if (!data?.active || !verifyIngestionKey(token, data.keyHash)) {
     throw new Error('Invalid or revoked ingestion key');
@@ -522,7 +522,7 @@ export const businessIngestionWebhook = onRequest(
       } else {
         const text = safeTextInput(
           request.body?.text ||
-          \`IoT/API JSON payload: ${JSON.stringify(request.body || {})}\`,
+          `IoT/API JSON payload: ${JSON.stringify(request.body || {})}`,
         );
         extraction = await geminiExtract({
           text,
@@ -531,7 +531,7 @@ export const businessIngestionWebhook = onRequest(
       }
       const proposal = await saveProposal(
         org,
-        \`ingestion-key:${keyId}\`,
+        `ingestion-key:${keyId}`,
         'iot_api',
         extraction,
         {
