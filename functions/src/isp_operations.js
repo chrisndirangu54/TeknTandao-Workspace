@@ -5,7 +5,8 @@ import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {z} from 'zod';
 import {isSuperAdminToken} from './super_admin_domain.js';
 import {canChangeIncidentStatus, canChangeWorkOrderStatus, canonicalSubscriberCode} from './isp_domain.js';
-import {evaluateLink, summarizeTelemetry, possibleSharedFault} from './isp_analytics_domain.js';
+import {evaluateLink, summarizeTelemetry, possibleSharedFault, customerExperienceRisk} from './isp_analytics_domain.js';
+import {capacityForecast, explainSupportMessage, minimumCpeCriteria} from './isp_support_domain.js';
 
 // ISP operations here are management records only. No router credentials,
 // M-Pesa credentials, or device commands are handled by this module.
@@ -224,4 +225,48 @@ export const ispListProvisioningRequests = callable(async request => {
   return {requests: snapshot.docs.map(d => ({id: d.id, ...d.data(),
     createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || null,
   }))};
+});
+
+// Support ticket triage uses explainable keyword routing until a grounded
+// AI assistant, customer-consent flow and ticket review are connected.
+export const ispCreateSupportTicket = callable(async request => {
+  const uid = actor(request);
+  const input = z.object({
+    subscriberId: z.string().regex(/^[A-Z0-9_-]{2,64}$/),
+    message: z.string().trim().min(4).max(1000),
+    site: shortText,
+  }).strict().parse(request.data);
+  const sub = await db.collection('ispSubscribers').doc(input.subscriberId).get();
+  if (!sub.exists) throw new HttpsError('not-found', 'Subscriber not found');
+  const id = randomUUID();
+  const suggestion = explainSupportMessage(input.message);
+  await db.collection('ispSupportTickets').doc(id).create({
+    ...input, ...suggestion, status: 'open', createdBy: uid, createdAt: now(), updatedAt: now()
+  });
+  await audit(uid, 'isp.support.create', 'support_ticket', id);
+  return {ok: true, id, suggestion};
+});
+
+export const ispSupportOverview = callable(async request => {
+  actor(request);
+  const snapshot = await db.collection('ispSupportTickets').limit(100).get();
+  return {tickets: snapshot.docs.map(d => ({id: d.id, ...d.data(),
+    createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || null,
+  })), assistantConnected: false};
+});
+
+export const ispDecisionSupport = callable(async request => {
+  actor(request);
+  const snapshot = await db.collection('ispTelemetry').orderBy('createdAt', 'desc').limit(250).get();
+  const samples = snapshot.docs.map(d => d.data());
+  // The utilization forecast is deliberately labeled heuristic.
+  // Readings are ordered newest first; use oldest-to-newest.
+  return {
+    capacity: capacityForecast(samples.slice().reverse()),
+    customerRecoveryExample: customerExperienceRisk({outages30d: 3, openTickets: 1}),
+    procurementCriteria: minimumCpeCriteria,
+    aiModelTrained: false,
+    paymentVerified: false,
+    deviceControlConnected: false,
+  };
 });
