@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'platform_security_panel.dart';
+import 'isp_admin_panel.dart';
 
 class SuperAdminGate {
   static Future<Map<String, dynamic>> context() async {
@@ -371,6 +372,10 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                           stat('Admins', admins.where((a) => a['active'] != false).length, Icons.shield_rounded),
                           FilledButton.icon(onPressed: createUser, icon: const Icon(Icons.person_add_rounded), label: const Text('Create user')),
                           FilledButton.icon(onPressed: createWorkspace, icon: const Icon(Icons.add_business_rounded), label: const Text('Create workspace')),
+                          FilledButton.icon(
+                            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IspAdminPanel())),
+                            icon: const Icon(Icons.router_rounded), label: const Text('ISP operations'),
+                          ),
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
                             onPressed: addAdmin,
