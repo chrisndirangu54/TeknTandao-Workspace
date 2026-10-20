@@ -4,6 +4,7 @@ import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {z} from 'zod';
 import {isSuperAdminToken} from './super_admin_domain.js';
+import {canChangeIncidentStatus, canChangeWorkOrderStatus, canonicalSubscriberCode} from './isp_domain.js';
 
 // ISP operations here are management records only. No router credentials,
 // M-Pesa credentials, or device commands are handled by this module.
@@ -27,7 +28,7 @@ function actor(request) {
 }
 
 function callable(handler) {
-  return onCall({region, timeoutSeconds: 60, enforceAppCheck: false}, async request => {
+  return onCall({region, timeoutSeconds: 60}, async request => {
     try { return await handler(request); }
     catch (error) {
       if (error instanceof HttpsError) throw error;
@@ -84,11 +85,9 @@ export const ispAddSubscriber = callable(async request => {
     site: shortText, accessType: z.enum(['fiber', 'wireless']),
     planMbps: z.number().int().min(1).max(10000)
   }).strict().parse(request.data);
-  const exists = await db.collection('ispSubscribers').where('accountCode', '==', input.accountCode).limit(1).get();
-  if (!exists.empty) throw new HttpsError('already-exists', 'Subscriber account code already exists');
-  const id = randomUUID();
+  const id = canonicalSubscriberCode(input.accountCode);
   await db.collection('ispSubscribers').doc(id).create({
-    ...input, status: 'planned', provisioningStatus: 'not_connected',
+    ...input, accountCode: id, status: 'planned', provisioningStatus: 'not_connected',
     createdBy: uid, createdAt: now(), updatedAt: now()
   });
   await audit(uid, 'isp.subscriber.plan', 'subscriber', id);
@@ -118,8 +117,7 @@ export const ispSetIncidentStatus = callable(async request => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new HttpsError('not-found', 'Incident not found');
     const previous = snap.data().status;
-    const allowed = {open: ['acknowledged', 'resolved'], acknowledged: ['resolved'], resolved: []};
-    if (!allowed[previous]?.includes(input.status)) throw new HttpsError('failed-precondition', 'Invalid incident status transition');
+    if (!canChangeIncidentStatus(previous, input.status)) throw new HttpsError('failed-precondition', 'Invalid incident status transition');
     tx.update(ref, {status: input.status, updatedAt: now(), updatedBy: uid});
   });
   await audit(uid, 'isp.incident.' + input.status, 'incident', input.id);
@@ -148,8 +146,7 @@ export const ispSetWorkOrderStatus = callable(async request => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new HttpsError('not-found', 'Work order not found');
     const previous = snap.data().status;
-    const allowed = {open: ['in_progress', 'completed'], in_progress: ['completed'], completed: []};
-    if (!allowed[previous]?.includes(input.status)) throw new HttpsError('failed-precondition', 'Invalid work order status transition');
+    if (!canChangeWorkOrderStatus(previous, input.status)) throw new HttpsError('failed-precondition', 'Invalid work order status transition');
     tx.update(ref, {status: input.status, updatedAt: now(), updatedBy: uid});
   });
   await audit(uid, 'isp.workorder.' + input.status, 'workorder', input.id);
