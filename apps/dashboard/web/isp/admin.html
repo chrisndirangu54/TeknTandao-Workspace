@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ISP Operations Admin | TeknTandao</title><meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Access-controlled ISP work orders, manually reported incidents and provisioning review.">
+<link rel="stylesheet" href="./isp.css">
+<script defer src="/__/firebase/12.19.0/firebase-app-compat.js"></script>
+<script defer src="/__/firebase/12.19.0/firebase-auth-compat.js"></script>
+<script defer src="/__/firebase/12.19.0/firebase-firestore-compat.js"></script>
+<script defer src="/__/firebase/12.19.0/firebase-functions-compat.js"></script>
+<script defer src="/__/firebase/init.js"></script>
+<script defer src="./admin.js"></script></head>
+<body><header><nav class="wrap"><a class="brand" href="./index.html">Tekn<span>Tandao</span> / ISP</a><div class="links"><a href="./index.html">Architecture</a><a href="/">Workspace</a><a href="#" id="logout" class="hidden">Sign out</a></div></nav></header>
+<main class="wrap"><p class="eyebrow">Authenticated operations · Audit logged</p><h1>ISP administration</h1>
+<p class="lede">Manage manually reported incidents, technician work orders and pending subscriber provisioning requests. Live RouterOS, OLT, ACS and M-Pesa actions are not enabled on this page.</p>
+<div id="feedback" class="status" role="status" aria-live="polite">Checking sign-in…</div>
+<section id="authSection" class="card hidden"><h2>Sign in to TeknTandao</h2><p>Use an authorized Firebase account for your workspace. Only owners, or existing members with a verified platform super-admin claim, can access ISP operations.</p>
+<form id="loginForm" class="grid two"><div><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+<div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
+<div><button class="btn primary" type="submit">Sign in</button> <button class="btn" type="button" id="googleLogin">Sign in with Google</button></div></form></section>
+<section id="workspaceSection" class="admin-card hidden"><div class="toolbar"><div><h2>Workspace access</h2><p>Use the existing organization's ID. Entering another ID does not grant access.</p></div>
+<div><label for="orgId">Workspace ID</label><input id="orgId" maxlength="128" autocomplete="off" placeholder="Workspace ID"><button class="btn primary" type="button" id="load">Open workspace</button></div></div></section>
+<div id="dashboard" class="hidden">
+<section><div class="toolbar"><div><h2 id="orgName">ISP overview</h2><p class="hint">Recent records (up to 50 per type), not whole-network telemetry</p></div><button class="btn" id="refresh" type="button">Refresh</button></div>
+<div class="kpis"><div class="card"><small>Recent unresolved incidents</small><strong id="incidentCount">—</strong></div><div class="card"><small>Recent open work orders</small><strong id="orderCount">—</strong></div><div class="card"><small>Pending provisioning reviews</small><strong id="queueCount">—</strong></div></div></section>
+<section class="grid two">
+<div class="admin-card"><h2>Report an incident</h2><form id="incidentForm">
+<label for="incidentTitle">Title</label><input id="incidentTitle" required minlength="2" maxlength="140" placeholder="PON 1 customers offline">
+<label for="incidentDescription">Description</label><textarea id="incidentDescription" required minlength="5" maxlength="2000"></textarea>
+<div class="grid two"><div><label for="incidentSegment">Segment</label><select id="incidentSegment"><option value="fiber">Fiber</option><option value="wireless">Wireless</option><option value="core">Core</option><option value="other">Other</option></select></div>
+<div><label for="incidentSeverity">Severity</label><select id="incidentSeverity"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div></div>
+<button class="btn primary" type="submit">Create incident</button></form></div>
+<div class="admin-card"><h2>Create technician work order</h2><form id="orderForm">
+<label for="orderTitle">Task</label><input id="orderTitle" required minlength="2" maxlength="140" placeholder="Inspect distribution cabinet">
+<label for="orderDescription">Instructions</label><textarea id="orderDescription" required minlength="5" maxlength="2000"></textarea>
+<div class="grid two"><div><label for="assignedTo">Assigned technician</label><input id="assignedTo" required minlength="2" maxlength="120" placeholder="Technician's name"></div>
+<div><label for="orderPriority">Priority</label><select id="orderPriority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div></div>
+<label for="orderIncident">Linked incident (optional)</label><select id="orderIncident"><option value="">No incident</option></select>
+<button class="btn primary" type="submit">Create work order</button></form></div>
+</section>
+<section class="admin-card"><h2>Queue subscriber provisioning for review</h2><p class="hint">This stores an auditable request only. It does not create a PPPoE account, change router configuration or activate a customer.</p>
+<form id="provisionForm" class="grid two"><div><label for="accountReference">Customer account reference</label><input id="accountReference" required minlength="2" maxlength="140" autocomplete="off"></div>
+<div><label for="serviceType">Access type</label><select id="serviceType"><option value="fiber">GPON / fiber</option><option value="wireless">Wireless-fed</option></select></div>
+<div><label for="packageMbps">Requested package (Mbps)</label><input id="packageMbps" type="number" min="1" max="1000" value="20" required></div>
+<div><label for="provisionNotes">Technician notes</label><input id="provisionNotes" maxlength="1000"></div>
+<div><button class="btn primary" type="submit">Queue manual review</button></div></form></section>
+<section><h2>Recent incidents</h2><div id="incidents" class="records"><p class="empty">No records.</p></div></section>
+<section><h2>Technician work orders</h2><div id="orders" class="records"><p class="empty">No records.</p></div></section>
+<section><h2>Provisioning review queue</h2><div id="provisions" class="records"><p class="empty">No records.</p></div></section>
+</div></main><footer><div class="wrap">TeknTandao ISP administration · Server-side workspace authorization and audit logging required. No production network operations have been connected.</div></footer></body></html>
