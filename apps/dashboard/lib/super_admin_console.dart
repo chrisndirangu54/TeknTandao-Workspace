@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'platform_security_panel.dart';
 import 'isp_admin_panel.dart';
+import 'isp_suite_console.dart';
 
 class SuperAdminGate {
   static Future<Map<String, dynamic>> context() async {
@@ -375,6 +376,10 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                           FilledButton.icon(
                             onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IspAdminPanel())),
                             icon: const Icon(Icons.router_rounded), label: const Text('ISP operations'),
+                          ),
+                          FilledButton.icon(
+                            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IspSuiteConsole())),
+                            icon: const Icon(Icons.hub_outlined), label: const Text('Full ISP suite'),
                           ),
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
