@@ -47,6 +47,7 @@ export * from './decision_intelligence_domain.js';
 export * from './digital_twin_domain.js';
 
 export * from './super_admin.js';
+export * from './isp_operations.js';
 
 export * from './platform_security.js';
 
