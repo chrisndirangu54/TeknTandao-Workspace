@@ -2,12 +2,12 @@
 
 ## Entry points
 
-- Public responsive HTML page: `apps/dashboard/web/isp/index.html`
-- Accessible topology: `apps/dashboard/web/isp/architecture.svg`
+- Public HTML page: [`chrisndirangu54/HTML/isp-architecture.html`](https://github.com/chrisndirangu54/HTML/blob/master/isp-architecture.html) (separate repository, available after HTML branch merge)
+- HTML SVG topology: `chrisndirangu54/HTML/assets/isp/architecture.svg` (separate repository)
 - Admin interface: **Platform Super Admin → ISP operations** (`apps/dashboard/lib/isp_admin_panel.dart`)
 - Secured Firebase Cloud Functions: `functions/src/isp_operations.js` (re-exported via `platform_entry.js`)
 
-When the Flutter web app is built, the files in `apps/dashboard/web/isp/` are copied to `apps/dashboard/build/web/isp/`. With existing Firebase Hosting configuration, `/isp/index.html` serves the static public page and `/isp/architecture.svg` serves its diagram. This page is independent from the authenticated workspace.
+The Flutter Workspace retains the Flutter interface and does not bundle a duplicate HTML ISP page. The HTML-specific pages and HTML-site admin tools are maintained separately in the `HTML` GitHub repository. Each app has its own backend and authorization model; there is no automatic synchronization of ISP records.
 
 ## Proposed deployment reference (NOT live state)
 
@@ -79,7 +79,7 @@ flutter build web --dart-define-from-file=../../firebase-config.json
 Use a valid local Firebase configuration file and do not commit it. For preview testing use `flutter run -d chrome --dart-define=PREVIEW=true`, but **do not mistake preview data for production**.
 
 Verify after building that:
-- `build/web/isp/index.html` and `build/web/isp/architecture.svg` exist;
+- the Flutter admin ISP operations panel builds correctly; separately validate the HTML page in the `HTML` repository;
 - non-admin authenticated users receive `permission-denied` from the ISP callables;
 - incident and work order transitions reject invalid state jumps;
 - refreshing the admin page retrieves new records;
