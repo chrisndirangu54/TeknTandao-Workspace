@@ -7,6 +7,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: IspCustomerPortal()));
     expect(find.text('Fiber, wireless and managed Wi-Fi'), findsOneWidget);
     expect(find.text('Site / estate / general neighborhood'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byType(CheckboxListTile), 220);
+    await tester.pumpAndSettle();
     expect(find.text('I agree to be contacted about this enquiry.'), findsOneWidget);
     expect(find.text('Send service request'), findsOneWidget);
     expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
