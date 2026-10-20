@@ -7,7 +7,7 @@ A multi-tenant, modular business operating system for African SMEs, enterprises,
 ## 🌐 TeknTandao hybrid ISP architecture and operations
 
 The repo also includes an optional ISP-specific experience:
-- **Public HTML architecture**: `apps/dashboard/web/isp/index.html` (available at `/isp/index.html` after Flutter web build/deployment), with a responsive SVG topology of the proposed fiber + wireless pilot.
+- **Separate public HTML architecture**: maintained in [chrisndirangu54/HTML](https://github.com/chrisndirangu54/HTML), with `isp.html`, `isp-architecture.html` and an SVG topology; not shipped inside the Flutter Workspace build.
 - **Secured admin controls**: Platform Super Admin → ISP operations (device register, planned subscribers, incidents, work orders).
 - **Cloud Functions**: `functions/src/isp_operations.js`, restricted by the existing server-side super-admin policy.
 - **Deployment boundaries**: these are planning and management records, not live router provisioning, functioning AI diagnostics, or verified ISP M-Pesa transactions.
