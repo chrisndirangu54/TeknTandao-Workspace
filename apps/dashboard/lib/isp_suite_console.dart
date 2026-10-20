@@ -353,7 +353,7 @@ class _IspSuiteConsoleState extends State<IspSuiteConsole> {
           SizedBox(width: 130, child: Text(row['site']?.toString() ?? 'Site',
               overflow: TextOverflow.ellipsis)),
           Expanded(child: LinearProgressIndicator(
-            value: ((row['utilizationPct'] as num).toDouble()/100).clamp(0, 1),
+            value: ((row['utilizationPct'] as num).toDouble()/100).clamp(0.0, 1.0).toDouble(),
             minHeight: 10)),
           const SizedBox(width: 12),
           SizedBox(width: 50, child: Text('${row['utilizationPct']}%')),
