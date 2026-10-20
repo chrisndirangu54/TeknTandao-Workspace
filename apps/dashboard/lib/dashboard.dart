@@ -34,6 +34,7 @@ import 'modules/automation_studio.dart';
 import 'modules/reseller_studio.dart';
 import 'modules/smart_intake.dart';
 import 'modules/executive_intelligence.dart';
+import 'isp_suite_console.dart';
 
 class Dashboard extends StatefulWidget {
   final SuiteStore store;
@@ -373,6 +374,11 @@ class _DashboardState extends State<Dashboard> {
               ],
             ),
             actions: [
+              IconButton(
+                tooltip: 'ISP service enquiries',
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IspCustomerPortal())),
+                icon: const Icon(Icons.wifi_tethering_outlined),
+              ),
               IconButton(
                 tooltip: 'Smart Intake · photo, document, text & IoT',
                 onPressed: _openSmartIntake,
