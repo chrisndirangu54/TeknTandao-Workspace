@@ -16,6 +16,8 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
   String? error;
   Map<String, dynamic> overview = const {};
   Map<String, dynamic> telemetry = const {};
+  Map<String, dynamic> decisionSupport = const {};
+  List<Map<String, dynamic>> supportTickets = const [];
   int tab = 0;
 
   FirebaseFunctions get functions => FirebaseFunctions.instanceFor(region: 'europe-west1');
@@ -42,7 +44,13 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
     try {
       final next = await call('ispAdminOverview');
       final metrics = await call('ispTelemetrySummary');
-      if (mounted) setState(() { overview = next; telemetry = metrics; });
+      final decisions = await call('ispDecisionSupport');
+      final tickets = await call('ispSupportOverview');
+      if (mounted) setState(() {
+        overview = next; telemetry = metrics; decisionSupport = decisions;
+        supportTickets = (tickets['tickets'] as List? ?? const []).whereType<Map>()
+            .map((t) => Map<String, dynamic>.from(t)).toList();
+      });
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
@@ -236,6 +244,66 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
     });
   }
 
+  Future<void> addSupportTicket() async {
+    final subs = rows('subscribers');
+    if (subs.isEmpty) {
+      notice('Register a planned subscriber before creating a ticket.', bad: true);
+      return;
+    }
+    final values = await ask('Create support ticket', [
+      'Subscriber account code', 'Site', 'Customer message',
+    ], defaults: {
+      'Subscriber account code': subs.first['accountCode']?.toString() ?? '',
+      'Site': subs.first['site']?.toString() ?? '',
+    });
+    if (values == null) return;
+    await perform('ispCreateSupportTicket', {
+      'subscriberId': values['Subscriber account code'],
+      'site': values['Site'],
+      'message': values['Customer message'],
+    });
+  }
+
+  Widget decisionPanel() {
+    final capacity = Map<String, dynamic>.from(
+      decisionSupport['capacity'] as Map? ?? const {},
+    );
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      child: ExpansionTile(
+        leading: const Icon(Icons.psychology_alt_outlined),
+        title: const Text('Decision support & customer tickets'),
+        subtitle: const Text('Capacity heuristic and rule-based support triage'),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Capacity status: ${capacity['state'] ?? 'insufficient_data'}'),
+              Text('Suggested utilization: ${capacity['estimateUtilizationPct'] ?? 'N/A'}%'),
+              Text((capacity['recommendation'] ?? 'Collect site measurements.').toString()),
+              const SizedBox(height: 6),
+              const Text('Customer support classification uses keywords. Predictive ML and WhatsApp automation are not connected.'),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: writing ? null : addSupportTicket,
+                icon: const Icon(Icons.support_agent),
+                label: const Text('Create support ticket'),
+              ),
+              const SizedBox(height: 10),
+              Text('Tickets: ${supportTickets.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              for (final ticket in supportTickets.take(8))
+                ListTile(
+                  dense: true,
+                  title: Text((ticket['subscriberId'] ?? 'Subscriber').toString()),
+                  subtitle: Text('${ticket['category'] ?? 'general'} · ${ticket['nextStep'] ?? ''}'),
+                ),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget telemetryPanel() {
     final counts = Map<String, dynamic>.from(telemetry['statusCount'] as Map? ?? const {});
     final samples = telemetry['sampleCount'] ?? 0;
@@ -407,6 +475,7 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
                 ),
               ),
               telemetryPanel(),
+              decisionPanel(),
               SizedBox(
                 height: 147,
                 child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), children: [
