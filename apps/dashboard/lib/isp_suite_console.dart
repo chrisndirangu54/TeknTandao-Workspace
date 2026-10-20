@@ -26,6 +26,7 @@ class _IspSuiteConsoleState extends State<IspSuiteConsole> {
   List<Map<String, dynamic>> integrations = [];
   List<Map<String, dynamic>> records = [];
   Map<String, dynamic> dashboard = {};
+  Map<String, dynamic> analytics = {};
   List<Map<String, dynamic>> requests = [];
 
   FirebaseFunctions get functions =>
@@ -86,6 +87,7 @@ class _IspSuiteConsoleState extends State<IspSuiteConsole> {
       } else if (name == 'quality') {
         final response = await _call('ispSuiteRecords', {'module': 'telemetry'});
         records = _toRows(response['records']);
+        analytics = await _call('ispSuiteAnalytics');
       } else if (name == 'overview') {
         dashboard = await _call('ispSuiteDashboard');
       }
@@ -347,6 +349,22 @@ class _IspSuiteConsoleState extends State<IspSuiteConsole> {
         _stat('Critical samples', '${categories['critical']}', 'Not confirmed outages', Icons.error_outline),
       ]),
       const SizedBox(height: 14),
+      _info('Capacity assessment',
+          '${Map<String, dynamic>.from(analytics['capacityReview'] as Map? ?? {})['state'] ?? 'insufficient_data'} · ' +
+          '${Map<String, dynamic>.from(analytics['capacityReview'] as Map? ?? {})['recommendation'] ?? 'Collect consistent timestamped samples before forecasting.'}',
+          icon: Icons.insights_outlined),
+      const SizedBox(height: 10),
+      const Text('Possible shared-segment faults',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      for (final candidate in _toRows(analytics['sharedFaultCandidates']))
+        Card(child: ListTile(
+          leading: const Icon(Icons.warning_amber_outlined, color: Colors.orange),
+          title: Text('Segment ${candidate['segmentId']}'),
+          subtitle: Text('${candidate['affectedDeviceCount']} distinct affected devices in manual critical samples. Requires human verification.'),
+        )),
+      if (_toRows(analytics['sharedFaultCandidates']).isEmpty)
+        const Text('No shared faults identified in the loaded samples.'),
+      const SizedBox(height: 15),
       const Text('Link utilization samples', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
       for (final row in valid.take(30))
         Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [
