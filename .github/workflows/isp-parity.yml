@@ -1,0 +1,49 @@
+name: Flutter ISP parity validation
+
+on:
+  pull_request:
+    paths:
+      - 'apps/dashboard/lib/isp_suite_console.dart'
+      - 'apps/dashboard/lib/dashboard.dart'
+      - 'apps/dashboard/lib/super_admin_console.dart'
+      - 'apps/dashboard/test/isp_suite_test.dart'
+      - 'functions/src/isp_suite*.js'
+      - 'functions/test/isp_suite_domain.test.js'
+      - '.github/workflows/isp-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isp-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run isolated ISP domain tests
+        run: node --test functions/test/isp_suite_domain.test.js
+      - name: Validate Firebase Callable sources
+        run: |
+          node --check functions/src/isp_suite.js
+          node --check functions/src/isp_suite_domain.js
+  isp-flutter:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Analyze native ISP implementation
+        run: flutter analyze --no-fatal-infos lib/isp_suite_console.dart lib/super_admin_console.dart lib/dashboard.dart
+      - name: Run isolated ISP widget tests
+        run: flutter test test/isp_suite_test.dart
+      - name: Verify Flutter web artifact builds
+        run: flutter build web --release --dart-define=PREVIEW=true --no-wasm-dry-run
