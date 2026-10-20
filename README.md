@@ -4,6 +4,18 @@ A multi-tenant, modular business operating system for African SMEs, enterprises,
 
 ---
 
+## 🌐 TeknTandao hybrid ISP architecture and operations
+
+The repo also includes an optional ISP-specific experience:
+- **Separate public HTML architecture**: maintained in [chrisndirangu54/HTML](https://github.com/chrisndirangu54/HTML), with `isp.html`, `isp-architecture.html` and an SVG topology; not shipped inside the Flutter Workspace build.
+- **Secured admin controls**: Platform Super Admin → ISP operations (device register, planned subscribers, incidents, work orders).
+- **Cloud Functions**: `functions/src/isp_operations.js`, restricted by the existing server-side super-admin policy.
+- **Deployment boundaries**: these are planning and management records, not live router provisioning, functioning AI diagnostics, or verified ISP M-Pesa transactions.
+
+See [the ISP integration guide](docs/ISP_HYBRID.md) for equipment assumptions, tests, and deployment steps.
+
+---
+
 ## 🌟 Key Capabilities
 
 ### 🧩 1. Jigsaw Puzzle Workspace Engine (`JigsawCanvas`)
