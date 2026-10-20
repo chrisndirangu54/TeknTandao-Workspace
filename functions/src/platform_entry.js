@@ -48,6 +48,7 @@ export * from './digital_twin_domain.js';
 
 export * from './super_admin.js';
 export * from './isp_operations.js';
+export * from './isp_suite.js';
 
 export * from './platform_security.js';
 
