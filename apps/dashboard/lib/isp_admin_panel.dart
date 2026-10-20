@@ -278,6 +278,29 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
                     style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8))),
                 ]),
               ),
+              Card(
+                margin: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+                child: ExpansionTile(
+                  leading: const Icon(Icons.account_tree_outlined),
+                  title: const Text('View hybrid ISP architecture'),
+                  subtitle: const Text('Proposed topology — not live network telemetry'),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(children: const [
+                        ListTile(leading: Icon(Icons.public), title: Text('Upstream → MikroTik RB5009'),
+                          subtitle: Text('Firewall · PPPoE · VLANs · RADIUS · QoS')),
+                        ListTile(leading: Icon(Icons.cable), title: Text('Fiber: VSOL OLT → 2 × 1:16 splitters'),
+                          subtitle: Text('32 planned ONT subscribers; interoperability unverified')),
+                        ListTile(leading: Icon(Icons.wifi_tethering), title: Text('Wireless: 2 COMFAST bridge pairs'),
+                          subtitle: Text('Two remote buildings → managed switches → 9 routers each')),
+                        ListTile(leading: Icon(Icons.hub_outlined), title: Text('Control platform: monitoring, ACS and CRM'),
+                          subtitle: Text('Diagnostics, AI, M-Pesa and provisioning adapters require integration')),
+                      ]),
+                    ),
+                  ],
+                ),
+              ),
               SizedBox(
                 height: 147,
                 child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), children: [
