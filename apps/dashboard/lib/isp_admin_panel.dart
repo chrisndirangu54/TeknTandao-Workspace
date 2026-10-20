@@ -15,6 +15,7 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
   bool writing = false;
   String? error;
   Map<String, dynamic> overview = const {};
+  Map<String, dynamic> telemetry = const {};
   int tab = 0;
 
   FirebaseFunctions get functions => FirebaseFunctions.instanceFor(region: 'europe-west1');
@@ -40,7 +41,8 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
     if (mounted) setState(() { loading = true; error = null; });
     try {
       final next = await call('ispAdminOverview');
-      if (mounted) setState(() => overview = next);
+      final metrics = await call('ispTelemetrySummary');
+      if (mounted) setState(() { overview = next; telemetry = metrics; });
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
@@ -172,6 +174,109 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
     }
   }
 
+  Future<void> submitTelemetry() async {
+    final devices = rows('devices');
+    if (devices.isEmpty) {
+      notice('Register a device before submitting a diagnostic sample.', bad: true);
+      return;
+    }
+    final defaultDevice = devices.first;
+    final values = await ask('Record manually measured telemetry', [
+      'Device ID', 'Site', 'Segment ID',
+      'Latency (ms)', 'Jitter (ms)', 'Packet loss (%)', 'Utilization (%)'
+    ], defaults: {
+      'Device ID': defaultDevice['id']?.toString() ?? '',
+      'Site': defaultDevice['site']?.toString() ?? '',
+      'Segment ID': '',
+      'Latency (ms)': '10', 'Jitter (ms)': '2',
+      'Packet loss (%)': '0', 'Utilization (%)': '25',
+    });
+    if (values == null) return;
+    final fields = {
+      'latencyMs': 'Latency (ms)', 'jitterMs': 'Jitter (ms)',
+      'packetLossPct': 'Packet loss (%)', 'utilizationPct': 'Utilization (%)',
+    };
+    final numeric = <String, double>{};
+    for (final field in fields.entries) {
+      final result = double.tryParse(values[field.value] ?? '');
+      if (result == null) {
+        notice('Invalid number for ${field.value}', bad: true);
+        return;
+      }
+      numeric[field.key] = result;
+    }
+    await perform('ispRecordTelemetry', {
+      'deviceId': values['Device ID'], 'site': values['Site'],
+      'segmentId': values['Segment ID'], ...numeric,
+    });
+  }
+
+  Future<void> requestProvisioning() async {
+    final subs = rows('subscribers');
+    final devices = rows('devices');
+    if (subs.isEmpty || devices.isEmpty) {
+      notice('Register both a subscriber and a device first.', bad: true);
+      return;
+    }
+    final values = await ask('Create non-executing provisioning request', [
+      'Subscriber account code', 'Device ID',
+      'Operation (activate/suspend/change_plan/deactivate)', 'Justification'
+    ], defaults: {
+      'Subscriber account code': subs.first['accountCode']?.toString() ?? '',
+      'Device ID': devices.first['id']?.toString() ?? '',
+      'Operation (activate/suspend/change_plan/deactivate)': 'activate',
+      'Justification': 'Engineer to verify link and authorize provisioning',
+    });
+    if (values == null) return;
+    await perform('ispRequestProvisioning', {
+      'subscriberId': values['Subscriber account code'],
+      'deviceId': values['Device ID'],
+      'operation': values['Operation (activate/suspend/change_plan/deactivate)'],
+      'justification': values['Justification'],
+    });
+  }
+
+  Widget telemetryPanel() {
+    final counts = Map<String, dynamic>.from(telemetry['statusCount'] as Map? ?? const {});
+    final samples = telemetry['sampleCount'] ?? 0;
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: ExpansionTile(
+        leading: const Icon(Icons.monitor_heart_outlined),
+        title: Text('Monitoring samples: $samples'),
+        subtitle: const Text('Manually submitted data only • live collectors not connected'),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Wrap(spacing: 12, runSpacing: 6, children: [
+                Chip(label: Text('Healthy: ${counts['healthy'] ?? 0}')),
+                Chip(label: Text('Warning: ${counts['warning'] ?? 0}')),
+                Chip(label: Text('Critical: ${counts['critical'] ?? 0}')),
+                Chip(label: Text('Missing: ${counts['insufficient_data'] ?? 0}')),
+              ]),
+              const SizedBox(height: 8),
+              const Text('These are sample-level statistics and cannot be used as verified network uptime or active incidents.'),
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                OutlinedButton.icon(
+                  onPressed: writing ? null : submitTelemetry,
+                  icon: const Icon(Icons.add_chart_outlined),
+                  label: const Text('Record diagnostic reading'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: writing ? null : requestProvisioning,
+                  icon: const Icon(Icons.assignment_outlined),
+                  label: const Text('Request provisioning approval'),
+                ),
+              ]),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget metric(String label, int count, IconData icon) {
     return Card(child: SizedBox(
       width: 190, child: Padding(
@@ -301,6 +406,7 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
                   ],
                 ),
               ),
+              telemetryPanel(),
               SizedBox(
                 height: 147,
                 child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), children: [
