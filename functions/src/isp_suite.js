@@ -2,6 +2,8 @@ import {randomUUID} from 'node:crypto';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {isSuperAdminToken} from './super_admin_domain.js';
+import {summarizeTelemetry,possibleSharedFault} from './isp_analytics_domain.js';
+import {capacityForecast} from './isp_support_domain.js';
 import {ispSchema,ispIntegrationStatus,normalizeIspRecord,allowedIspTransition,ispRecordId,ispLinkHealth} from './isp_suite_domain.js';
 
 // Shared Flutter Firebase project. All network, billing, firmware and messaging
@@ -149,4 +151,19 @@ export const ispSuiteCustomerRequests=callable(async req=>{
  superAdmin(req);
  const snapshot=await db().collection('ispCustomerRequests').limit(100).get();
  return {requests:snapshot.docs.map(serialize),limit:100};
+});
+
+// Reporting only. Data provenance is manual_admin until a separately reviewed
+// hardware collector is deployed. No notifications, device commands or payments.
+export const ispSuiteAnalytics=callable(async req=>{
+ superAdmin(req);
+ const docs=await db().collection('ispTelemetry').orderBy('createdAt','desc').limit(250).get();
+ const samples=docs.docs.map(d=>d.data());
+ return {
+  ...summarizeTelemetry(samples),
+  sharedFaultCandidates:possibleSharedFault(samples),
+  capacityReview:capacityForecast(samples.slice().reverse()),
+  source:'manual_admin',liveCollectorConnected:false,
+  predictiveModelTrained:false,sampleLimit:250
+ };
 });
