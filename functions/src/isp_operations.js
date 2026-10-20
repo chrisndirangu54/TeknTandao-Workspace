@@ -5,6 +5,7 @@ import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {z} from 'zod';
 import {isSuperAdminToken} from './super_admin_domain.js';
 import {canChangeIncidentStatus, canChangeWorkOrderStatus, canonicalSubscriberCode} from './isp_domain.js';
+import {evaluateLink, summarizeTelemetry, possibleSharedFault} from './isp_analytics_domain.js';
 
 // ISP operations here are management records only. No router credentials,
 // M-Pesa credentials, or device commands are handled by this module.
@@ -151,4 +152,76 @@ export const ispSetWorkOrderStatus = callable(async request => {
   });
   await audit(uid, 'isp.workorder.' + input.status, 'workorder', input.id);
   return {ok: true};
+});
+
+// Admin-submitted telemetry intake: validated and audited, never auto-acts on
+// the network. A future device collector requires a separate credential-scoped
+// ingestion endpoint, NOT public access to this callable.
+export const ispRecordTelemetry = callable(async request => {
+  const uid = actor(request);
+  const input = z.object({
+    deviceId: z.string().uuid(),
+    site: shortText,
+    segmentId: z.string().trim().max(120).default(''),
+    latencyMs: z.number().min(0).max(60000),
+    jitterMs: z.number().min(0).max(60000),
+    packetLossPct: z.number().min(0).max(100),
+    utilizationPct: z.number().min(0).max(100)
+  }).strict().parse(request.data);
+  const device = await db.collection('ispDevices').doc(input.deviceId).get();
+  if (!device.exists) throw new HttpsError('not-found', 'Device not registered');
+  const health = evaluateLink(input);
+  const id = randomUUID();
+  await db.collection('ispTelemetry').doc(id).create({
+    ...input, ...health, source: 'manual_admin',
+    submittedBy: uid, createdAt: now()
+  });
+  await audit(uid, 'isp.telemetry.record', 'telemetry', id);
+  return {ok: true, id, health};
+});
+
+export const ispTelemetrySummary = callable(async request => {
+  actor(request);
+  const snapshot = await db.collection('ispTelemetry')
+    .orderBy('createdAt', 'desc').limit(250).get();
+  const samples = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+  return {
+    ...summarizeTelemetry(samples),
+    sharedFaultCandidates: possibleSharedFault(samples),
+    connectedToLiveDevices: false,
+    queryLimit: 250,
+  };
+});
+
+// Provisioning requires an explicit approval record; this function only
+// writes a pending request, without executing RADIUS/OLT/ACS operations.
+export const ispRequestProvisioning = callable(async request => {
+  const uid = actor(request);
+  const input = z.object({
+    subscriberId: z.string().regex(/^[A-Z0-9_-]{2,64}$/),
+    deviceId: z.string().uuid(),
+    operation: z.enum(['activate', 'suspend', 'change_plan', 'deactivate']),
+    justification: z.string().trim().min(10).max(1000)
+  }).strict().parse(request.data);
+  const [sub, device] = await Promise.all([
+    db.collection('ispSubscribers').doc(input.subscriberId).get(),
+    db.collection('ispDevices').doc(input.deviceId).get(),
+  ]);
+  if (!sub.exists || !device.exists)
+    throw new HttpsError('not-found', 'Subscriber and registered device are required');
+  const id = randomUUID();
+  await db.collection('ispProvisioningRequests').doc(id).create({
+    ...input, state: 'awaiting_approval',
+    executionState: 'not_connected', requestedBy: uid, createdAt: now()
+  });
+  await audit(uid, 'isp.provisioning.request', 'provisioning', id);
+  return {ok: true, id, state: 'awaiting_approval', executed: false};
+});
+
+export const ispListProvisioningRequests = callable(async request => {
+  actor(request);
+  const snapshot = await db.collection('ispProvisioningRequests').limit(100).get();
+  return {requests: snapshot.docs.map(d => ({id: d.id, ...d.data(),
+    createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || null,
+  }))};
 });
