@@ -274,7 +274,7 @@ class _IspAdminPanelState extends State<IspAdminPanel> {
                   SizedBox(height: 6),
                   Text('Management records only. Router provisioning, M-Pesa settlement, live diagnostics and automated AI remediation are NOT connected.'),
                   SizedBox(height: 6),
-                  SelectableText('Public architecture page: /isp/index.html',
+                  SelectableText('Public HTML architecture (after deployment): www.tekntandao.com/isp-architecture.html',
                     style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8))),
                 ]),
               ),
