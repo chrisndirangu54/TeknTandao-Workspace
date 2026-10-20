@@ -55,3 +55,6 @@ export * from './business_ingestion.js';
 export * from './executive_intelligence.js';
 
 export * from './office_exports.js';
+
+// Owner-guarded ISP operations: incident reports, field work orders and provisioning review.
+export * from './isp_admin.js';
