@@ -35,6 +35,7 @@ import 'modules/reseller_studio.dart';
 import 'modules/smart_intake.dart';
 import 'modules/executive_intelligence.dart';
 import 'isp_suite_console.dart';
+import 'whatsapp_workspace_settings.dart';
 
 class Dashboard extends StatefulWidget {
   final SuiteStore store;
@@ -374,6 +375,13 @@ class _DashboardState extends State<Dashboard> {
               ],
             ),
             actions: [
+              IconButton(
+                tooltip: 'Workspace WhatsApp Business settings',
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => WhatsAppWorkspaceSettings(workspaceId: store.orgId),
+                )),
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+              ),
               IconButton(
                 tooltip: 'ISP service enquiries',
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IspCustomerPortal())),
