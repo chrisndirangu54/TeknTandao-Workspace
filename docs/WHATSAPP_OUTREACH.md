@@ -21,3 +21,6 @@ const link = makeClickToChat('+254711161164',message);
 ```
 
 Never store Meta API secrets in GitHub. Avoid bypassing platform messaging limits or anti-spam rules.
+
+## Intended business sender
+The TeknTandao WhatsApp Business number supplied by the owner is **+254 180 590803** (E.164: `+254180590803`). This identifies the intended sending line only, **not** a verified Cloud API registration. Do not place access tokens in this repository. The Meta business portfolio/WABA ID, Phone Number ID, display name approval and API permission status must be verified in WhatsApp Manager before sending. Provision access token and webhook verification material through Firebase Secret Manager. No production sending is enabled by this PR.
