@@ -57,3 +57,5 @@ export * from './business_ingestion.js';
 export * from './executive_intelligence.js';
 
 export * from './office_exports.js';
+
+export * from './whatsapp_workspace_api.js';
