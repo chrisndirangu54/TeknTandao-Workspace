@@ -25,10 +25,11 @@ async function access(req,action='read-metrics'){
  if(!check.allowed)throw new HttpsError('permission-denied','Not permitted');
  return {org,uid:req.auth.uid,role};
 }
+const payload=req=>{const {orgId,...data}=req.data||{};return data;};
 const jobs=org=>org.collection('cloudJobs');
 export const cloudCreateOperation=call(async req=>{
  const {org,uid}=await access(req,'approve-plan');
- const input=z.object({planId:uuid,kind:z.enum(['deployment','maintenance']),reason:z.string().trim().min(10).max(1000)}).strict().parse(req.data);
+ const input=z.object({planId:uuid,kind:z.enum(['deployment','maintenance']),reason:z.string().trim().min(10).max(1000)}).strict().parse(payload(req));
  const plan=await org.collection('cloudAutomationPlans').doc(input.planId).get();
  if(!plan.exists||plan.data()?.state!=='approved_for_manual_setup')throw new HttpsError('failed-precondition','Plan not approved');
  const ref=jobs(org).doc(randomUUID());
@@ -39,7 +40,7 @@ export const cloudCreateOperation=call(async req=>{
 export const cloudAdvanceOperation=call(async req=>{
  const {org,uid}=await access(req,'approve-plan');
  const input=z.object({jobId:uuid,decision:z.enum(['validate','request_customer','approve_customer','approve_operator','reject']),
-   budgetReviewed:z.boolean().optional()}).strict().parse(req.data);
+   budgetReviewed:z.boolean().optional()}).strict().parse(payload(req));
  const ref=jobs(org).doc(input.jobId);
  await db.runTransaction(async tx=>{
   const snap=await tx.get(ref);
@@ -48,6 +49,9 @@ export const cloudAdvanceOperation=call(async req=>{
   const next=({validate:'validated',request_customer:'awaiting_customer',
     approve_customer:'awaiting_operator',approve_operator:'queued',reject:'rejected'})[input.decision];
   if(input.decision==='approve_operator'){
+    throw new HttpsError('failed-precondition','Operator approval is reserved for a separately authenticated platform operator; not enabled in this release');
+  }
+  if(false){
     if(data.customerApprovedBy===uid)throw new HttpsError('failed-precondition','Independent operator approval required');
     if(input.budgetReviewed!==true)throw new HttpsError('failed-precondition','Budget review required');
   }
@@ -72,7 +76,7 @@ export const cloudDraftServiceInvoice=call(async req=>{
  const input=z.object({planId:uuid,usageUsd:z.number().finite().min(0).max(1000000),
   markupPercent:z.number().finite().min(0).max(100),
   managedServiceKes:z.number().finite().min(0).max(100000000),
-  exchangeKesPerUsd:z.number().finite().gt(0).max(10000)}).strict().parse(req.data);
+  exchangeKesPerUsd:z.number().finite().gt(0).max(10000)}).strict().parse(payload(req));
  const plan=await org.collection('cloudAutomationPlans').doc(input.planId).get();
  if(!plan.exists)throw new HttpsError('not-found','Plan not found');
  const values=computeInvoice(input);
