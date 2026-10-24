@@ -47,3 +47,23 @@ These commits are a reviewable implementation of the **planning, import and huma
 7. Pass multi-tenant security, emulator, operational and human-approval acceptance tests before hosting deployment.
 
 Current app screens are **not** a deployed service. No cloud resources have been provisioned.
+
+## Executable Azure integration added in feature branch
+
+- `infra/azure/container-app.bicep`: Azure Container Apps, managed environment and Log Analytics template for a pre-approved customer resource group.
+- `.github/workflows/azure-customer-deploy.yml`: manually dispatched, OIDC-authenticated `what-if` and deployment. Uses GitHub Environment `azure-production-customer-approval`. Repository administrators must configure required reviewers, protect this environment, and set `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` before use. Restrict the identity to specific customer-owned resource groups.
+- `.github/workflows/azure-approved-maintenance.yml`: approved inspection or restart of an existing container revision.
+- `scripts/cloud-ops/monitor.mjs`: read-only Azure Metrics REST reader using a short-lived token, with no automatic remediation.
+- `scripts/cloud-ops/incident-agent.mjs`: bounded incident suggestion engine; does not call an LLM or act on infrastructure.
+- `scripts/cloud-ops/billing.mjs`: separates verified Azure usage, resale markup and managed-service fees into draft invoices; does not retrieve Microsoft CSP invoices, submit fiscal documents or collect payments.
+- Node tests cover bill calculations, incident logic, planning and import contracts.
+
+### Work still requiring integrations, credentials and validation
+- **AI model execution**: connect an approved model endpoint with per-tenant redaction, traceability and human review; the present runbook is deterministic.
+- **Continuous monitoring**: schedule the read-only monitor with workload identity and per-tenant telemetry isolation; present monitoring is on demand.
+- **Customer migration**: plan export/import is implemented; full Firebase identity, account, subscription and data transfer requires verified linkage and a transactional migration/reconciliation tool.
+- **Subscription billing**: provider usage synchronization, CSP rate cards, tax compliance, payment provider integration and reconciliation are not yet wired into the draft calculator.
+- **Verification**: run `npm --prefix functions test`, `flutter analyze`, `flutter test`, and Azure Bicep `az bicep build --file infra/azure/container-app.bicep` in a connected CI environment; none has been confirmed passing in this session.
+- **Never claim a production Azure deployment** before proving tenant delegation, required GitHub environment reviewers and monitoring/rollback procedures.
+
+Manual GitHub workflow invocation is an infrastructure change with cost implications; do not trigger it without the individual customer's express authorization.
