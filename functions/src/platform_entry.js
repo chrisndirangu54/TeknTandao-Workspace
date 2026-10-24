@@ -61,3 +61,5 @@ export * from './office_exports.js';
 export * from './whatsapp_workspace_api.js';
 
 export * from './cloud_automation.js';
+
+export * from './cloud_operations.js';
