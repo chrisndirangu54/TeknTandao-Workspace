@@ -26,6 +26,7 @@ async function authorized(req,action='read-metrics'){
  if(!policy.allowed)throw new HttpsError('permission-denied','Cloud action denied by workspace policy');
  return {org,uid:req.auth.uid};
 }
+const payload=req=>{const {orgId,...data}=req.data||{};return data;};
 const plans=org=>org.collection('cloudAutomationPlans');
 export const cloudImportMigrationPlan=callable(async req=>{
  const {org,uid}=await authorized(req,'import-plan');
@@ -43,7 +44,7 @@ export const cloudListMigrationPlans=callable(async req=>{
 });
 export const cloudReviewMigrationPlan=callable(async req=>{
  const {org,uid}=await authorized(req,'approve-plan');
- const input=z.object({planId:z.string().uuid(),decision:z.enum(['approve','reject'])}).strict().parse(req.data);
+ const input=z.object({planId:z.string().uuid(),decision:z.enum(['approve','reject'])}).strict().parse(payload(req));
  const ref=plans(org).doc(input.planId);
  await db.runTransaction(async tx=>{
  const doc=await tx.get(ref);
@@ -60,7 +61,7 @@ export const cloudReviewMigrationPlan=callable(async req=>{
 
 export const cloudPreviewPlan=callable(async req=>{
  const {org,uid}=await authorized(req,'preview-deployment');
- const input=z.object({planId:z.string().uuid()}).strict().parse(req.data);
+ const input=z.object({planId:z.string().uuid()}).strict().parse(payload(req));
  const snap=await plans(org).doc(input.planId).get();
  if(!snap.exists)throw new HttpsError('not-found','Plan not found');
  const blueprint=generateCloudBlueprint(snap.data());
@@ -72,7 +73,7 @@ export const cloudAssessMonitoring=callable(async req=>{
  const input=z.object({planId:z.string().uuid(),signals:z.array(z.object({
    metric:z.enum(['cpuPercent','memoryPercent','errorRatePercent','monthlySpendPercent','backupAgeHours']),
    value:z.number().finite().min(0).max(100000)
- }).strict()).max(100)}).strict().parse(req.data);
+ }).strict()).max(100)}).strict().parse(payload(req));
  const snap=await plans(org).doc(input.planId).get();
  if(!snap.exists)throw new HttpsError('not-found','Plan not found');
  const results=assessCloudSignals(input.signals);
