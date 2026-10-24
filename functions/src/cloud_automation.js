@@ -5,6 +5,7 @@ import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {z} from 'zod';
 import {validateCloudMigrationRequest, proposeCloudAutomationSteps} from './cloud_migration_contract.js';
 import {generateCloudBlueprint, assessCloudSignals} from './cloud_planning_domain.js';
+import {authorizeCloudAction} from './cloud_policy_domain.js';
 
 const db=getFirestore(), region='europe-west1';
 const orgIdSchema=z.string().regex(/^[A-Za-z0-9_-]{10,128}$/);
@@ -14,17 +15,20 @@ function callable(fn){return onCall({region,timeoutSeconds:60,enforceAppCheck:fa
  if(e instanceof z.ZodError)throw new HttpsError('invalid-argument','Invalid cloud automation request');
  throw new HttpsError('invalid-argument','Cloud automation request could not be processed');
  }});}
-async function authorized(req){
+async function authorized(req,action='read-metrics'){
  if(!req.auth)throw new HttpsError('unauthenticated','Please sign in');
  const orgId=orgIdSchema.parse(req.data?.orgId);
  const org=db.collection('organizations').doc(orgId);
  const member=await org.collection('members').doc(req.auth.uid).get();
- if(!member.exists || member.data()?.role!=='owner')throw new HttpsError('permission-denied','Workspace owner access required');
+ const role=member.data()?.role;
+ const policy=authorizeCloudAction({actorOrgId:orgId,resourceOrgId:orgId,
+   memberActive:member.exists,role},action);
+ if(!policy.allowed)throw new HttpsError('permission-denied','Cloud action denied by workspace policy');
  return {org,uid:req.auth.uid};
 }
 const plans=org=>org.collection('cloudAutomationPlans');
 export const cloudImportMigrationPlan=callable(async req=>{
- const {org,uid}=await authorized(req);
+ const {org,uid}=await authorized(req,'import-plan');
  const plan=validateCloudMigrationRequest(req.data?.plan);
  const ref=plans(org).doc(randomUUID());
  await ref.create({...plan,steps:proposeCloudAutomationSteps(req.data.plan),
@@ -38,7 +42,7 @@ export const cloudListMigrationPlans=callable(async req=>{
  return {plans:snapshot.docs.map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()??null}))};
 });
 export const cloudReviewMigrationPlan=callable(async req=>{
- const {org,uid}=await authorized(req);
+ const {org,uid}=await authorized(req,'approve-plan');
  const input=z.object({planId:z.string().uuid(),decision:z.enum(['approve','reject'])}).strict().parse(req.data);
  const ref=plans(org).doc(input.planId);
  await db.runTransaction(async tx=>{
@@ -55,7 +59,7 @@ export const cloudReviewMigrationPlan=callable(async req=>{
 // Approval records planning consent only: provisioning remains disabled.
 
 export const cloudPreviewPlan=callable(async req=>{
- const {org,uid}=await authorized(req);
+ const {org,uid}=await authorized(req,'preview-deployment');
  const input=z.object({planId:z.string().uuid()}).strict().parse(req.data);
  const snap=await plans(org).doc(input.planId).get();
  if(!snap.exists)throw new HttpsError('not-found','Plan not found');
