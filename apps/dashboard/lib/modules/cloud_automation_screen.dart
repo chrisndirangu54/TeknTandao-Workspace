@@ -13,6 +13,7 @@ class _CloudAutomationScreenState extends State<CloudAutomationScreen>{
   bool busy=false;
   String message='';
   List<Map<String,dynamic>> plans=[];
+  List<Map<String,dynamic>> jobs=[];
   @override
   void initState(){super.initState();if(!widget.store.demo) refresh();}
   @override
@@ -20,7 +21,11 @@ class _CloudAutomationScreenState extends State<CloudAutomationScreen>{
   Future<void> refresh()async{
     try{
       final result=await widget.store.call('cloudListMigrationPlans');
-      if(mounted)setState(()=>plans=(result['plans'] as List? ?? []).map((e)=>Map<String,dynamic>.from(e as Map)).toList());
+      final operations=await widget.store.call('cloudListOperations');
+      if(mounted)setState((){
+        plans=(result['plans'] as List? ?? []).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
+        jobs=(operations['jobs'] as List? ?? []).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
+      });
     }catch(e){if(mounted)setState(()=>message='Unable to load plans: $e');}
   }
   Future<void> importPlan()async{
@@ -45,6 +50,26 @@ class _CloudAutomationScreenState extends State<CloudAutomationScreen>{
           const JsonEncoder.withIndent('  ').convert(result['blueprint'])))),
         actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
     }catch(e){if(mounted)setState(()=>message='Preview unavailable: $e');}
+  }
+  Future<void> createOperation(String planId)async{
+    if(busy)return;
+    setState(()=>busy=true);
+    try{
+      await widget.store.call('cloudCreateOperation',{'planId':planId,'kind':'deployment',
+        'reason':'Customer requested a scoped cloud deployment review'});
+      if(mounted)setState(()=>message='Deployment request created; no cloud resources changed.');
+      await refresh();
+    }catch(e){if(mounted)setState(()=>message='Cannot create request: $e');}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> advanceJob(String jobId,String decision)async{
+    if(busy)return;
+    setState(()=>busy=true);
+    try{
+      await widget.store.call('cloudAdvanceOperation',{'jobId':jobId,'decision':decision});
+      await refresh();
+    }catch(e){if(mounted)setState(()=>message='Cannot advance job: $e');}
+    finally{if(mounted)setState(()=>busy=false);}
   }
   Future<void> review(String id,String decision)async{
     if(busy)return;
@@ -76,11 +101,27 @@ class _CloudAutomationScreenState extends State<CloudAutomationScreen>{
         Text('Status: ${plan['state']} · execution disabled'),
         OutlinedButton(onPressed:busy?null:()=>previewPlan(plan['id'].toString()),
           child:const Text('View cloud blueprint')),
+        if(plan['state']=='approved_for_manual_setup')
+          OutlinedButton(onPressed:busy?null:()=>createOperation(plan['id'].toString()),child:const Text('Request deployment review')),
         if(plan['state']=='awaiting_review')Wrap(spacing:10,children:[
           OutlinedButton(onPressed:busy?null:()=>review(plan['id'].toString(),'reject'),child:const Text('Reject')),
           FilledButton(onPressed:busy?null:()=>review(plan['id'].toString(),'approve'),child:const Text('Approve planning record'))
         ])
       ])))),
+      const Divider(height:32),
+      const Text('Operations approval queue',style:TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
+      const Text('Operator approval and live execution remain disabled pending verified platform credentials.'),
+      ...jobs.map((job)=>Card(child:ListTile(
+        title:Text('${job['kind']} — ${job['state']}'),
+        subtitle:Text(job['reason']?.toString()??''),
+        trailing:job['state']=='proposed'
+          ?TextButton(onPressed:busy?null:()=>advanceJob(job['id'].toString(),'validate'),child:const Text('Validate'))
+          :job['state']=='validated'
+          ?TextButton(onPressed:busy?null:()=>advanceJob(job['id'].toString(),'request_customer'),child:const Text('Request approval'))
+          :job['state']=='awaiting_customer'
+          ?TextButton(onPressed:busy?null:()=>advanceJob(job['id'].toString(),'approve_customer'),child:const Text('Customer approve'))
+          :null,
+      ))),
     ]),
   );
 }
