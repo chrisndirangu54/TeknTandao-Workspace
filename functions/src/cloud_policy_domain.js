@@ -5,6 +5,8 @@ export function authorizeCloudAction(context, action) {
   if (!context || context.actorOrgId !== context.resourceOrgId || !context.memberActive)
     return {allowed:false,reason:'tenant-boundary'};
   if (!['owner','operator','viewer'].includes(context.role)) return {allowed:false,reason:'unknown-role'};
+  if (['approve-plan','import-plan'].includes(action) && context.role !== 'owner')
+    return {allowed:false,reason:'owner-required'};
   if (context.role === 'viewer' && !['read-metrics','preview-deployment'].includes(action))
     return {allowed:false,reason:'read-only-role'};
   if (['apply-deployment','restart-revision','delete-resource'].includes(action)) {
