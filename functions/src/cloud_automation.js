@@ -4,6 +4,7 @@ import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {z} from 'zod';
 import {validateCloudMigrationRequest, proposeCloudAutomationSteps} from './cloud_migration_contract.js';
+import {generateCloudBlueprint, assessCloudSignals} from './cloud_planning_domain.js';
 
 const db=getFirestore(), region='europe-west1';
 const orgIdSchema=z.string().regex(/^[A-Za-z0-9_-]{10,128}$/);
@@ -52,3 +53,26 @@ export const cloudReviewMigrationPlan=callable(async req=>{
 });
 // No service principals, third-party API tokens, or remote execution are accepted here.
 // Approval records planning consent only: provisioning remains disabled.
+
+export const cloudPreviewPlan=callable(async req=>{
+ const {org,uid}=await authorized(req);
+ const input=z.object({planId:z.string().uuid()}).strict().parse(req.data);
+ const snap=await plans(org).doc(input.planId).get();
+ if(!snap.exists)throw new HttpsError('not-found','Plan not found');
+ const blueprint=generateCloudBlueprint(snap.data());
+ await org.collection('cloudAutomationAudit').add({action:'plan.preview',planId:input.planId,by:uid,at:FieldValue.serverTimestamp()});
+ return {blueprint,cloudChangesMade:false};
+});
+export const cloudAssessMonitoring=callable(async req=>{
+ const {org,uid}=await authorized(req);
+ const input=z.object({planId:z.string().uuid(),signals:z.array(z.object({
+   metric:z.enum(['cpuPercent','memoryPercent','errorRatePercent','monthlySpendPercent','backupAgeHours']),
+   value:z.number().finite().min(0).max(100000)
+ }).strict()).max(100)}).strict().parse(req.data);
+ const snap=await plans(org).doc(input.planId).get();
+ if(!snap.exists)throw new HttpsError('not-found','Plan not found');
+ const results=assessCloudSignals(input.signals);
+ const ref=org.collection('cloudAssessments').doc(randomUUID());
+ await ref.create({planId:input.planId,results,source:'manual-observations',createdBy:uid,createdAt:FieldValue.serverTimestamp()});
+ return {id:ref.id,results,remediationPerformed:false};
+});
