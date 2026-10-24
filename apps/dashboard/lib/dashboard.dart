@@ -31,6 +31,7 @@ import 'modules/ngo_module.dart';
 import 'modules/documents_module.dart';
 import 'modules/generic_module_screen.dart';
 import 'modules/automation_studio.dart';
+import 'modules/cloud_automation_screen.dart';
 import 'modules/reseller_studio.dart';
 import 'modules/smart_intake.dart';
 import 'modules/executive_intelligence.dart';
@@ -76,6 +77,10 @@ class _DashboardState extends State<Dashboard> {
         if (!mounted) return;
         if (moduleId == 'reseller') {
           if (widget.canSeeReseller) _openResellerStudio();
+          return;
+        }
+        if (moduleId == 'cloud-automation') {
+          _openCloudAutomation();
           return;
         }
         if (moduleId == 'automation') {
@@ -127,6 +132,10 @@ class _DashboardState extends State<Dashboard> {
   void _openKnownModule(String id) {
     final module = workspaceModuleById[id];
     if (module != null) _navigateToModule(module);
+  }
+
+  void _openCloudAutomation() {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CloudAutomationScreen(store: store)));
   }
 
   void _openAutomationStudio() {
