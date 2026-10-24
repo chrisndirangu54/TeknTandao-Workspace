@@ -24,3 +24,26 @@
 Run the contract unit test with `node --test functions/test/cloud_migration_contract.test.js`.
 
 **No live deployments, customer data migration or cloud billing are enabled by this change.**
+
+## October 24 implementation extension
+
+- `cloudImportMigrationPlan`: signed-in organization-owner submission of an HTML JSON deployment plan.
+- `cloudListMigrationPlans`: lists only plans for the authorized workspace.
+- `cloudReviewMigrationPlan`: atomically records approval or rejection for a pending plan, but cannot deploy.
+- `cloudPreviewPlan`: creates a provider-specific, non-executing target blueprint (Azure/AWS/GCP/private).
+- `cloudAssessMonitoring`: assesses explicitly submitted numerical signals, records the observation and flags human-review incidents; it does **not** connect to live telemetry or remediate anything.
+- Flutter's `CloudAutomationScreen` can import JSON, list plans, review pending requests and preview a blueprint via `?module=cloud-automation`.
+- HTML links to Workspace's module and makes no remote cloud API calls.
+
+### Deployment readiness gate
+
+These commits are a reviewable implementation of the **planning, import and human-review path**, not a completed end-to-end migration of customer data. Before going live:
+1. Execute Node tests and Flutter static analysis in a configured build environment.
+2. Implement and test customer account linking, identity reconciliation, data import/deduplication and rollback with fixtures; no live customer records are moved yet.
+3. Configure per-customer Azure Lighthouse/RBAC delegation and approved Microsoft reseller onboarding.
+4. Add real IaC preview/diff and price quoting, and only then an explicitly approved cloud executor.
+5. Integrate read-only Azure Monitor telemetry with controlled polling, authentication, retention and anomaly detection.
+6. Add dedicated secret management, audited scoped credentials, service quotas, alert thresholds, billing integration and admin rollback.
+7. Pass multi-tenant security, emulator, operational and human-approval acceptance tests before hosting deployment.
+
+Current app screens are **not** a deployed service. No cloud resources have been provisioned.
