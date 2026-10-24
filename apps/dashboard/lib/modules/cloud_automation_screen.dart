@@ -36,6 +36,16 @@ class _CloudAutomationScreenState extends State<CloudAutomationScreen>{
     }catch(e){if(mounted)setState(()=>message='Import failed: $e');}
     finally{if(mounted)setState(()=>busy=false);}
   }
+  Future<void> previewPlan(String id)async{
+    try{
+      final result=await widget.store.call('cloudPreviewPlan',{'planId':id});
+      if(mounted)showDialog<void>(context:context,builder:(context)=>AlertDialog(
+        title:const Text('Cloud deployment preview — no changes made'),
+        content:SizedBox(width:600,child:SingleChildScrollView(child:SelectableText(
+          const JsonEncoder.withIndent('  ').convert(result['blueprint'])))),
+        actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
+    }catch(e){if(mounted)setState(()=>message='Preview unavailable: $e');}
+  }
   Future<void> review(String id,String decision)async{
     if(busy)return;
     setState(()=>busy=true);
@@ -64,6 +74,8 @@ class _CloudAutomationScreenState extends State<CloudAutomationScreen>{
         Text(plan['appName']?.toString()??'Application',style:const TextStyle(fontWeight:FontWeight.bold)),
         Text('${plan['provider']} · ${plan['stack']} · USD ${plan['monthlyBudgetUsd']}/month requested'),
         Text('Status: ${plan['state']} · execution disabled'),
+        OutlinedButton(onPressed:busy?null:()=>previewPlan(plan['id'].toString()),
+          child:const Text('View cloud blueprint')),
         if(plan['state']=='awaiting_review')Wrap(spacing:10,children:[
           OutlinedButton(onPressed:busy?null:()=>review(plan['id'].toString(),'reject'),child:const Text('Reject')),
           FilledButton(onPressed:busy?null:()=>review(plan['id'].toString(),'approve'),child:const Text('Approve planning record'))
