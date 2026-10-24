@@ -1,7 +1,7 @@
 'use strict';
 // Deliberately pure: intended for reuse by existing verified-billing and ISP
 // admin Functions, without touching routers or changing payment state.
-const PRODUCTS = new Set(['TV','ISP','WORKSPACE']);
+const PRODUCTS = new Set(['TV','ISP','WORKSPACE','ISP_TV_BUNDLE']);
 function normalizedSubscription(record, id) {
   if (!record || !PRODUCTS.has(record.product)) throw new Error('invalid_product');
   if (typeof record.customerId !== 'string' || !record.customerId) throw new Error('invalid_customer');
@@ -19,4 +19,8 @@ function eventEnvelope({eventId, subscriptionId, customerId, product, status, oc
   if (!Number.isFinite(when.getTime())) throw new Error('invalid_time');
   return {type:'subscription.status.changed.v1',eventId,subscriptionId,customerId,product,newStatus:status,occurredAt:when.toISOString()};
 }
-module.exports={normalizedSubscription,eventEnvelope};
+function serviceProducts(product) {
+  if (!PRODUCTS.has(product)) throw new Error('invalid_product');
+  return product === 'ISP_TV_BUNDLE' ? ['ISP','TV'] : [product];
+}
+module.exports={normalizedSubscription,eventEnvelope,serviceProducts};
