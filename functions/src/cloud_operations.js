@@ -51,10 +51,7 @@ export const cloudAdvanceOperation=call(async req=>{
   if(input.decision==='approve_operator'){
     throw new HttpsError('failed-precondition','Operator approval is reserved for a separately authenticated platform operator; not enabled in this release');
   }
-  if(false){
-    if(data.customerApprovedBy===uid)throw new HttpsError('failed-precondition','Independent operator approval required');
-    if(input.budgetReviewed!==true)throw new HttpsError('failed-precondition','Budget review required');
-  }
+
   transitionCloudJob(state,next,{customerApproved:!!data.customerApprovedBy,
     operatorApproved:input.decision==='approve_operator',budgetReviewed:input.budgetReviewed===true});
   tx.update(ref,{state:next,updatedBy:uid,updatedAt:FieldValue.serverTimestamp(),
