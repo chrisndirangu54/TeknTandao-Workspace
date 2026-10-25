@@ -44,17 +44,15 @@ class _PosModuleScreenState extends State<PosModuleScreen> {
     setState(() => _processing = true);
 
     try {
-      if (_cart.length != 1) throw Exception('Multi-item checkout needs an atomic sale endpoint. Please check out one item at a time.');
       if (_customerId == null) throw Exception('Select a customer before checkout.');
-      final item = _cart.single;
-      final productId = (item['id'] ?? item['sku'])?.toString();
-      if (productId == null || productId.isEmpty) throw Exception('Product ID missing.');
       final requestId = 'pos_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 30)}';
-      await widget.store.call('createSale', {
+      await widget.store.call('createPosCartSale', {
         'requestId': requestId,
-        'productId': productId,
         'contactId': _customerId,
-        'quantity': item['qty'],
+        'items': [
+          for (final item in _cart)
+            {'productId': (item['id'] ?? item['sku']).toString(), 'quantity': item['qty']}
+        ],
       });
 
       if (mounted) {
