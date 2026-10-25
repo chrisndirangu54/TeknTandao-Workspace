@@ -34,6 +34,50 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> showWarehouseBalances() async {
+    setState(() => saving = true);
+    try {
+      final result = await widget.store.call('getWarehouseInventoryOverview', {});
+      if (!mounted) return;
+      final rawStock = result['stock'];
+      final stock = rawStock is List ? rawStock : const [];
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Warehouse balances'),
+          content: SizedBox(
+            width: 500,
+            child: stock.isEmpty
+                ? const Text('No warehouse stock records found.')
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: stock.length,
+                    itemBuilder: (context, index) {
+                      final item = Map<String, dynamic>.from(stock[index] as Map);
+                      return ListTile(
+                        title: Text(item['sku']?.toString() ?? 'Unknown SKU'),
+                        subtitle: Text(item['warehouseId']?.toString() ?? 'Unknown warehouse'),
+                        trailing: Text('${item['quantity'] ?? 0} units'),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load warehouse balances: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> transferStock() async {
     final values = await recordForm(context, 'Transfer warehouse stock',
       ['SKU Code', 'From warehouse ID', 'To warehouse ID', 'Units']);
@@ -108,6 +152,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : transferStock,
                 icon: const Icon(Icons.swap_horiz_rounded),
                 label: const Text('Transfer between warehouses'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : showWarehouseBalances,
+                icon: const Icon(Icons.warehouse_outlined),
+                label: const Text('View warehouse balances'),
               ),
             ),
             const SizedBox(height:20),
