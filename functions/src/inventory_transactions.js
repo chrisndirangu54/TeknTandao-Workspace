@@ -64,6 +64,7 @@ export const transferWarehouseStock = callable(async request => {
 // Receiving never creates a financial payable or assumes payment has been made.
 export const receivePurchaseOrderStock = callable(async request => {
   const {org,uid} = await authorized(request,'procurement');
+  await authorized(request,'inventory');
   const {requestId,purchaseOrderId,sku,warehouseId} = request.data;
   const id=identifier(requestId), orderId=identifier(purchaseOrderId), product=identifier(sku);
   const warehouse=identifier(warehouseId), receiving=quantity(request.data.receiving);
