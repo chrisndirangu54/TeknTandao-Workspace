@@ -20,6 +20,7 @@ import {tillReconciliation} from './pos_till_domain.js';
 import {maintenanceTicket,transitionMaintenance} from './property_maintenance_domain.js';
 import {validateLease,leaseOverlaps,rentCharge} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
+import {availableRentAllocation} from './property_payments_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -530,6 +531,48 @@ export const issuePropertyRentCharge = callable(async request=>{
  });
 });
 
+// Payment evidence is created by a separate trusted settlement integration.
+// This API cannot create or mark payment evidence as verified.
+export const allocateVerifiedPropertyRent = callable(async request=>{
+ const {org,user,member}=await authorize(request,'property');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Property owner required');
+ const paymentId=identifier(request.data.paymentId),chargeId=identifier(request.data.chargeId);
+ const allocationId=identifier(request.data.allocationId);
+ const amountMinor=money(request.data.amountMinor);
+ const paymentRef=org.collection('verifiedRentPayments').doc(paymentId);
+ const chargeRef=org.collection('propertyRentCharges').doc(chargeId);
+ const allocationRef=org.collection('propertyRentAllocations').doc(allocationId);
+ return db.runTransaction(async tx=>{
+  const [payment,charge,prior,allocations]=await Promise.all([
+   tx.get(paymentRef),tx.get(chargeRef),tx.get(allocationRef),
+   tx.get(org.collection('propertyRentAllocations').where('paymentId','==',paymentId).limit(501))
+  ]);
+  if(!payment.exists||!charge.exists)throw new Error('Payment evidence or rent charge not found');
+  if(prior.exists){
+   const old=prior.data();
+   if(old.paymentId!==paymentId||old.chargeId!==chargeId||old.amountMinor!==amountMinor)
+    throw new Error('Conflicting allocation ID');
+   return {allocationId,replayed:true};
+  }
+  if(allocations.size>500)throw new Error('Payment allocation history too large');
+  if(payment.data().tenantId!==charge.data().tenantId)
+   throw new Error('Payment and charge belong to different tenants');
+  availableRentAllocation(payment.data(),allocations.docs.map(d=>d.data()),amountMinor);
+  // Contention on the common payment and charge documents serializes competing allocations.
+  const chargeAllocations=await tx.get(org.collection('propertyRentAllocations')
+   .where('chargeId','==',chargeId).limit(501));
+  if(chargeAllocations.size>500)throw new Error('Rent charge allocation history too large');
+  const already=chargeAllocations.docs.reduce((sum,d)=>sum+d.data().amountMinor,0);
+  if(!Number.isSafeInteger(already+amountMinor)||already+amountMinor>charge.data().amountMinor)
+   throw new Error('Allocation exceeds charge outstanding');
+  tx.update(paymentRef,{allocationRevision:FieldValue.increment(1)});
+  tx.update(chargeRef,{allocationRevision:FieldValue.increment(1)});
+  tx.create(allocationRef,{paymentId,chargeId,leaseId:charge.data().leaseId,
+   tenantId:charge.data().tenantId,amountMinor,verified:true,createdBy:user,createdAt:stamp()});
+  return {allocationId,replayed:false};
+ });
+});
+
 export const getPropertyTenantStatement = callable(async request=>{
  const {org,member}=await authorize(request,'property');
  if(member.role!=='owner')throw new HttpsError('permission-denied','Property owner required');
@@ -539,13 +582,14 @@ export const getPropertyTenantStatement = callable(async request=>{
  if(!lease.exists)throw new Error('Lease not found');
  const charges=await org.collection('propertyRentCharges').where('leaseId','==',leaseId).limit(501).get();
  if(charges.size>500)throw new Error('Charge history exceeds bounded report');
- // Payment allocation integration is not yet available. Reporting zero verified
- // allocations avoids fabricating rent collection from unverified statuses.
+ const allocations=await org.collection('propertyRentAllocations').where('leaseId','==',leaseId).limit(1001).get();
+ if(allocations.size>1000)throw new Error('Allocation history exceeds bounded report');
  const statement=propertyTenantStatement(
-   charges.docs.map(d=>({chargeId:d.id,...d.data()})),[],{asOf});
+   charges.docs.map(d=>({chargeId:d.id,...d.data()})),
+   allocations.docs.map(d=>({allocationId:d.id,...d.data()})),{asOf});
  return {leaseId,tenantId:lease.data().tenantId,...statement,
-  reconciliationStatus:'payments_not_integrated',
-  limitations:'Outstanding charges are shown without verified settlement allocations. Confirm bank and mobile-money receipts independently.'};
+  reconciliationStatus:'allocation_records_only',
+  limitations:'Amounts rely on trusted externally verified rent-payment evidence; this endpoint does not independently confirm bank settlements.'};
 });
 
 export const createPropertyMaintenanceTicket = callable(async request=>{
