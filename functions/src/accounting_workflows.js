@@ -8,7 +8,7 @@ import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js'
 import {preparePosting} from './posting_policy_domain.js';
 import {provisionalFinancialStatements} from './financial_statements_domain.js';
 import {provisionalCashFlow} from './cash_flow_domain.js';
-import {depreciationSchedule,depreciationJournal,planAssetDisposal} from './fixed_assets_domain.js';
+import {depreciationSchedule,depreciationJournal,planAssetDisposal,assetAcquisitionJournal} from './fixed_assets_domain.js';
 
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
@@ -125,6 +125,38 @@ export const registerFixedAsset = api(async request => {
     lifeMonths:request.data.lifeMonths,startMonth:request.data.startMonth,schedule,
     createdBy:user,createdAt:stamp()});
   return {assetId:id,periodCount:schedule.length};
+});
+// Creates an acquisition asset and an unreconciled clearing liability.
+// This does not claim that a supplier was paid or an invoice was verified.
+export const postFixedAssetAcquisition = api(async request => {
+  const {db,org,user}=await books(request);
+  const membership=await org.collection('members').doc(user).get();
+  if(membership.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required');
+  const id=identifier(request.data.assetId);
+  const postingDate=request.data.postingDate;
+  const period=accountingPeriod(postingDate);
+  const ref=org.collection('fixedAssets').doc(id);
+  const journalRef=org.collection('journals').doc(`asset_acquisition_${id}`);
+  return db.runTransaction(async tx=>{
+    const [asset,existing,lock]=await Promise.all([tx.get(ref),tx.get(journalRef),
+      tx.get(org.collection('accountingPeriods').doc(period))]);
+    if(!asset.exists)throw new Error('Asset not registered');
+    if(existing.exists){
+      if(existing.data().postingDate!==postingDate||existing.data().total!==asset.data().costMinor)
+        throw new Error('Conflicting asset acquisition posting');
+      return {assetId:id,replayed:true};
+    }
+    if(asset.data().disposedAt||asset.data().status==='disposed')
+      throw new Error('Cannot acquire a disposed asset');
+    assertOpenPeriod(period,lock.data());
+    const posting=preparePosting({postingDate,periodState:lock.data(),
+      sourceType:'asset_acquisition',sourceId:id,
+      journal:assetAcquisitionJournal(asset.data().costMinor)});
+    tx.create(journalRef,{...posting.journal,createdBy:user,createdAt:stamp(),
+      settlementState:'unreconciled'});
+    tx.update(ref,{acquisitionJournalId:journalRef.id,acquisitionPostingDate:postingDate});
+    return {assetId:id,posted:true,replayed:false,settlementState:'unreconciled'};
+  });
 });
 export const postFixedAssetDepreciation = api(async request => {
   const {db,org,user}=await books(request);
