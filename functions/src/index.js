@@ -15,6 +15,7 @@ import {invoiceJournal} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
 import {buildPosSaleSnapshot,posReceipt} from './pos_receipts_domain.js';
+import {validatePosCart,pricePosCart} from './pos_cart_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -425,6 +426,65 @@ export const createSale = callable(async request => {
     tx.create(org.collection('events').doc(`sale_${id}`), {type: 'sale.created', saleId: id, createdAt: stamp()});
     return {id, total};
   });
+});
+
+export const createPosCartSale = callable(async request=>{
+ const {org,user}=await authorize(request,'pos');
+ const id=identifier(request.data.requestId),contactId=identifier(request.data.contactId);
+ const items=validatePosCart(request.data.items);
+ const saleRef=org.collection('sales').doc(id);
+ const contactRef=org.collection('contacts').doc(contactId);
+ const productRefs=items.map(item=>org.collection('products').doc(item.productId));
+ return db.runTransaction(async tx=>{
+  // Every read precedes all writes, including the FEFO batch queries.
+  const [previous,customer,...products]=await Promise.all([
+   tx.get(saleRef),tx.get(contactRef),...productRefs.map(ref=>tx.get(ref))]);
+  if(previous.exists){
+   const prior=previous.data();
+   if(prior.kind!=='pos_cart'||prior.contactId!==contactId||
+      JSON.stringify(prior.cartRequest)!==JSON.stringify(items))
+    throw new Error('Sale request ID already used for different cart');
+   return {id,total:prior.total,replayed:true};
+  }
+  if(!customer.exists||products.some(p=>!p.exists))throw new Error('Customer or product unavailable');
+  const productsById=new Map(products.map(p=>[p.id,p.data()]));
+  const priced=pricePosCart(items,productsById);
+  const warehouseIds=items.map(item=>identifier(productsById.get(item.productId).warehouseId||'main'));
+  const warehouseRefs=items.map((item,i)=>org.collection('warehouseStock').doc(warehouseIds[i]+'__'+item.productId));
+  const [warehouses,...batchQueries]=await Promise.all([
+    Promise.all(warehouseRefs.map(ref=>tx.get(ref))),
+    ...items.map((item,i)=>tx.get(org.collection('inventoryBatches')
+      .where('warehouseId','==',warehouseIds[i]).where('sku','==',item.productId)))
+  ]);
+  const {allocateBatchesFEFO}=await import('./inventory_batches_domain.js');
+  const updates=[];
+  const lineSnapshots=priced.lines.map((line,i)=>{
+    const available=warehouses[i].data()?.quantity;
+    if(!Number.isSafeInteger(available)||available<line.quantity)
+      throw new Error('Insufficient warehouse stock for '+line.productId);
+    const batchSnap=batchQueries[i];
+    let allocations=[];
+    if(!batchSnap.empty){
+      allocations=allocateBatchesFEFO({quantity:line.quantity,
+        batches:batchSnap.docs.map(d=>({batchId:d.data().batchId,
+          quantity:d.data().quantity,expiryAt:d.data().expiryAt||null}))}).allocations;
+      for(const allocation of allocations){
+        const lot=batchSnap.docs.find(d=>d.data().batchId===allocation.batchId);
+        updates.push({ref:lot.ref,quantity:lot.data().quantity-allocation.quantity});
+      }
+    }
+    updates.push({ref:warehouseRefs[i],quantity:available-line.quantity});
+    updates.push({ref:productRefs[i],stock:productsById.get(line.productId).stock-line.quantity});
+    return {...line,warehouseId:warehouseIds[i],batchAllocations:allocations};
+  });
+  for(const update of updates)tx.update(update.ref,{
+    ...(update.quantity!==undefined?{quantity:update.quantity}:{stock:update.stock}),updatedAt:stamp()});
+  tx.create(saleRef,{kind:'pos_cart',contactId,cartRequest:items,lines:lineSnapshots,
+    total:priced.total,currency:'KES',paymentState:'unpaid',
+    createdAt:stamp(),createdBy:user});
+  tx.create(org.collection('events').doc('sale_'+id),{type:'sale.created',saleId:id,createdAt:stamp()});
+  return {id,total:priced.total,replayed:false,items:lineSnapshots.length};
+ });
 });
 
 export const getPosReceipt = callable(async request=>{
