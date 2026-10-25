@@ -7,6 +7,7 @@ import {defineSecret} from 'firebase-functions/params';
 import {randomUUID} from 'node:crypto';
 import {prepareModuleRecord} from './module_records.js';
 import {transitionEncounter,transitionAssessment,assessmentScore} from './vertical_workflows_domain.js';
+import {requireVerticalPermission} from './vertical_permissions_domain.js';
 import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expandRequiredApps, sanitizeRecord} from './domain.js';
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
 import {invoiceJournal} from './ledger_domain.js';
@@ -188,7 +189,13 @@ export const saveModuleRecord = callable(async request => {
   const ownerWriteKinds = {hospital: ['prescription', 'clinicalNote', 'labTest'],
     school: ['grade'], hr: ['payRun']};
   if (ownerWriteKinds[app]?.includes(request.data.kind) && member.role !== 'owner') {
-    throw new HttpsError('permission-denied', 'Owner approval required for sensitive records');
+    const assignment = (await org.collection('professionalAssignments').doc(user).get()).data();
+    const permissions = {hospital:{prescription:'clinical:write',clinicalNote:'clinical:write',labTest:'lab:write'},
+      school:{grade:'grade:write'}};
+    const permission=permissions[app]?.[request.data.kind];
+    if(!permission)throw new HttpsError('permission-denied','Owner required');
+    try{requireVerticalPermission({app,member,assignment,permission});}
+    catch{throw new HttpsError('permission-denied','Professional assignment required');}
   }
   const {record, reference} = prepareModuleRecord(app, request.data.kind, request.data.record);
   const id = identifier(request.data.id || randomUUID());
