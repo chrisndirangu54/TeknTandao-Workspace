@@ -294,9 +294,9 @@ test('accounting rejects credit request replay across customers and self-reversa
   await api.installApp.run(req({appId: 'crm'}));
   await api.saveRecord.run(req({appId: 'crm', id: 'customer_a', record: {name: 'Customer A'}}));
   await api.saveRecord.run(req({appId: 'crm', id: 'customer_b', record: {name: 'Customer B'}}));
-  await api.issueCreditNote.run(req({requestId: 'credit_1', name: 'Return', total: 2500, contactId: 'customer_a'}));
+  await api.issueCreditNote.run(req({requestId: 'credit_1', postingDate: '2026-10-25', name: 'Return', total: 2500, contactId: 'customer_a'}));
   await assert.rejects(
-    api.issueCreditNote.run(req({requestId: 'credit_1', name: 'Return', total: 2500, contactId: 'customer_b'})),
+    api.issueCreditNote.run(req({requestId: 'credit_1', postingDate: '2026-10-25', name: 'Return', total: 2500, contactId: 'customer_b'})),
     /Request ID already used/
   );
   assert.equal((await db.doc(`organizations/${orgId}/invoices/credit_1`).get()).data().contactId, 'customer_a');
