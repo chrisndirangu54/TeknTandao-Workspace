@@ -37,7 +37,55 @@ class _PosModuleScreenState extends State<PosModuleScreen> {
   }
 
   int _kesToMinor(String input) {
-    final match = RegExp(r'^(0|[1-9][0-9]*)(?:\\.([0-9]{1,2}))? => _cart.fold<int>(0, (sum, item) => sum + ((item['price'] as int) * (item['qty'] as int)));
+    final m = RegExp(r'^(0|[1-9][0-9]*)(?:\.([0-9]{1,2}))?$').firstMatch(input);
+    if (m == null) throw const FormatException('Enter KES with at most 2 decimals');
+    final shillings = int.parse(m.group(1)!);
+    if (shillings > 100000000) throw const FormatException('Amount too large');
+    return shillings * 100 + int.parse((m.group(2) ?? '').padRight(2, '0'));
+  }
+
+  Future<void> _tillAction(String action) async {
+    if (_tillBusy) return;
+    final till = _activeTillId;
+    if (action != 'open' && till == null) return;
+    final input = await _askTillValue(action == 'open' ? 'Open cashier till' :
+      action == 'close' ? 'Close cashier till' : 'Record cash movement', 'Amount (KES)');
+    if (input == null || !mounted) return;
+    setState(() => _tillBusy = true);
+    try {
+      final minor = _kesToMinor(input);
+      if (action == 'open') {
+        final id = 'till_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 30)}';
+        await widget.store.call('openPosTill', {'tillId': id, 'openingMinor': minor});
+        if (mounted) setState(() => _activeTillId = id);
+      } else if (action == 'close') {
+        final result = await widget.store.call('closePosTill', {'tillId': till, 'countedMinor': minor});
+        if (mounted) {
+          setState(() => _activeTillId = null);
+          await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+            title: const Text('Till reconciliation'),
+            content: Text('Expected: ${kes(result['expectedMinor'])}\nCounted: ${kes(result['countedMinor'])}\nDifference: ${kes(result['differenceMinor'])}\n\nManual cash movements only; payments remain unverified.'),
+            actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+          ));
+        }
+      } else {
+        await widget.store.call('recordPosTillMovement', {
+          'tillId': till,
+          'movementId': 'cash_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 30)}',
+          'type': action == 'in' ? 'cash_in' : 'cash_out',
+          'amountMinor': minor,
+          'reason': action == 'in' ? 'Cash added manually' : 'Cash removed manually',
+        });
+      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Till operation recorded')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Till operation failed: $e')));
+    } finally {
+      if (mounted) setState(() => _tillBusy = false);
+    }
+  }
+
+  int get _cartSubtotal => _cart.fold<int>(0, (sum, item) => sum + ((item['price'] as int) * (item['qty'] as int)));
   int get _vatAmount => (_cartSubtotal * 0.16 / 1.16).round();
 
   void _addToCart(Map<String, dynamic> product) {
