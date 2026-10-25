@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {depreciationSchedule,depreciationJournal,planAssetDisposal} from '../src/fixed_assets_domain.js';
+import {depreciationSchedule,depreciationJournal,planAssetDisposal,assetAcquisitionJournal} from '../src/fixed_assets_domain.js';
 import {trialBalance} from '../src/ledger_domain.js';
 test('straight line schedule allocates exact depreciable cost',()=>{
  const rows=depreciationSchedule({assetId:'laptop',costMinor:12001,residualMinor:1,lifeMonths:7,startMonth:'2026-10'});
@@ -22,4 +22,12 @@ test('disposal recognizes gain or loss and produces balanced journals',()=>{
  const loss=planAssetDisposal({costMinor:10000,accumulatedMinor:0,proceedsMinor:5000});
  assert.equal(loss.lossMinor,5000);
  assert.equal(trialBalance([loss.journal]).journalCount,1);
+});
+
+test('asset acquisition records an asset and unreconciled clearing liability',()=>{
+ const journal=assetAcquisitionJournal(125000);
+ assert.equal(journal.lines.find(row=>row.account==='1500').debit,125000);
+ assert.equal(journal.lines.find(row=>row.account==='2290').credit,125000);
+ assert.equal(trialBalance([journal]).journalCount,1);
+ assert.throws(()=>assetAcquisitionJournal(0),/positive/);
 });
