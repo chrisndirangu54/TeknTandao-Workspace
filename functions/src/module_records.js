@@ -62,6 +62,14 @@ export function prepareModuleRecord(appId, kind, input) {
   }
   if (schema.reference) identifier(record[schema.reference[0]]);
   if (record.startAt && record.endAt && Date.parse(record.endAt) <= Date.parse(record.startAt)) throw new Error('End must follow start');
+  // Validate critical HR and healthcare/school record semantics before storage.
+  if (kind === 'leave') {
+    if (Date.parse(record.endAt) <= Date.parse(record.startAt)) throw new Error('Leave end must follow start');
+  }
+  if (kind === 'calendar' && Date.parse(record.endAt) <= Date.parse(record.startAt)) {
+    throw new Error('Calendar end must follow start');
+  }
+  if (kind === 'grade' && record.result.length > 80) throw new Error('Invalid grade result');
   const stages = {deal: ['lead', 'qualified', 'proposal', 'won', 'lost'], application: ['applied', 'screening', 'interview', 'offered', 'hired', 'rejected']};
   if (Object.hasOwn(stages, kind) && !stages[kind].includes(record.stage)) throw new Error('Invalid workflow stage');
   const statuses = {task: ['open', 'in_progress', 'completed', 'cancelled'], leave: ['requested', 'approved', 'rejected', 'cancelled'], payRun: ['draft', 'approved', 'paid', 'void']};
