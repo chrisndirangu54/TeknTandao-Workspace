@@ -372,4 +372,21 @@ test('product creation initializes a single warehouse balance and rejects direct
   assert.equal((await db.doc(`organizations/${tenant}/warehouseStock/east__tea`).get()).data().quantity,7);
 });
 
+
+test('legacy warehouse migration requires owner and refuses discrepancies', async () => {
+  const tenant = `legacy_migration_${Date.now()}`;
+  const req = (data, uid=tenant) => ({data:{orgId:tenant,...data},auth:{uid}});
+  await api.createOrganization.run(req({name:'Legacy migration'}));
+  await api.installApp.run(req({appId:'inventory'}));
+  const org=db.doc(`organizations/${tenant}`);
+  await org.collection('products').doc('legacy_tea').set({name:'Tea',stock:9,price:100,warehouseId:'east'});
+  await api.grantMember.run(req({uid:'clerk',apps:['inventory']}));
+  await assert.rejects(api.migrateLegacyWarehouseStock.run(req({sku:'legacy_tea'},'clerk')),/Owner required/);
+  const migrated=await api.migrateLegacyWarehouseStock.run(req({sku:'legacy_tea'}));
+  assert.equal(migrated.quantity,9);
+  assert.equal((await api.migrateLegacyWarehouseStock.run(req({sku:'legacy_tea'}))).status,'already_present');
+  await org.collection('warehouseStock').doc('east__legacy_tea').update({quantity:7});
+  await assert.rejects(api.migrateLegacyWarehouseStock.run(req({sku:'legacy_tea'})),/manual reconciliation required/);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
