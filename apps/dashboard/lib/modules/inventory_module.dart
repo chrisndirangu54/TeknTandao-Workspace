@@ -145,6 +145,35 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }
   }
 
+  Future<void> matchSupplierInvoice() async {
+    final values = await recordForm(context, 'Match supplier invoice to received goods',
+      ['Supplier invoice ID', 'Purchase order ID', 'Invoiced units', 'Unit price (KES)']);
+    if (values == null || values.length < 4) return;
+    final units = int.tryParse(values[2].trim());
+    final price = double.tryParse(values[3].replaceAll(',', '').trim());
+    if (units == null || units <= 0 || price == null || price <= 0) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid positive units and price.')));
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      final result = await widget.store.call('matchSupplierInvoice', {
+        'invoiceId': values[0].trim(),
+        'purchaseOrderId': values[1].trim(),
+        'units': units,
+        'unitPriceMinor': (price * 100).round(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Matched bill ${result['id']}; accounting posting still required.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Invoice matching failed: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> cancelPurchaseOrder() async {
     final values = await recordForm(context, 'Cancel unreceived purchase order',
       ['Purchase order ID']);
@@ -356,6 +385,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : cancelPurchaseOrder,
                 icon: const Icon(Icons.cancel_outlined),
                 label: const Text('Cancel unreceived purchase order (owner)'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : matchSupplierInvoice,
+                icon: const Icon(Icons.request_quote_outlined),
+                label: const Text('Match supplier invoice (owner)'),
               ),
             ),
             const SizedBox(height: 8),
