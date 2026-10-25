@@ -17,6 +17,7 @@ import {preparePosting} from './posting_policy_domain.js';
 import {buildPosSaleSnapshot,posReceipt} from './pos_receipts_domain.js';
 import {validatePosCart,pricePosCart} from './pos_cart_domain.js';
 import {tillReconciliation} from './pos_till_domain.js';
+import {maintenanceTicket,transitionMaintenance} from './property_maintenance_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -481,6 +482,57 @@ export const closePosTill = callable(async request=>{
   tx.update(till,{status:'closed',closedAt:stamp(),closedBy:user,reconciliation});
   return {tillId,...reconciliation,replayed:false};
  });
+});
+
+export const createPropertyMaintenanceTicket = callable(async request=>{
+ const {org,user}=await authorize(request,'property');
+ const id=identifier(request.data.ticketId||randomUUID());
+ const ticket=maintenanceTicket(request.data);
+ const property=org.collection('properties').doc(ticket.propertyId);
+ const ref=org.collection('propertyMaintenance').doc(id);
+ await db.runTransaction(async tx=>{
+  if(!(await tx.get(property)).exists)throw new Error('Property not found in workspace');
+  tx.create(ref,{...ticket,createdBy:user,createdAt:stamp(),updatedAt:stamp()});
+  tx.create(ref.collection('history').doc(randomUUID()),
+   {action:'created',to:'open',actor:user,at:stamp()});
+ });
+ return {ticketId:id,status:'open'};
+});
+export const updatePropertyMaintenanceTicket = callable(async request=>{
+ const {org,user,member}=await authorize(request,'property');
+ const id=identifier(request.data.ticketId);
+ const ref=org.collection('propertyMaintenance').doc(id);
+ const next=request.data.status;
+ return db.runTransaction(async tx=>{
+  const prior=await tx.get(ref);
+  if(!prior.exists)throw new Error('Maintenance ticket not found');
+  // Only the creator may cancel their unassigned ticket; all other
+  // lifecycle transitions are property-manager (workspace owner) actions.
+  if(member.role!=='owner'&&!(next==='cancelled'&&prior.data().status==='open'&&prior.data().createdBy===user))
+   throw new HttpsError('permission-denied','Property manager approval required');
+  const transition=transitionMaintenance(prior.data(),next,{
+   note:request.data.note??'',assigneeId:request.data.assigneeId??null});
+  tx.update(ref,{status:transition.status,assigneeId:transition.assigneeId,updatedAt:stamp(),updatedBy:user,
+   ...(next==='resolved'?{resolutionNote:transition.note,resolvedAt:stamp()}:{})});
+  tx.create(ref.collection('history').doc(randomUUID()),{
+   from:prior.data().status,to:next,actor:user,note:transition.note,at:stamp()});
+  return {ticketId:id,status:next};
+ });
+});
+export const listPropertyMaintenanceTickets = callable(async request=>{
+ const {org}=await authorize(request,'property');
+ const propertyId=identifier(request.data.propertyId);
+ const limit=request.data.limit??50;
+ if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid page size');
+ const [property,tickets]=await Promise.all([
+  org.collection('properties').doc(propertyId).get(),
+  org.collection('propertyMaintenance').where('propertyId','==',propertyId).limit(limit).get()
+ ]);
+ if(!property.exists)throw new Error('Property not found');
+ return {tickets:tickets.docs.map(doc=>({
+  id:doc.id,propertyId,status:doc.data().status,priority:doc.data().priority,
+  title:doc.data().title,assigneeId:doc.data().assigneeId??null
+ }))};
 });
 
 export const createPosCartSale = callable(async request=>{
