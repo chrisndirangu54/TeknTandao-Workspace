@@ -8,6 +8,7 @@ import {reconcileInventory} from './inventory_reconciliation_domain.js';
 import {planSupplierInvoiceMatch} from './supplier_invoice_domain.js';
 import {supplierBillJournal} from './ledger_domain.js';
 import {supplierPayablesAging} from './payables_aging_domain.js';
+import {accountingPeriod,assertOpenPeriod} from './accounting_period_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -345,19 +346,23 @@ export const postMatchedSupplierBill = callable(async request => {
   const id=identifier(request.data.invoiceId);
   const invoiceRef=org.collection('supplierInvoices').doc(id);
   const journalRef=org.collection('journals').doc(`supplier_bill_${id}`);
+  const postingDate=request.data.postingDate;
+  const period=accountingPeriod(postingDate);
+  const lockRef=org.collection('accountingPeriods').doc(period);
   return db.runTransaction(async tx=>{
-    const [invoice,journal]=await Promise.all([tx.get(invoiceRef),tx.get(journalRef)]);
+    const [invoice,journal,lock]=await Promise.all([tx.get(invoiceRef),tx.get(journalRef),tx.get(lockRef)]);
     if(!invoice.exists)throw new Error('Matched supplier invoice not found');
     const bill=invoice.data();
     if(bill.accountingState==='posted'){
       if(!journal.exists)throw new Error('Posted bill has no journal; reconcile ledger manually');
       return {id,status:'posted',replayed:true};
     }
+    assertOpenPeriod(period,lock.data());
     if(bill.status!=='matched_pending_accounting'||bill.accountingState!=='not_posted'||journal.exists)
       throw new Error('Bill cannot be posted in current state');
     if(bill.currency!=='KES'||bill.paymentState!=='unpaid')throw new Error('Unexpected supplier bill state');
     const entry=supplierBillJournal(bill.totalMinor);
-    tx.create(journalRef,{...entry,sourceType:'supplier_bill',sourceId:id,
+    tx.create(journalRef,{...entry,sourceType:'supplier_bill',sourceId:id,postingDate,period,
       createdBy:uid,createdAt:stamp()});
     tx.update(invoiceRef,{accountingState:'posted',postedBy:uid,postedAt:stamp(),updatedAt:stamp()});
     return {id,status:'posted',replayed:false,totalMinor:entry.total};
@@ -373,4 +378,21 @@ export const getSupplierPayablesAging = callable(async request => {
   if(docs.size>500)throw new HttpsError('resource-exhausted','Use paginated payables reporting for more than 500 bills');
   const asOf=request.data.asOf;
   return supplierPayablesAging(docs.docs.map(d=>({id:d.id,...d.data()})),asOf);
+});
+
+
+export const closeAccountingPeriod = callable(async request => {
+  const {org,uid}=await authorized(request,'accounting');
+  const member=await org.collection('members').doc(uid).get();
+  if(member.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required to close accounting periods');
+  const period=request.data.period;
+  assertOpenPeriod(period);
+  const ref=org.collection('accountingPeriods').doc(period);
+  return db.runTransaction(async tx=>{
+    const snapshot=await tx.get(ref);
+    if(snapshot.data()?.status==='closed')return {period,status:'closed',replayed:true};
+    assertOpenPeriod(period,snapshot.data());
+    tx.set(ref,{status:'closed',closedBy:uid,closedAt:stamp()});
+    return {period,status:'closed',replayed:false};
+  });
 });
