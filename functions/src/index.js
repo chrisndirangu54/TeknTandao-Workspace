@@ -237,8 +237,16 @@ export const setProfessionalAssignment = callable(async request=>{
  if(typeof request.data.active!=='boolean')throw new Error('Active flag required');
  const staff=await org.collection('members').doc(staffUid).get();
  if(!staff.exists)throw new Error('Assign an existing organization member');
+ const patientIds=request.data.patientIds??[],classNames=request.data.classNames??[];
+ if(!Array.isArray(patientIds)||!Array.isArray(classNames)||patientIds.length>200||classNames.length>100)
+   throw new Error('Invalid professional scope');
+ const scopePatients=patientIds.map(identifier);
+ const scopeClasses=classNames.map(name=>textValue(name,100));
+ if((app==='hospital'&&scopeClasses.length)||(app==='school'&&scopePatients.length))
+   throw new Error('Scope does not match professional app');
  await org.collection('professionalAssignments').doc(staffUid).set({
-  app,role,active:request.data.active,assignedBy:user,updatedAt:stamp()
+  app,role,active:request.data.active,patientIds:scopePatients,classNames:scopeClasses,
+  assignedBy:user,updatedAt:stamp()
  });
  return {staffUid,app,role,active:request.data.active};
 });
