@@ -430,4 +430,28 @@ test('POS allocates tracked lots in earliest-expiry order and blocks exhausted t
     /Insufficient non-expired batch stock/);
 });
 
+
+test('warehouse transfer moves tracked FEFO lots with aggregate quantities', async () => {
+  const tenant = `batch_transfer_${Date.now()}`;
+  const req = data => ({data:{orgId:tenant,...data},auth:{uid:tenant}});
+  await api.createOrganization.run(req({name:'Batch transfer'}));
+  await api.installApp.run(req({appId:'inventory'}));
+  const org=db.doc(`organizations/${tenant}`);
+  await org.collection('warehouseStock').doc('east__tea').set({warehouseId:'east',sku:'tea',quantity:7});
+  await org.collection('warehouseStock').doc('west__tea').set({warehouseId:'west',sku:'tea',quantity:0});
+  for(const [id,quantity,expiryAt] of [['early',3,'2026-12-01'],['later',4,'2027-02-01']]){
+    await org.collection('inventoryBatches').doc(`east__tea__${id}`).set({
+      warehouseId:'east',sku:'tea',batchId:id,quantity,expiryAt});
+  }
+  const command={requestId:'transfer_fefo',sku:'tea',fromWarehouse:'east',toWarehouse:'west',quantity:5};
+  await api.transferWarehouseStock.run(req(command));
+  assert.equal((await org.collection('inventoryBatches').doc('east__tea__early').get()).data().quantity,0);
+  assert.equal((await org.collection('inventoryBatches').doc('east__tea__later').get()).data().quantity,2);
+  assert.equal((await org.collection('inventoryBatches').doc('west__tea__early').get()).data().quantity,3);
+  assert.equal((await org.collection('inventoryBatches').doc('west__tea__later').get()).data().quantity,2);
+  assert.equal((await org.collection('warehouseStock').doc('east__tea').get()).data().quantity,2);
+  assert.equal((await org.collection('warehouseStock').doc('west__tea').get()).data().quantity,5);
+  assert.equal((await api.transferWarehouseStock.run(req(command))).replayed,true);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
