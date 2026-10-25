@@ -66,7 +66,7 @@ export function trialBalance(journals) {
     let debitTotal = 0;
     let creditTotal = 0;
     for (const item of journal.lines) {
-      if (!item || typeof item.account !== 'string' || !/^\\d{4}$/.test(item.account) ||
+      if (!item || typeof item.account !== 'string' || !/^\d{4}$/.test(item.account) ||
           typeof item.name !== 'string' || !item.name.trim()) throw new Error('Invalid journal account');
       const debit = money(item.debit);
       const credit = money(item.credit);
