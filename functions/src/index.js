@@ -6,6 +6,7 @@ import {onDocumentCreated} from 'firebase-functions/v2/firestore';
 import {defineSecret} from 'firebase-functions/params';
 import {randomUUID} from 'node:crypto';
 import {prepareModuleRecord} from './module_records.js';
+import {transitionEncounter,transitionAssessment,assessmentScore} from './vertical_workflows_domain.js';
 import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expandRequiredApps, sanitizeRecord} from './domain.js';
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
 import {invoiceJournal} from './ledger_domain.js';
@@ -203,6 +204,64 @@ export const saveModuleRecord = callable(async request => {
       ...(existing.exists ? {} : {createdAt: stamp(), createdBy: user})}, {merge: true});
   });
   return {id};
+});
+
+// Separate lifecycle records retain authorization and a transition history.
+// Clinical notes and student scores are not exposed in the response.
+export const advanceClinicalEncounter = callable(async request => {
+ const {org,user,member}=await authorize(request,'hospital');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Clinical encounter owner authorization required');
+ const id=identifier(request.data.encounterId),next=request.data.nextStatus;
+ const ref=org.collection('clinicalEncounters').doc(id);
+ return db.runTransaction(async tx=>{
+  const snap=await tx.get(ref);
+  if(!snap.exists)throw new Error('Encounter not found');
+  const prior=snap.data();
+  const status=transitionEncounter(prior.status,next);
+  tx.update(ref,{status,updatedAt:stamp(),updatedBy:user});
+  tx.create(org.collection('clinicalEncounterEvents').doc(randomUUID()),
+    {encounterId:id,from:prior.status,to:status,actor:user,at:stamp()});
+  return {encounterId:id,status};
+ });
+});
+export const createClinicalEncounter = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hospital');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Clinical encounter owner authorization required');
+ const id=identifier(request.data.encounterId),patientId=identifier(request.data.patientId);
+ const ref=org.collection('clinicalEncounters').doc(id);
+ await db.runTransaction(async tx=>{
+  const patient=await tx.get(org.collection('patients').doc(patientId));
+  if(!patient.exists)throw new Error('Patient not found');
+  tx.create(ref,{patientId,status:'scheduled',createdBy:user,createdAt:stamp()});
+ });
+ return {encounterId:id,status:'scheduled'};
+});
+export const publishSchoolAssessment = callable(async request=>{
+ const {org,user,member}=await authorize(request,'school');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Assessment approval requires owner');
+ const id=identifier(request.data.assessmentId);
+ const ref=org.collection('schoolAssessments').doc(id);
+ return db.runTransaction(async tx=>{
+  const snap=await tx.get(ref);
+  if(!snap.exists)throw new Error('Assessment not found');
+  const status=transitionAssessment(snap.data().status,request.data.nextStatus);
+  tx.update(ref,{status,updatedBy:user,updatedAt:stamp()});
+  tx.create(org.collection('assessmentAuditEvents').doc(randomUUID()),{
+   assessmentId:id,from:snap.data().status,to:status,actor:user,at:stamp()});
+  return {assessmentId:id,status};
+ });
+});
+export const createSchoolAssessment = callable(async request=>{
+ const {org,user,member}=await authorize(request,'school');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Assessment creation requires owner');
+ const id=identifier(request.data.assessmentId),studentId=identifier(request.data.studentId);
+ const result=assessmentScore(request.data.score,request.data.maxScore);
+ await db.runTransaction(async tx=>{
+  if(!(await tx.get(org.collection('students').doc(studentId))).exists)throw new Error('Student not found');
+  tx.create(org.collection('schoolAssessments').doc(id),{studentId,...result,status:'draft',
+   createdBy:user,createdAt:stamp()});
+ });
+ return {assessmentId:id,status:'draft',percentBasisPoints:result.percentBasisPoints};
 });
 
 export const createSale = callable(async request => {
