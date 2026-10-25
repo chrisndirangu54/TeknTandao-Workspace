@@ -14,6 +14,7 @@ import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, qu
 import {invoiceJournal} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
+import {buildPosSaleSnapshot,posReceipt} from './pos_receipts_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -419,10 +420,19 @@ export const createSale = callable(async request => {
     }
     tx.update(warehouseRef, {quantity: available - request.data.quantity, updatedAt: stamp()});
     tx.update(productRef, {stock: product.stock - request.data.quantity, updatedAt: stamp()});
-    tx.create(saleRef, {productId: productRef.id, contactId: contactRef.id, quantity: request.data.quantity, total, currency: 'KES', paymentState: 'unpaid', batchAllocations, createdAt: stamp(), createdBy: user});
+    const receiptSnapshot=buildPosSaleSnapshot({saleId:id,productId:productRef.id,productName:product.name,contactId:contactRef.id,quantity:request.data.quantity,unitPriceMinor:product.price,totalMinor:total,warehouseId});
+    tx.create(saleRef, {productId: productRef.id, contactId: contactRef.id, quantity: request.data.quantity, total, currency: 'KES', paymentState: 'unpaid', receiptSnapshot, batchAllocations, createdAt: stamp(), createdBy: user});
     tx.create(org.collection('events').doc(`sale_${id}`), {type: 'sale.created', saleId: id, createdAt: stamp()});
     return {id, total};
   });
+});
+
+export const getPosReceipt = callable(async request=>{
+ const {org}=await authorize(request,'pos');
+ const saleId=identifier(request.data.saleId);
+ const sale=await org.collection('sales').doc(saleId).get();
+ if(!sale.exists)throw new HttpsError('not-found','Sale not found');
+ return posReceipt(sale.data(),saleId);
 });
 
 export const saleAutomation = onDocumentCreated({document: 'organizations/{orgId}/events/{eventId}', region, retry: true}, async event => {
