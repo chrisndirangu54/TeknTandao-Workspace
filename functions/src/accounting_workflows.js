@@ -5,6 +5,7 @@ import {identifier, canAccess} from './domain.js';
 import {buildReversal, buildCredit, planNetting, applyNetting} from './accounting_domain.js';
 import {creditJournal, trialBalance} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
+import {preparePosting} from './posting_policy_domain.js';
 
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
@@ -51,7 +52,8 @@ export const reverseInvoice = api(async request => {
     const reversal = buildReversal({...invoice, id: invoiceRef.id}, reversalRef.id);
     tx.create(reversalRef, {...reversal, createdAt: stamp(), createdBy: user});
     tx.update(invoiceRef, {paymentState: 'reversed', reversedBy: reversalRef.id, updatedAt: stamp()});
-    tx.create(org.collection('journals').doc(`reversal_${reversalRef.id}`), {...creditJournal(reversal.total), source: 'reversal', sourceId: reversalRef.id, memo: `Reversal of ${invoiceRef.id}`, postingDate, period, createdAt: stamp()});
+    const posting = preparePosting({postingDate, periodState:lock.data(), sourceType:'reversal', sourceId:reversalRef.id, journal:creditJournal(reversal.total)});
+    tx.create(org.collection('journals').doc(`reversal_${reversalRef.id}`), {...posting.journal, memo:`Reversal of ${invoiceRef.id}`, createdAt:stamp()});
   });
   return {id: reversalRef.id};
 });
@@ -76,7 +78,8 @@ export const issueCreditNote = api(async request => {
     assertOpenPeriod(period, lock.data());
     await partyExists(tx, org, credit);
     tx.create(ref, {...credit, createdAt: stamp(), createdBy: user});
-    tx.create(org.collection('journals').doc(`credit_${ref.id}`), {...creditJournal(credit.total), source: 'credit', sourceId: ref.id, postingDate, period, createdAt: stamp()});
+    const posting = preparePosting({postingDate, periodState:lock.data(), sourceType:'credit', sourceId:ref.id, journal:creditJournal(credit.total)});
+    tx.create(org.collection('journals').doc(`credit_${ref.id}`), {...posting.journal, createdAt:stamp()});
   });
   return {id: ref.id};
 });
