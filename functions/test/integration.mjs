@@ -472,4 +472,28 @@ test('procurement cancellation requires owner and refuses received orders', asyn
   await assert.rejects(api.cancelWarehousePurchaseOrder.run(req({purchaseOrderId:'po2'})),/Cannot cancel/);
 });
 
+
+test('supplier bill posting requires accounting entitlement and is idempotent', async () => {
+  const tenant = `supplier_post_${Date.now()}`;
+  const req = data => ({data:{orgId:tenant,...data},auth:{uid:tenant}});
+  await api.createOrganization.run(req({name:'Supplier posting'}));
+  await api.installApp.run(req({appId:'procurement'}));
+  const org=db.doc(`organizations/${tenant}`);
+  await org.collection('purchaseOrders').doc('po1').set({
+    supplierId:'supplier1',sku:'tea',warehouseId:'east',ordered:10,
+    received:5,invoiced:0,status:'partially_received'
+  });
+  await api.matchSupplierInvoice.run(req({
+    invoiceId:'bill1',purchaseOrderId:'po1',units:3,unitPriceMinor:200
+  }));
+  await assert.rejects(api.postMatchedSupplierBill.run(req({invoiceId:'bill1'})));
+  await api.installApp.run(req({appId:'accounting'}));
+  const posted=await api.postMatchedSupplierBill.run(req({invoiceId:'bill1'}));
+  assert.equal(posted.totalMinor,600);
+  assert.equal((await api.postMatchedSupplierBill.run(req({invoiceId:'bill1'}))).replayed,true);
+  const journal=(await org.collection('journals').doc('supplier_bill_bill1').get()).data();
+  assert.equal(journal.lines[0].account,'1200');
+  assert.equal(journal.lines[1].account,'2200');
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
