@@ -3,6 +3,7 @@ import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {identifier, canAccess} from './domain.js';
 import {planStockTransfer, planPurchaseReceipt} from './inventory_procurement_domain.js';
+import {planBatchReceipt} from './inventory_batches_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -189,5 +190,45 @@ export const migrateLegacyWarehouseStock = callable(async request => {
     tx.create(ref,{warehouseId,sku,quantity:units,createdAt:stamp(),updatedAt:stamp(),
       migrationSource:'legacy_product',migratedBy:uid});
     return {sku,warehouseId,status:'migrated',quantity:units};
+  });
+});
+
+// Batch receipts are separate from purchasing: these represent tagged stock
+// already counted in the warehouse, avoiding double-increment of SKU totals.
+export const assignWarehouseStockBatch = callable(async request => {
+  const {org,uid}=await authorized(request,'inventory');
+  const {requestId,sku,warehouseId,batchId,expiryAt=null}=request.data;
+  const id=identifier(requestId),product=identifier(sku),warehouse=identifier(warehouseId),batch=identifier(batchId);
+  const count=quantity(request.data.quantity);
+  if(!count) throw new Error('Batch quantity must be positive');
+  const movement=org.collection('inventoryMovements').doc(id);
+  const warehouseRef=inventoryRef(org,warehouse,product);
+  const batchRef=org.collection('inventoryBatches').doc(`${warehouse}__${product}__${batch}`);
+  return db.runTransaction(async tx=>{
+    const [prior,warehouseSnap,batchSnap]=await Promise.all([
+      tx.get(movement),tx.get(warehouseRef),tx.get(batchRef)
+    ]);
+    if(prior.exists){
+      const d=prior.data();
+      if(d.type!=='batch_assignment'||d.sku!==product||d.warehouseId!==warehouse||
+         d.batchId!==batch||d.quantity!==count||d.expiryAt!==expiryAt)
+        throw new Error('Movement ID already used');
+      return {requestId:id,status:'committed',replayed:true};
+    }
+    if(!warehouseSnap.exists) throw new Error('Warehouse balance not found');
+    const plan=planBatchReceipt({requestId:id,sku:product,warehouseId:warehouse,
+      batchId:batch,quantity:count,expiryAt,existing:quantity(batchSnap.data()?.quantity||0)});
+    const allBatches=await tx.get(org.collection('inventoryBatches')
+      .where('warehouseId','==',warehouse).where('sku','==',product));
+    const assigned=allBatches.docs.reduce((n,d)=>n+quantity(d.data().quantity),0);
+    if(assigned+count>quantity(warehouseSnap.data().quantity))
+      throw new Error('Batch assignments exceed warehouse stock');
+    if(batchSnap.exists && batchSnap.data().expiryAt!==expiryAt)
+      throw new Error('Existing batch expiry cannot change');
+    tx.set(batchRef,{sku:product,warehouseId:warehouse,batchId:batch,
+      expiryAt,quantity:plan.resultingQuantity,updatedAt:stamp()},{merge:true});
+    tx.create(movement,{type:'batch_assignment',sku:product,warehouseId:warehouse,batchId:batch,
+      expiryAt,quantity:count,createdBy:uid,createdAt:stamp(),status:'committed'});
+    return {requestId:id,status:'committed',replayed:false};
   });
 });
