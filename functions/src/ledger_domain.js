@@ -58,14 +58,35 @@ export function payrollJournal(slip) {
 
 export function trialBalance(journals) {
   const totals = new Map();
+  if (!Array.isArray(journals)) throw new Error('Journals must be an array');
   for (const journal of journals) {
-    if (journal.currency !== 'KES' || !Array.isArray(journal.lines)) throw new Error('Invalid journal');
+    if (!journal || journal.currency !== 'KES' || !Array.isArray(journal.lines) || journal.lines.length < 2) {
+      throw new Error('Invalid journal');
+    }
+    let debitTotal = 0;
+    let creditTotal = 0;
     for (const item of journal.lines) {
+      if (!item || typeof item.account !== 'string' || !/^\\d{4}$/.test(item.account) ||
+          typeof item.name !== 'string' || !item.name.trim()) throw new Error('Invalid journal account');
+      const debit = money(item.debit);
+      const credit = money(item.credit);
+      if ((debit === 0 && credit === 0) || (debit > 0 && credit > 0)) {
+        throw new Error('Invalid journal line: exactly one side must be positive');
+      }
+      debitTotal += debit;
+      creditTotal += credit;
+      if (!Number.isSafeInteger(debitTotal) || !Number.isSafeInteger(creditTotal)) {
+        throw new Error('Journal total exceeds safe integer range');
+      }
       const current = totals.get(item.account) || {account: item.account, name: item.name, debit: 0, credit: 0};
-      current.debit += item.debit;
-      current.credit += item.credit;
+      current.debit += debit;
+      current.credit += credit;
+      if (!Number.isSafeInteger(current.debit) || !Number.isSafeInteger(current.credit)) {
+        throw new Error('Ledger total exceeds safe integer range');
+      }
       totals.set(item.account, current);
     }
+    if (debitTotal === 0 || debitTotal !== creditTotal) throw new Error('Journal entry must balance');
   }
   const rows = [...totals.values()].map(row => ({...row, balance: row.debit - row.credit})).sort((a, b) => a.account.localeCompare(b.account));
   const net = rows.reduce((sum, row) => sum + row.balance, 0);
