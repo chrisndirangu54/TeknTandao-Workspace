@@ -8,6 +8,7 @@ import {randomUUID} from 'node:crypto';
 import {prepareModuleRecord} from './module_records.js';
 import {transitionEncounter,transitionAssessment,assessmentScore} from './vertical_workflows_domain.js';
 import {requireVerticalPermission,requireRecordScope} from './vertical_permissions_domain.js';
+import {validateAppointment,validateAttendance} from './vertical_operations_domain.js';
 import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expandRequiredApps, sanitizeRecord} from './domain.js';
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
 import {invoiceJournal} from './ledger_domain.js';
@@ -332,6 +333,45 @@ export const createSchoolAssessment = callable(async request=>{
    createdBy:user,createdAt:stamp()});
  });
  return {assessmentId:id,status:'draft',percentBasisPoints:result.percentBasisPoints};
+});
+
+export const scheduleHospitalResource = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hospital');
+ await authorizeVerticalProfessional(org,member,user,'hospital','encounter:create');
+ const id=identifier(request.data.bookingId),patientId=identifier(request.data.patientId);
+ const resourceId=identifier(request.data.resourceId);
+ const ref=org.collection('hospitalResourceBookings').doc(id);
+ const existing=await org.collection('hospitalResourceBookings').where('resourceId','==',resourceId).limit(501).get();
+ if(existing.size>500)throw new Error('Resource booking scan requires pagination');
+ const booking=validateAppointment({...request.data,resourceId},
+   existing.docs.map(d=>d.data()));
+ const patient=await org.collection('patients').doc(patientId).get();
+ if(!patient.exists)throw new Error('Patient not found');
+ if(member.role!=='owner'){
+  const assignment=(await org.collection('professionalAssignments').doc(user).get()).data();
+  try{requireRecordScope({app:'hospital',member,assignment,record:{patientId}});}
+  catch{throw new HttpsError('permission-denied','Patient outside assigned roster');}
+ }
+ // An owner-managed schedule is a planning record; simultaneous schedulers
+ // still require a serialized resource-slot lock to eliminate race conditions.
+ await ref.create({...booking,patientId,status:'scheduled',createdBy:user,createdAt:stamp()});
+ return {bookingId:id,status:'scheduled',conflictScanNotSerialized:true};
+});
+export const recordSchoolAttendance = callable(async request=>{
+ const {org,user,member}=await authorize(request,'school');
+ await authorizeVerticalProfessional(org,member,user,'school','assessment:create');
+ const studentId=identifier(request.data.studentId);
+ const result=validateAttendance({...request.data,studentId});
+ const student=await org.collection('students').doc(studentId).get();
+ if(!student.exists)throw new Error('Student not found');
+ if(member.role!=='owner'){
+  const assignment=(await org.collection('professionalAssignments').doc(user).get()).data();
+  try{requireRecordScope({app:'school',member,assignment,record:{studentId},studentClass:student.data().className});}
+  catch{throw new HttpsError('permission-denied','Student outside assigned class');}
+ }
+ const ref=org.collection('schoolAttendance').doc(studentId+'_'+result.date);
+ await ref.create({...result,className:student.data().className||'',recordedBy:user,recordedAt:stamp()});
+ return {studentId,date:result.date,status:result.status};
 });
 
 export const createSale = callable(async request => {
