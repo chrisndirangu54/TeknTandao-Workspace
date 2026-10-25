@@ -501,6 +501,9 @@ export const createPropertyLease = callable(async request=>{
   if(other.size>500)throw new Error('Lease history exceeds safe overlap scan');
   if(leaseOverlaps(lease,other.docs.map(d=>d.data())))
     throw new Error('Unit already leased for these dates');
+  // Serialize concurrent lease creation for the same unit through a shared
+  // property-document write, so competing transactions retry their overlap scan.
+  tx.update(unit,{leaseRevision:FieldValue.increment(1),leaseUpdatedAt:stamp()});
   tx.create(ref,{...lease,leaseId,createdBy:user,createdAt:stamp()});
   return {leaseId,status:'active'};
  });
