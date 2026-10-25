@@ -5,6 +5,7 @@ import {identifier, canAccess} from './domain.js';
 import {planStockTransfer, planPurchaseReceipt} from './inventory_procurement_domain.js';
 import {planBatchReceipt, allocateBatchesFEFO} from './inventory_batches_domain.js';
 import {reconcileInventory} from './inventory_reconciliation_domain.js';
+import {planSupplierInvoiceMatch} from './supplier_invoice_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -293,5 +294,38 @@ export const auditWarehouseInventory = callable(async request => {
     products:products.docs.map(d=>({sku:d.id,stock:d.data().stock})),
     warehouses:warehouses.docs.map(d=>d.data()),
     batches:batches.docs.map(d=>d.data())
+  });
+});
+
+
+// A matched supplier bill is a pending accounting document, not a paid invoice.
+// Requires an independently approved PO, actual received units and owner approval.
+export const matchSupplierInvoice = callable(async request => {
+  const {org,uid}=await authorized(request,'procurement');
+  const membership=await org.collection('members').doc(uid).get();
+  if(membership.data()?.role!=='owner') throw new HttpsError('permission-denied','Owner required to match supplier invoices');
+  const id=identifier(request.data.invoiceId),orderId=identifier(request.data.purchaseOrderId);
+  const units=quantity(request.data.units),unitPriceMinor=quantity(request.data.unitPriceMinor);
+  const invoice=org.collection('supplierInvoices').doc(id),po=org.collection('purchaseOrders').doc(orderId);
+  return db.runTransaction(async tx=>{
+    const [prior,orderSnap]=await Promise.all([tx.get(invoice),tx.get(po)]);
+    if(prior.exists) {
+      const d=prior.data();
+      if(d.purchaseOrderId!==orderId||d.units!==units||d.unitPriceMinor!==unitPriceMinor)
+        throw new Error('Supplier invoice ID already used');
+      return {id,status:d.status,replayed:true};
+    }
+    if(!orderSnap.exists) throw new Error('Purchase order not found');
+    const order=orderSnap.data();
+    if(!order.supplierId||order.supplierId==='unassigned')
+      throw new Error('Verified supplier required before invoice matching');
+    const plan=planSupplierInvoiceMatch({invoiceId:id,purchaseOrderId:orderId,
+      supplierId:order.supplierId,sku:order.sku,warehouseId:order.warehouseId,
+      units,unitPriceMinor,received:quantity(order.received||0),
+      previouslyInvoiced:quantity(order.invoiced||0),ordered:quantity(order.ordered),status:order.status});
+    tx.create(invoice,{...plan,createdBy:uid,createdAt:stamp(),accountingState:'not_posted',
+      paymentState:'unpaid'});
+    tx.update(po,{invoiced:plan.invoicedTotal,updatedAt:stamp()});
+    return {id,status:plan.status,totalMinor:plan.totalMinor,replayed:false};
   });
 });
