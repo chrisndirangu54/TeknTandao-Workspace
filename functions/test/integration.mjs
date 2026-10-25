@@ -310,4 +310,33 @@ test('accounting rejects credit request replay across customers and self-reversa
   );
 });
 
+
+test('warehouse transactions are tenant-scoped, atomic and replay safe', async () => {
+  const orgId = `stock_tx_${Date.now()}`;
+  const req = (data, uid=orgId) => ({data:{orgId,...data},auth:{uid}});
+  await api.createOrganization.run(req({name:'Warehouse transactions'}));
+  await api.installApp.run(req({appId:'inventory'}));
+  await api.installApp.run(req({appId:'procurement'}));
+  const root = db.doc(`organizations/${orgId}`);
+  await root.collection('warehouseStock').doc('east__tea').set({warehouseId:'east',sku:'tea',quantity:12});
+  await root.collection('warehouseStock').doc('west__tea').set({warehouseId:'west',sku:'tea',quantity:2});
+  const input={requestId:'transfer_1',sku:'tea',fromWarehouse:'east',toWarehouse:'west',quantity:3};
+  await assert.rejects(api.transferWarehouseStock.run(req(input,'stranger')));
+  await api.transferWarehouseStock.run(req(input));
+  const replay=await api.transferWarehouseStock.run(req(input));
+  assert.equal(replay.replayed,true);
+  await assert.rejects(api.transferWarehouseStock.run(req({...input,quantity:4})),/Movement ID already used/);
+  assert.equal((await root.collection('warehouseStock').doc('east__tea').get()).data().quantity,9);
+  assert.equal((await root.collection('warehouseStock').doc('west__tea').get()).data().quantity,5);
+  await root.collection('purchaseOrders').doc('po1').set({
+    sku:'tea',warehouseId:'east',status:'approved',ordered:8,received:2
+  });
+  await api.receivePurchaseOrderStock.run(req({requestId:'receipt_1',purchaseOrderId:'po1',
+    sku:'tea',warehouseId:'east',receiving:6}));
+  assert.equal((await root.collection('warehouseStock').doc('east__tea').get()).data().quantity,15);
+  assert.equal((await root.collection('purchaseOrders').doc('po1').get()).data().status,'fully_received');
+  await assert.rejects(api.receivePurchaseOrderStock.run(req({requestId:'receipt_2',
+    purchaseOrderId:'po1',sku:'tea',warehouseId:'east',receiving:1})),/Approved matching purchase order required/);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
