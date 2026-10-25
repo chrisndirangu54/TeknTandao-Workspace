@@ -49,6 +49,23 @@ export function buildPlan(objectiveInput, candidateSteps = []) {
     if (step.dependsOn.some(dep => dep === step.id)) throw new Error('step cannot depend on itself');
   }
 
+  // Validate the entire dependency graph before accepting a plan. Unknown
+  // dependencies and cycles would otherwise leave actions indefinitely blocked.
+  const byId = new Map(steps.map(step => [step.id, step]));
+  const visiting = new Set();
+  const visited = new Set();
+  const visit = id => {
+    if (visiting.has(id)) throw new Error('cyclic plan dependency');
+    if (visited.has(id)) return;
+    const step = byId.get(id);
+    if (!step) throw new Error('unknown plan dependency');
+    visiting.add(id);
+    for (const dependency of step.dependsOn) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const step of steps) visit(step.id);
+
   return {
     objective,
     steps,
@@ -64,7 +81,7 @@ export function readySteps(plan, executionState = {}) {
   return plan.steps.filter(step =>
     !completed.has(step.id) &&
     !failed.has(step.id) &&
-    step.dependsOn.every(dep => completed.has(dep))
+    step.dependsOn.every(dep => completed.has(dep) && !failed.has(dep))
   );
 }
 
@@ -75,7 +92,7 @@ export function evaluateStepResult(step, result = {}) {
     ? 1
     : expected.filter(item => evidence.includes(item)).length / expected.length;
   const confidence = clamp(result.confidence ?? 0, 0, 1);
-  const policyPassed = result.policyPassed !== false;
+  const policyPassed = result.policyPassed === true;
   const toolSucceeded = result.toolSucceeded === true;
   const score = (evidenceCoverage * 0.4) + (confidence * 0.3) + (policyPassed ? 0.2 : 0) + (toolSucceeded ? 0.1 : 0);
   return {
@@ -84,7 +101,7 @@ export function evaluateStepResult(step, result = {}) {
     confidence,
     policyPassed,
     toolSucceeded,
-    accepted: policyPassed && toolSucceeded && score >= 0.7
+    accepted: policyPassed && toolSucceeded && evidenceCoverage === 1 && score >= 0.7
   };
 }
 
