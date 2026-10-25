@@ -10,6 +10,7 @@ import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expa
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
 import {invoiceJournal} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
+import {preparePosting} from './posting_policy_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -279,7 +280,8 @@ export const saleAutomation = onDocumentCreated({document: 'organizations/{orgId
     if (books.data()?.expiresAt?.toMillis() > Date.now()) {
       assertOpenPeriod(period,periodLock.data());
       tx.create(org.collection('invoices').doc(saleId), {saleId, contactId: sale.contactId, total: sale.total, currency: sale.currency, paymentState: 'unpaid', status: 'draft', taxStatus: 'requires_tax_configuration', createdAt: stamp()});
-      tx.create(org.collection('journals').doc(`invoice_${saleId}`), {...invoiceJournal(sale.total), source: 'sale', sourceId: saleId, postingDate, period, createdAt: stamp()});
+      const posting = preparePosting({postingDate,periodState:periodLock.data(),sourceType:'sale',sourceId:saleId,journal:invoiceJournal(sale.total)});
+      tx.create(org.collection('journals').doc(`invoice_${saleId}`), {...posting.journal,createdAt:stamp()});
       tx.create(org.collection('taxOutbox').doc(saleId), {invoiceId: saleId, status: 'blocked_configuration', provider: 'kra-etims', createdAt: stamp()});
     }
     if (crm.data()?.expiresAt?.toMillis() > Date.now()) tx.create(org.collection('tasks').doc(`followup_${saleId}`), {name: 'Follow up after sale', contactId: sale.contactId, saleId, status: 'open', createdAt: stamp()});
