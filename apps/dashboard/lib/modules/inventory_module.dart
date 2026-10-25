@@ -34,6 +34,34 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> createPurchaseOrder() async {
+    final values = await recordForm(context, 'New purchase order',
+      ['SKU Code', 'Warehouse ID', 'Ordered units']);
+    if (values == null || values.length < 3) return;
+    final units = int.tryParse(values[2].trim());
+    if (units == null || units <= 0) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a positive order quantity.')));
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      final result = await widget.store.call('createWarehousePurchaseOrder', {
+        'requestId': 'po_${DateTime.now().microsecondsSinceEpoch}',
+        'sku': values[0].trim(),
+        'warehouseId': values[1].trim(),
+        'ordered': units,
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Draft PO created: ${result['id']}')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create PO: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> showWarehouseBalances() async {
     setState(() => saving = true);
     try {
@@ -161,6 +189,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : showWarehouseBalances,
                 icon: const Icon(Icons.warehouse_outlined),
                 label: const Text('View warehouse balances'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : createPurchaseOrder,
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('Create draft purchase order'),
               ),
             ),
             const SizedBox(height:20),
