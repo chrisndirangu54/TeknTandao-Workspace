@@ -19,6 +19,7 @@ import {validatePosCart,pricePosCart} from './pos_cart_domain.js';
 import {tillReconciliation} from './pos_till_domain.js';
 import {maintenanceTicket,transitionMaintenance} from './property_maintenance_domain.js';
 import {leaveRequest,overlappingLeave,leaveDecision} from './hr_leave_domain.js';
+import {validateLeavePolicy,chargeableLeaveDays,availableAnnualLeave} from './hr_leave_policy_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -511,6 +512,13 @@ export const requestHrLeave = callable(async request=>{
   return {requestId:id,status:'requested',calendarDays:leave.calendarDays};
  });
 });
+export const configureHrLeavePolicy = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const policy=validateLeavePolicy(request.data.policy);
+ await org.collection('hrSettings').doc('leavePolicy').set({...policy,updatedBy:user,updatedAt:stamp()});
+ return {policy};
+});
 export const decideHrLeave = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
  if(member.role!=='owner')throw new HttpsError('permission-denied','HR approval requires owner');
@@ -519,7 +527,22 @@ export const decideHrLeave = callable(async request=>{
   const previous=await tx.get(ref);
   if(!previous.exists)throw new Error('Leave request unavailable');
   const decision=leaveDecision(previous.data(),request.data.status,request.data.reason);
-  tx.update(ref,{...decision,decidedBy:user,decidedAt:stamp()});
+  let policyDays=null;
+  if(decision.status==='approved'&&previous.data().leaveType==='annual'){
+   const employeeRef=org.collection('employees').doc(identifier(previous.data().employeeId));
+   const [settings,employee,history]=await Promise.all([
+    tx.get(org.collection('hrSettings').doc('leavePolicy')),tx.get(employeeRef),
+    tx.get(org.collection('hrLeaveRequests').where('employeeId','==',previous.data().employeeId).limit(501))
+   ]);
+   if(!settings.exists||!employee.exists||history.size>500)throw new Error('Leave policy, employee or complete history unavailable');
+   const policy=validateLeavePolicy(settings.data());
+   policyDays=chargeableLeaveDays(previous.data(),policy);
+   const approvedDays=history.docs.filter(d=>d.id!==id&&d.data().status==='approved'&&d.data().leaveType==='annual')
+      .reduce((total,d)=>total+chargeableLeaveDays(d.data(),policy),0);
+   availableAnnualLeave({allowanceDays:policy.annualAllowanceDays,approvedDays,requestedDays:policyDays});
+   tx.update(employeeRef,{leaveApprovalRevision:FieldValue.increment(1)});
+  }
+  tx.update(ref,{...decision,...(policyDays===null?{}:{approvedWorkingDays:policyDays}),decidedBy:user,decidedAt:stamp()});
   tx.create(ref.collection('audit').doc(randomUUID()),{
    from:previous.data().status,to:decision.status,actor:user,at:stamp(),
    decisionReason:decision.decisionReason});
