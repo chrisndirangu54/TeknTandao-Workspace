@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../suite.dart';
 
@@ -12,7 +13,7 @@ class PosModuleScreen extends StatefulWidget {
 
 class _PosModuleScreenState extends State<PosModuleScreen> {
   final List<Map<String, dynamic>> _cart = [];
-  String _customerName = 'Wanjiku Enterprise Ltd';
+  String? _customerId;
   String _selectedPaymentMethod = 'M-Pesa STK';
   String _mpesaPhone = '254712345678';
   bool _processing = false;
@@ -43,13 +44,17 @@ class _PosModuleScreenState extends State<PosModuleScreen> {
     setState(() => _processing = true);
 
     try {
-      final itemsSummary = _cart.map((i) => "${i['name']} (x${i['qty']})").join(', ');
+      if (_cart.length != 1) throw Exception('Multi-item checkout needs an atomic sale endpoint. Please check out one item at a time.');
+      if (_customerId == null) throw Exception('Select a customer before checkout.');
+      final item = _cart.single;
+      final productId = (item['id'] ?? item['sku'])?.toString();
+      if (productId == null || productId.isEmpty) throw Exception('Product ID missing.');
+      final requestId = 'pos_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 30)}';
       await widget.store.call('createSale', {
-        'customer': _customerName,
-        'items': itemsSummary,
-        'total': _cartSubtotal,
-        'paymentMethod': _selectedPaymentMethod,
-        'phone': _mpesaPhone,
+        'requestId': requestId,
+        'productId': productId,
+        'contactId': _customerId,
+        'quantity': item['qty'],
       });
 
       if (mounted) {
@@ -60,7 +65,7 @@ class _PosModuleScreenState extends State<PosModuleScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Sale recorded in preview. A balanced journal was posted. eTIMS was not submitted.'),
+            content: Text('Sale recorded. Payment remains unverified and eTIMS has not been submitted.'),
             backgroundColor: Color(0xFF10B981),
           ),
         );
@@ -213,13 +218,13 @@ class _PosModuleScreenState extends State<PosModuleScreen> {
                   builder: (context, snapshot) {
                     final contacts = snapshot.data ?? [];
                     return DropdownButtonFormField<String>(
-                      initialValue: _customerName,
+                      value: _customerId,
                       decoration: const InputDecoration(labelText: 'Customer (CRM Linked)', isDense: true),
                       items: [
                         for (final c in contacts)
-                          DropdownMenuItem(value: c['name'] as String, child: Text(c['name'] as String)),
+                          DropdownMenuItem(value: (c['id'] ?? c['contactId']).toString(), child: Text((c['name'] ?? 'Customer').toString())),
                       ],
-                      onChanged: (val) => setState(() => _customerName = val!),
+                      onChanged: (val) => setState(() => _customerId = val),
                     );
                   },
                 ),
