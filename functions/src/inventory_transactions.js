@@ -313,7 +313,7 @@ export const matchSupplierInvoice = callable(async request => {
     const [prior,orderSnap]=await Promise.all([tx.get(invoice),tx.get(po)]);
     if(prior.exists) {
       const d=prior.data();
-      if(d.purchaseOrderId!==orderId||d.units!==units||d.unitPriceMinor!==unitPriceMinor)
+      if(d.purchaseOrderId!==orderId||d.units!==units||d.unitPriceMinor!==unitPriceMinor||d.dueDate!==request.data.dueDate)
         throw new Error('Supplier invoice ID already used');
       return {id,status:d.status,replayed:true};
     }
