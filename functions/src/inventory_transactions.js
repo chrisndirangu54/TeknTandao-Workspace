@@ -112,3 +112,50 @@ export const getWarehouseInventoryOverview = callable(async request => {
     truncated:{stock:stock.size===200,movements:movements.size===100}
   };
 });
+
+ 
+// Owner-controlled purchase order lifecycle. Approval is server-authoritative.
+export const createWarehousePurchaseOrder = callable(async request => {
+  const {org,uid}=await authorized(request,'procurement');
+  const id=identifier(request.data.requestId);
+  const sku=identifier(request.data.sku),warehouseId=identifier(request.data.warehouseId);
+  const ordered=quantity(request.data.ordered);
+  if(!ordered) throw new Error('Ordered quantity must be positive');
+  const ref=org.collection('purchaseOrders').doc(id);
+  return db.runTransaction(async tx=>{
+    const prior=await tx.get(ref);
+    if(prior.exists) {
+      const d=prior.data();
+      if(d.sku!==sku || d.warehouseId!==warehouseId || d.ordered!==ordered)
+        throw new Error('Purchase order ID already used');
+      return {id,status:d.status,replayed:true};
+    }
+    tx.create(ref,{sku,warehouseId,ordered,received:0,status:'draft',createdBy:uid,
+      createdAt:stamp(),updatedAt:stamp()});
+    return {id,status:'draft',replayed:false};
+  });
+});
+
+export const approveWarehousePurchaseOrder = callable(async request => {
+  const {org,uid}=await authorized(request,'procurement');
+  const owner=await org.collection('members').doc(uid).get();
+  if(owner.data()?.role!=='owner') throw new HttpsError('permission-denied','Workspace owner approval required');
+  const id=identifier(request.data.purchaseOrderId);
+  const ref=org.collection('purchaseOrders').doc(id);
+  return db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    if(!snap.exists) throw new Error('Purchase order not found');
+    const d=snap.data();
+    if(d.status==='approved') return {id,status:'approved',replayed:true};
+    if(d.status!=='draft' || d.received!==0) throw new Error('Only draft orders can be approved');
+    tx.update(ref,{status:'approved',approvedBy:uid,approvedAt:stamp(),updatedAt:stamp()});
+    return {id,status:'approved',replayed:false};
+  });
+});
+
+export const getProcurementOrders = callable(async request => {
+  const {org}=await authorized(request,'procurement');
+  const result=await org.collection('purchaseOrders').limit(200).get();
+  return {orders:result.docs.map(d=>({id:d.id,...d.data(),createdAt:null,updatedAt:null,approvedAt:null})),
+    truncated:result.size===200};
+});
