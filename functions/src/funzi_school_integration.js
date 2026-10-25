@@ -1,3 +1,4 @@
+import {randomBytes,createHash} from 'node:crypto';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {identifier,canAccess} from './domain.js';
@@ -33,6 +34,59 @@ export const configureFunziSchoolAccess=api(async request=>{
   updatedBy:uid,updatedAt:stamp()});
  return {active,funziUid,classNames:[...new Set(classNames)],
   allowedTypes:['lessons','assignments','announcements']};
+});
+
+// Student or verified guardian initiates a time-limited link. A matching email
+// is never sufficient authentication: both accounts must complete this handshake.
+export const createFunziLinkCode=api(async request=>{
+ const {org,uid}=access(request);
+ const studentId=identifier(request.data.studentId);
+ const [student,config,installation]=await Promise.all([
+  org.collection('students').doc(studentId).get(),
+  org.collection('integrations').doc('funziSchool').get(),
+  org.collection('apps').doc('school').get()]);
+ if(!student.exists)throw new HttpsError('not-found','Student not found');
+ if(student.data().portalUid!==uid && student.data().guardianUid!==uid)
+  throw new HttpsError('permission-denied','Verified student or guardian login required');
+ if(!config.data()?.active||!installation.data()?.expiresAt?.toMillis||
+    installation.data().expiresAt.toMillis()<=Date.now())
+  throw new HttpsError('failed-precondition','School integration inactive');
+ const code=randomBytes(24).toString('base64url');
+ const requestId=randomBytes(16).toString('hex');
+ const expiresAt=Date.now()+5*60*1000;
+ await org.collection('funziLinkRequests').doc(requestId).create({
+  studentId,requesterUid:uid,codeHash:createHash('sha256').update(code).digest('hex'),
+  expiresAt,used:false,createdAt:stamp()});
+ return {requestId,code,expiresAt};
+});
+
+// Redeem only from configured Funzi service identity, carrying an authenticated
+// learner ID obtained on Funzi's own backend. Links are single use.
+export const redeemFunziLinkCode=api(async request=>{
+ const {org,uid}=access(request);
+ const requestId=identifier(request.data.requestId);
+ const learnerId=identifier(request.data.funziLearnerId);
+ const code=request.data.code;
+ if(typeof code!=='string'||! /^[A-Za-z0-9_-]{32,64}$/.test(code))
+  throw new HttpsError('invalid-argument','Invalid linking code');
+ const ref=org.collection('funziLinkRequests').doc(requestId);
+ const linked=org.collection('funziStudentLinks').doc(learnerId);
+ const integration=org.collection('integrations').doc('funziSchool');
+ return db.runTransaction(async tx=>{
+  const [pending,config,prior]=await Promise.all([tx.get(ref),tx.get(integration),tx.get(linked)]);
+  if(!config.data()?.active||config.data().funziUid!==uid)
+   throw new HttpsError('permission-denied','Dedicated Funzi identity required');
+  const data=pending.data();
+  if(!data||data.used||data.expiresAt<=Date.now()||
+     data.codeHash!==createHash('sha256').update(code).digest('hex'))
+   throw new HttpsError('permission-denied','Link request invalid or expired');
+  if(prior.exists&&prior.data().active&&prior.data().studentId!==data.studentId)
+   throw new HttpsError('already-exists','Learner already linked to another student');
+  tx.set(linked,{funziLearnerId:learnerId,studentId:data.studentId,
+   active:true,linkedAt:stamp(),linkedBy:'verified_handshake',requestId});
+  tx.update(ref,{used:true,usedAt:stamp(),linkedLearnerId:learnerId});
+  return {linked:true,funziLearnerId:learnerId};
+ });
 });
 
 // School owner explicitly links one student to one Funzi learner identity.
