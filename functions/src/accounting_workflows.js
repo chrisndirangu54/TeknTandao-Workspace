@@ -71,8 +71,14 @@ export const issueCreditNote = api(async request => {
 
 export const getTrialBalance = api(async request => {
   const {org} = await books(request);
-  const page = await org.collection('journals').orderBy('createdAt', 'desc').limit(500).get();
-  return {...trialBalance(page.docs.map(doc => doc.data())), truncated: page.size === 500};
+  // Never return a partial trial balance as though it represented full books.
+  // Fetch one extra record to detect the hard reporting limit explicitly.
+  const page = await org.collection('journals').orderBy('createdAt', 'desc').limit(501).get();
+  if (page.size > 500) {
+    throw new HttpsError('resource-exhausted',
+      'Trial balance exceeds the 500-journal reporting limit. Export or paginate the complete ledger before closing accounts.');
+  }
+  return {...trialBalance(page.docs.map(doc => doc.data())), truncated: false};
 });
 
 export const netInvoices = api(async request => {
