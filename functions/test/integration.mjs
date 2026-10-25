@@ -389,4 +389,21 @@ test('legacy warehouse migration requires owner and refuses discrepancies', asyn
   await assert.rejects(api.migrateLegacyWarehouseStock.run(req({sku:'legacy_tea'})),/manual reconciliation required/);
 });
 
+
+test('batch assignments must remain within counted stock and cannot be replayed with changed quantity', async () => {
+  const tenant = `batches_${Date.now()}`;
+  const req = (data,uid=tenant) => ({data:{orgId:tenant,...data},auth:{uid}});
+  await api.createOrganization.run(req({name:'Batch tests'}));
+  await api.installApp.run(req({appId:'inventory'}));
+  const org=db.doc(`organizations/${tenant}`);
+  await org.collection('warehouseStock').doc('east__tea').set({warehouseId:'east',sku:'tea',quantity:10});
+  const one={requestId:'batch_one',sku:'tea',warehouseId:'east',batchId:'lot1',quantity:7,expiryAt:'2027-01-01'};
+  await api.assignWarehouseStockBatch.run(req(one));
+  assert.equal((await api.assignWarehouseStockBatch.run(req(one))).replayed,true);
+  await assert.rejects(api.assignWarehouseStockBatch.run(req({...one,quantity:8})),/already used/);
+  await assert.rejects(api.assignWarehouseStockBatch.run(req({...one,requestId:'batch_two',batchId:'lot2',quantity:4})),
+    /exceed warehouse stock/);
+  assert.equal((await org.collection('inventoryBatches').doc('east__tea__lot1').get()).data().quantity,7);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
