@@ -76,6 +76,34 @@ class PropertyModuleScreen extends StatelessWidget {
                           children: [
                             Text('${kes(p['rentKes'])}/mo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                             const SizedBox(width: 12),
+                            IconButton(
+                              tooltip: 'Report maintenance',
+                              icon: const Icon(Icons.build_circle_outlined),
+                              onPressed: () async {
+                                final unitId = (p['id'] ?? '').toString();
+                                if (unitId.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('This property has no record ID.')));
+                                  return;
+                                }
+                                final details = await recordForm(context, 'Maintenance request',
+                                  ['Issue title', 'Description']);
+                                if (details == null || details[0].trim().isEmpty) return;
+                                try {
+                                  await store.call('createPropertyMaintenanceTicket', {
+                                    'propertyId': unitId,
+                                    'title': details[0].trim(),
+                                    'description': details.length > 1 ? details[1].trim() : '',
+                                    'priority': 'normal',
+                                  });
+                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Maintenance ticket submitted')));
+                                } catch (e) {
+                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Maintenance request failed: $e')));
+                                }
+                              },
+                            ),
                             Chip(label: Text(p['status']), backgroundColor: const Color(0xFFCCFBF1)),
                           ],
                         ),
