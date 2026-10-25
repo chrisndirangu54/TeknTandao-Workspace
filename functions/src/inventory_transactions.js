@@ -164,3 +164,30 @@ export const getProcurementOrders = callable(async request => {
   return {orders:result.docs.map(d=>({id:d.id,...d.data(),createdAt:null,updatedAt:null,approvedAt:null})),
     truncated:result.size===200};
 });
+
+
+// Legacy stock migration is intentionally one SKU at a time, owner-only and
+// create-only. Existing warehouse balances are never replaced automatically.
+export const migrateLegacyWarehouseStock = callable(async request => {
+  const {org,uid}=await authorized(request,'inventory');
+  const member=await org.collection('members').doc(uid).get();
+  if(member.data()?.role!=='owner') throw new HttpsError('permission-denied','Owner required for stock migration');
+  const sku=identifier(request.data.sku);
+  const productRef=org.collection('products').doc(sku);
+  return db.runTransaction(async tx=>{
+    const product=await tx.get(productRef);
+    if(!product.exists) throw new Error('Unknown SKU');
+    const warehouseId=identifier(product.data().warehouseId || 'main');
+    const ref=inventoryRef(org,warehouseId,sku);
+    const existing=await tx.get(ref);
+    if(existing.exists) {
+      if(existing.data().quantity!==product.data().stock)
+        throw new Error('Existing warehouse balance differs; manual reconciliation required');
+      return {sku,warehouseId,status:'already_present'};
+    }
+    const units=quantity(product.data().stock);
+    tx.create(ref,{warehouseId,sku,quantity:units,createdAt:stamp(),updatedAt:stamp(),
+      migrationSource:'legacy_product',migratedBy:uid});
+    return {sku,warehouseId,status:'migrated',quantity:units};
+  });
+});
