@@ -162,7 +162,15 @@ export const saveRecord = callable(async request => {
 
 export const saveModuleRecord = callable(async request => {
   const app = identifier(request.data.appId);
-  const {org, user} = await authorize(request, app);
+  const {org, user, member} = await authorize(request, app);
+  // Until profession-specific clinician/educator/payroll RBAC is available,
+  // sensitive records are owner-write only rather than permitting every
+  // generic app member to alter prescriptions, grades or payroll.
+  const ownerWriteKinds = {hospital: ['prescription', 'clinicalNote', 'labTest'],
+    school: ['grade'], hr: ['payRun']};
+  if (ownerWriteKinds[app]?.includes(request.data.kind) && member.role !== 'owner') {
+    throw new HttpsError('permission-denied', 'Owner approval required for sensitive records');
+  }
   const {record, reference} = prepareModuleRecord(app, request.data.kind, request.data.record);
   const id = identifier(request.data.id || randomUUID());
   const target = org.collection('modules').doc(app).collection('records').doc(id);
