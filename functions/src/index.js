@@ -228,9 +228,27 @@ export const createSale = callable(async request => {
     if (!Number.isSafeInteger(available) || available < request.data.quantity) {
       throw new Error('Insufficient warehouse stock');
     }
+    // When batches are tracked, use FEFO and update every chosen lot inside
+    // the same transaction. Reject incomplete lot coverage rather than silently
+    // bypassing traceability.
+    const tracked = await tx.get(org.collection('inventoryBatches')
+      .where('warehouseId', '==', warehouseId).where('sku', '==', productRef.id));
+    let batchAllocations = [];
+    if (!tracked.empty) {
+      const {allocateBatchesFEFO} = await import('./inventory_batches_domain.js');
+      batchAllocations = allocateBatchesFEFO({
+        quantity: request.data.quantity,
+        batches: tracked.docs.map(d => ({batchId: d.data().batchId, quantity: d.data().quantity,
+          expiryAt: d.data().expiryAt || null}))
+      }).allocations;
+      for (const allocation of batchAllocations) {
+        const lot = tracked.docs.find(d => d.data().batchId === allocation.batchId);
+        tx.update(lot.ref, {quantity: lot.data().quantity - allocation.quantity, updatedAt: stamp()});
+      }
+    }
     tx.update(warehouseRef, {quantity: available - request.data.quantity, updatedAt: stamp()});
     tx.update(productRef, {stock: product.stock - request.data.quantity, updatedAt: stamp()});
-    tx.create(saleRef, {productId: productRef.id, contactId: contactRef.id, quantity: request.data.quantity, total, currency: 'KES', paymentState: 'unpaid', createdAt: stamp(), createdBy: user});
+    tx.create(saleRef, {productId: productRef.id, contactId: contactRef.id, quantity: request.data.quantity, total, currency: 'KES', paymentState: 'unpaid', batchAllocations, createdAt: stamp(), createdBy: user});
     tx.create(org.collection('events').doc(`sale_${id}`), {type: 'sale.created', saleId: id, createdAt: stamp()});
     return {id, total};
   });
