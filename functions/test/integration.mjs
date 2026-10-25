@@ -72,6 +72,12 @@ test('shared workflow enforces auth, dependencies, tenant scope, stock transacti
   const sale = {requestId:'sale-one',productId:'tea',contactId:'customer',quantity:2};
   await Promise.all([api.createSale.run(request(sale)), api.createSale.run(request(sale))]);
   assert.equal((await db.doc(`organizations/${owner}/products/tea`).get()).data().stock, 1);
+  await assert.rejects(
+    api.createSale.run(request({...sale, quantity: 1})),
+    /Sale request ID already used for different inputs/
+  );
+  assert.equal((await db.doc(`organizations/${owner}/products/tea`).get()).data().stock, 1,
+    'rejected replay must not deduct stock again');
   await assert.rejects(api.createSale.run(request({...sale,requestId:'oversell'})));
 
   const event = {params:{orgId:owner,eventId:'sale_sale-one'}, data:{data:()=>({type:'sale.created',saleId:'sale-one'})}};
