@@ -18,6 +18,7 @@ import {buildPosSaleSnapshot,posReceipt} from './pos_receipts_domain.js';
 import {validatePosCart,pricePosCart} from './pos_cart_domain.js';
 import {tillReconciliation} from './pos_till_domain.js';
 import {maintenanceTicket,transitionMaintenance} from './property_maintenance_domain.js';
+import {validateLease,leaseOverlaps,rentCharge} from './property_leases_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -481,6 +482,47 @@ export const closePosTill = callable(async request=>{
    movements.docs.map(doc=>doc.data()),countedMinor);
   tx.update(till,{status:'closed',closedAt:stamp(),closedBy:user,reconciliation});
   return {tillId,...reconciliation,replayed:false};
+ });
+});
+
+export const createPropertyLease = callable(async request=>{
+ const {org,user,member}=await authorize(request,'property');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Property owner required');
+ const leaseId=identifier(request.data.leaseId||randomUUID());
+ const lease=validateLease(request.data),unit=org.collection('properties').doc(lease.propertyId);
+ const tenant=org.collection('contacts').doc(lease.tenantId);
+ const ref=org.collection('propertyLeases').doc(leaseId);
+ return db.runTransaction(async tx=>{
+  const [property,contact,existing,other]=await Promise.all([
+   tx.get(unit),tx.get(tenant),tx.get(ref),
+   tx.get(org.collection('propertyLeases').where('propertyId','==',lease.propertyId).limit(501))]);
+  if(!property.exists||!contact.exists)throw new Error('Property or tenant missing');
+  if(existing.exists)throw new Error('Lease ID already exists');
+  if(other.size>500)throw new Error('Lease history exceeds safe overlap scan');
+  if(leaseOverlaps(lease,other.docs.map(d=>d.data())))
+    throw new Error('Unit already leased for these dates');
+  tx.create(ref,{...lease,leaseId,createdBy:user,createdAt:stamp()});
+  return {leaseId,status:'active'};
+ });
+});
+export const issuePropertyRentCharge = callable(async request=>{
+ const {org,user,member}=await authorize(request,'property');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Property owner required');
+ const leaseId=identifier(request.data.leaseId);
+ const period=request.data.period;
+ const leaseRef=org.collection('propertyLeases').doc(leaseId);
+ const chargeRef=org.collection('propertyRentCharges').doc(leaseId+'_'+String(period));
+ return db.runTransaction(async tx=>{
+  const [leaseSnap,prior]=await Promise.all([tx.get(leaseRef),tx.get(chargeRef)]);
+  if(!leaseSnap.exists)throw new Error('Lease not found');
+  const charge=rentCharge(leaseSnap.data(),period);
+  if(prior.exists){
+   if(prior.data().amountMinor!==charge.amountMinor||
+      prior.data().tenantId!==charge.tenantId)throw new Error('Rent charge conflicts with lease');
+   return {chargeId:chargeRef.id,amountMinor:prior.data().amountMinor,replayed:true};
+  }
+  tx.create(chargeRef,{...charge,status:'issued',issuedBy:user,issuedAt:stamp()});
+  return {chargeId:chargeRef.id,amountMinor:charge.amountMinor,replayed:false};
  });
 });
 
