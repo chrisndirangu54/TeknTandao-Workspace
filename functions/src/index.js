@@ -231,9 +231,14 @@ export const setProfessionalAssignment = callable(async request=>{
  });
  return {staffUid,app,role,active:request.data.active};
 });
+async function authorizeVerticalProfessional(org,member,user,app,permission){
+ const assignment=(await org.collection('professionalAssignments').doc(user).get()).data();
+ try{return requireVerticalPermission({app,member,assignment,permission});}
+ catch{throw new HttpsError('permission-denied','Professional role or permission required');}
+}
 export const advanceClinicalEncounter = callable(async request => {
  const {org,user,member}=await authorize(request,'hospital');
- if(member.role!=='owner')throw new HttpsError('permission-denied','Clinical encounter owner authorization required');
+ await authorizeVerticalProfessional(org,member,user,'hospital','encounter:advance');
  const id=identifier(request.data.encounterId),next=request.data.nextStatus;
  const ref=org.collection('clinicalEncounters').doc(id);
  return db.runTransaction(async tx=>{
@@ -249,7 +254,7 @@ export const advanceClinicalEncounter = callable(async request => {
 });
 export const createClinicalEncounter = callable(async request=>{
  const {org,user,member}=await authorize(request,'hospital');
- if(member.role!=='owner')throw new HttpsError('permission-denied','Clinical encounter owner authorization required');
+ await authorizeVerticalProfessional(org,member,user,'hospital','encounter:create');
  const id=identifier(request.data.encounterId),patientId=identifier(request.data.patientId);
  const ref=org.collection('clinicalEncounters').doc(id);
  await db.runTransaction(async tx=>{
@@ -261,7 +266,7 @@ export const createClinicalEncounter = callable(async request=>{
 });
 export const publishSchoolAssessment = callable(async request=>{
  const {org,user,member}=await authorize(request,'school');
- if(member.role!=='owner')throw new HttpsError('permission-denied','Assessment approval requires owner');
+ await authorizeVerticalProfessional(org,member,user,'school',request.data.nextStatus==='published'?'assessment:publish':'assessment:review');
  const id=identifier(request.data.assessmentId);
  const ref=org.collection('schoolAssessments').doc(id);
  return db.runTransaction(async tx=>{
@@ -276,7 +281,7 @@ export const publishSchoolAssessment = callable(async request=>{
 });
 export const createSchoolAssessment = callable(async request=>{
  const {org,user,member}=await authorize(request,'school');
- if(member.role!=='owner')throw new HttpsError('permission-denied','Assessment creation requires owner');
+ await authorizeVerticalProfessional(org,member,user,'school','assessment:create');
  const id=identifier(request.data.assessmentId),studentId=identifier(request.data.studentId);
  const result=assessmentScore(request.data.score,request.data.maxScore);
  await db.runTransaction(async tx=>{
