@@ -35,41 +35,73 @@ export const configureFunziSchoolAccess=api(async request=>{
   allowedTypes:['lessons','assignments','announcements']};
 });
 
-// Read-only, explicit class-scoped curriculum endpoint. Never exports names,
-// student records, grades, health records, payments or attendance.
+// School owner explicitly links one student to one Funzi learner identity.
+// Do not provide a roster endpoint or broad class feed.
+export const linkFunziStudent=api(async request=>{
+ const {org,uid}=access(request);
+ const [member,installation,config]=await Promise.all([
+  org.collection('members').doc(uid).get(),
+  org.collection('apps').doc('school').get(),
+  org.collection('integrations').doc('funziSchool').get()]);
+ if(member.data()?.role!=='owner'||!canAccess(member.data(),'school',installation.data()))
+  throw new HttpsError('permission-denied','School owner required');
+ if(!config.data()?.active)throw new Error('Funzi integration must be active');
+ const studentId=identifier(request.data.studentId);
+ const funziLearnerId=identifier(request.data.funziLearnerId);
+ const active=request.data.active;
+ if(typeof active!=='boolean')throw new Error('Active flag required');
+ const student=await org.collection('students').doc(studentId).get();
+ if(!student.exists)throw new Error('Student not found');
+ // Administrative confirmation is required; never infer a relationship from a
+ // supplied name, class, or email. Enrollment consent must be handled externally.
+ if(request.data.linkApproved!==true)throw new Error('Explicit student-link approval required');
+ await org.collection('funziStudentLinks').doc(funziLearnerId).set({
+  studentId,funziLearnerId,active,approvedBy:uid,updatedAt:stamp()
+ });
+ return {funziLearnerId,active};
+});
+
+// Retrieves only the specific linked learner's class curriculum; no class roster,
+// student names, attendance, grades, notes or financial data are transmitted.
 export const funziSchoolFeed=api(async request=>{
  const {org,uid}=access(request);
- const [integration,installation]=await Promise.all([
-   org.collection('integrations').doc('funziSchool').get(),
-   org.collection('apps').doc('school').get()]);
+ const funziLearnerId=identifier(request.data.funziLearnerId);
+ const [integration,installation,link]=await Promise.all([
+  org.collection('integrations').doc('funziSchool').get(),
+  org.collection('apps').doc('school').get(),
+  org.collection('funziStudentLinks').doc(funziLearnerId).get()]);
  const config=integration.data();
  if(!config?.active||config.funziUid!==uid)
-   throw new HttpsError('permission-denied','Funzi identity not authorized');
- if(!installation.data()?.expiresAt?.toMillis || installation.data().expiresAt.toMillis()<=Date.now())
-   throw new HttpsError('permission-denied','Active school subscription required');
- const type=request.data.type,className=request.data.className;
- if(!Object.hasOwn(types,type)||!config.allowedTypes?.includes(type))
-   throw new Error('Unsupported Funzi feed type');
+  throw new HttpsError('permission-denied','Funzi service identity not authorized');
+ if(!installation.data()?.expiresAt?.toMillis||
+    installation.data().expiresAt.toMillis()<=Date.now())
+  throw new HttpsError('permission-denied','Active school subscription required');
+ if(!link.data()?.active||link.data().funziLearnerId!==funziLearnerId)
+  throw new HttpsError('permission-denied','Funzi learner has no active student link');
+ const student=await org.collection('students').doc(link.data().studentId).get();
+ if(!student.exists)throw new HttpsError('permission-denied','Linked student unavailable');
+ const className=student.data().className;
  if(typeof className!=='string'||!config.classNames?.includes(className))
-   throw new HttpsError('permission-denied','Class not permitted');
+  throw new HttpsError('permission-denied','Linked student class is not permitted');
+ const type=request.data.type;
+ if(!Object.hasOwn(types,type)||!config.allowedTypes?.includes(type))
+  throw new Error('Unsupported Funzi feed type');
  const count=request.data.limit??50;
  if(!Number.isInteger(count)||count<1||count>100)throw new Error('Limit must be 1 to 100');
  const after=request.data.afterId;
  if(after!==undefined)identifier(after);
  const collection=org.collection('modules').doc('school').collection('records');
- // Query only selected class/kind. Stable ID cursors, never arbitrary offsets.
  let query=collection.where('kind','==',types[type]).where('className','==',className)
-    .orderBy('__name__').limit(count+1);
+  .orderBy('__name__').limit(count+1);
  if(after)query=query.startAfter(collection.doc(after));
  const result=await query.get();
  const page=result.docs.slice(0,count);
- const pick=d=>{
-  const x=d.data(),base={id:d.id,type,className:x.className,name:x.name};
-  if(type==='lessons')return {...base,subject:x.subject,notes:x.notes||''};
-  if(type==='assignments')return {...base,subject:x.subject,dueAt:x.dueAt,notes:x.notes||''};
-  return {...base,notes:x.notes||''};
- };
- return {schemaVersion:1,orgId:org.id,type,className,
-   items:page.map(pick),nextCursor:result.size>count?page.at(-1)?.id??null:null,
-   readOnly:true};
+ const items=page.map(doc=>{
+  const x=doc.data();
+  const base={id:doc.id,type,name:x.name,subject:x.subject||null};
+  if(type==='assignments')return {...base,dueAt:x.dueAt};
+  return base;
+ });
+ return {schemaVersion:2,orgId:org.id,funziLearnerId,type,
+  items,nextCursor:result.size>count?page.at(-1)?.id??null:null,readOnly:true};
 });
