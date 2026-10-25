@@ -3,7 +3,7 @@ import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {identifier, canAccess} from './domain.js';
 import {planStockTransfer, planPurchaseReceipt} from './inventory_procurement_domain.js';
-import {planBatchReceipt} from './inventory_batches_domain.js';
+import {planBatchReceipt, allocateBatchesFEFO} from './inventory_batches_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -54,9 +54,32 @@ export const transferWarehouseStock = callable(async request => {
     }
     const plan = planStockTransfer({requestId:id,sku,fromWarehouse,toWarehouse,quantity:amount,
       available:quantity(src.data()?.quantity ?? 0),destinationStock:quantity(dst.data()?.quantity ?? 0)});
+    const [sourceLots,destLots]=await Promise.all([
+      tx.get(org.collection('inventoryBatches').where('warehouseId','==',fromWarehouse).where('sku','==',sku)),
+      tx.get(org.collection('inventoryBatches').where('warehouseId','==',toWarehouse).where('sku','==',sku))
+    ]);
+    let allocations=[];
+    if(!sourceLots.empty){
+      allocations=allocateBatchesFEFO({quantity:amount,batches:sourceLots.docs.map(d=>({
+        batchId:d.data().batchId,quantity:d.data().quantity,expiryAt:d.data().expiryAt||null
+      }))}).allocations;
+      for(const allocation of allocations){
+        const lot=sourceLots.docs.find(d=>d.data().batchId===allocation.batchId);
+        const destinationLotRef=org.collection('inventoryBatches').doc(
+          `${toWarehouse}__${sku}__${allocation.batchId}`);
+        const destinationLot=destLots.docs.find(d=>d.ref.path===destinationLotRef.path);
+        if(destinationLot && (destinationLot.data().expiryAt||null)!==(lot.data().expiryAt||null))
+          throw new Error('Destination batch expiry mismatch');
+        const destQuantity=quantity(destinationLot?.data().quantity||0);
+        if(destQuantity+allocation.quantity>1000000000) throw new Error('Destination batch overflow');
+        tx.update(lot.ref,{quantity:quantity(lot.data().quantity)-allocation.quantity,updatedAt:stamp()});
+        tx.set(destinationLotRef,{warehouseId:toWarehouse,sku,batchId:allocation.batchId,
+          expiryAt:lot.data().expiryAt||null,quantity:destQuantity+allocation.quantity,updatedAt:stamp()},{merge:true});
+      }
+    }
     tx.update(source,{quantity:plan.resultingSource,updatedAt:stamp()});
     tx.set(destination,{warehouseId:toWarehouse,sku,quantity:plan.resultingDestination,updatedAt:stamp()},{merge:true});
-    tx.create(movement,{type:'transfer',requestId:id,sku,fromWarehouse,toWarehouse,quantity:amount,
+    tx.create(movement,{type:'transfer',requestId:id,sku,fromWarehouse,toWarehouse,quantity:amount,allocations,
       createdBy:uid,createdAt:stamp(),status:'committed'});
     return {requestId:id,status:'committed',replayed:false};
   });
