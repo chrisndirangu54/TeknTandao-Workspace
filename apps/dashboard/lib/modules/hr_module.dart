@@ -72,6 +72,79 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _requestLeave() async {
+    final id = selectedId;
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select your linked employee record first.')));
+      return;
+    }
+    final values = await recordForm(context, 'Request time off',
+      ['Start date YYYY-MM-DD', 'End date YYYY-MM-DD', 'Leave type (annual/sick/parental/unpaid/other)', 'Reason']);
+    if (values == null || !mounted) return;
+    try {
+      final result = await widget.store.call('requestHrLeave', {
+        'employeeId': id,
+        'startDate': values[0].trim(),
+        'endDate': values[1].trim(),
+        'leaveType': values[2].trim().toLowerCase(),
+        'reason': values[3].trim(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Leave request ${result['requestId']} submitted for review.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Leave request failed: $e')));
+    }
+  }
+
+  Future<void> _showLeaveBalance() async {
+    if (selectedId == null) return;
+    final year = DateTime.now().year.toString();
+    try {
+      final result = await widget.store.call('getHrAnnualLeaveBalance', {
+        'employeeId': selectedId, 'year': year,
+      });
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+        title: Text('Annual leave · $year'),
+        content: Text(result['configured'] == true
+          ? 'Granted: ${result['grantedDays']} days\nUsed: ${result['usedDays']} days\nRemaining: ${result['remainingDays']} days'
+          : 'Your employer has not configured an annual leave entitlement for this year.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+      ));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Balance unavailable: $e')));
+    }
+  }
+
+  Future<void> _showLeaveHistory() async {
+    if (selectedId == null) return;
+    try {
+      final result = await widget.store.call('listHrLeaveRequests', {'employeeId': selectedId});
+      if (!mounted) return;
+      final requests = (result['requests'] as List?) ?? [];
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+        title: const Text('Leave request history'),
+        content: SizedBox(width: 450, child: requests.isEmpty
+          ? const Text('No leave requests recorded.')
+          : ListView.builder(shrinkWrap: true, itemCount: requests.length,
+              itemBuilder: (context, i) {
+                final entry = requests[i] as Map;
+                return ListTile(
+                  title: Text('${entry['leaveType']} · ${entry['status']}'),
+                  subtitle: Text('${entry['startDate']} – ${entry['endDate']}'),
+                );
+              })),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+      ));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Leave history unavailable: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
@@ -117,6 +190,21 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _requestLeave,
+                  icon: const Icon(Icons.event_available_outlined),
+                  label: const Text('Request leave'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _showLeaveBalance,
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  label: const Text('Leave balance'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _showLeaveHistory,
+                  icon: const Icon(Icons.history),
+                  label: const Text('Leave history'),
+                ),
                 ElevatedButton.icon(
                   onPressed: runPayroll,
                   icon: const Icon(Icons.payments_rounded, size: 16),
