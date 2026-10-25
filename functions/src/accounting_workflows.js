@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {randomUUID} from 'node:crypto';
@@ -105,6 +106,33 @@ export const getPeriodFinancialStatements = api(async request => {
   const {org}=await books(request);
   const journals=await readBoundedJournals(org.collection('journals'));
   return periodFinancialStatements(journals,{fromDate:request.data.fromDate,toDate:request.data.toDate});
+});
+
+// Create-once period report for audit/reference. This is NOT a transactional
+// Firestore ledger snapshot: concurrent legacy journal writers remain a risk.
+export const freezeProvisionalPeriodReport = api(async request => {
+  const {db,org,user}=await books(request);
+  const membership=await org.collection('members').doc(user).get();
+  if(membership.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required');
+  const period=request.data.period;
+  assertOpenPeriod(period);
+  const periodRef=org.collection('accountingPeriods').doc(period);
+  const close=await periodRef.get();
+  if(close.data()?.status!=='closed')throw new Error('Close accounting period before freezing report');
+  const journals=await readBoundedJournals(org.collection('journals'));
+  const report=periodFinancialStatements(journals,{fromDate:period+'-01',
+    toDate:new Date(Date.UTC(Number(period.slice(0,4)),Number(period.slice(5,7)),0)).toISOString().slice(0,10)});
+  const digest=createHash('sha256').update(JSON.stringify(journals)).digest('hex');
+  const ref=org.collection('periodReportSnapshots').doc(period);
+  return db.runTransaction(async tx=>{
+    const [state,prior]=await Promise.all([tx.get(periodRef),tx.get(ref)]);
+    if(state.data()?.status!=='closed')throw new Error('Accounting period is no longer closed');
+    if(prior.exists)return {period,digest:prior.data().digest,replayed:true,provisional:true};
+    tx.create(ref,{period,digest,report,sourceJournalCount:journals.length,
+      frozenBy:user,frozenAt:stamp(),provisional:true,
+      limitations:'Not a transactionally isolated journal snapshot; legacy posting paths and concurrent writes require reconciliation.'});
+    return {period,digest,replayed:false,provisional:true};
+  });
 });
 
 export const getProvisionalCashFlow = api(async request => {
