@@ -9,6 +9,7 @@ import {preparePosting} from './posting_policy_domain.js';
 import {verifyAssetAcquisition} from './asset_acquisition_reconciliation_domain.js';
 import {provisionalFinancialStatements,periodFinancialStatements} from './financial_statements_domain.js';
 import {provisionalCashFlow} from './cash_flow_domain.js';
+import {readBoundedJournals} from './ledger_pagination.js';
 import {depreciationSchedule,depreciationJournal,planAssetDisposal,assetAcquisitionJournal} from './fixed_assets_domain.js';
 
 const region = 'europe-west1';
@@ -89,39 +90,27 @@ export const issueCreditNote = api(async request => {
 });
 
 export const getTrialBalance = api(async request => {
-  const {org} = await books(request);
-  // Never return a partial trial balance as though it represented full books.
-  // Fetch one extra record to detect the hard reporting limit explicitly.
-  const page = await org.collection('journals').orderBy('createdAt', 'desc').limit(501).get();
-  if (page.size > 500) {
-    throw new HttpsError('resource-exhausted',
-      'Trial balance exceeds the 500-journal reporting limit. Export or paginate the complete ledger before closing accounts.');
-  }
-  return {...trialBalance(page.docs.map(doc => doc.data())), truncated: false};
+  const {org}=await books(request);
+  const journals=await readBoundedJournals(org.collection('journals'));
+  return {...trialBalance(journals),truncated:false,provisional:true};
 });
 
 export const getProvisionalFinancialStatements = api(async request => {
   const {org}=await books(request);
-  const snapshot=await org.collection('journals').limit(501).get();
-  if(snapshot.size>500)throw new HttpsError('resource-exhausted','Full financial statements require paginated journal reporting above 500 entries');
-  return provisionalFinancialStatements(snapshot.docs.map(doc=>doc.data()));
+  const journals=await readBoundedJournals(org.collection('journals'));
+  return provisionalFinancialStatements(journals);
 });
 
 export const getPeriodFinancialStatements = api(async request => {
   const {org}=await books(request);
-  const snapshot=await org.collection('journals').limit(501).get();
-  if(snapshot.size>500)throw new HttpsError('resource-exhausted',
-    'Period reporting needs full paginated ledger data beyond 500 journals');
-  return periodFinancialStatements(snapshot.docs.map(doc=>doc.data()),{
-    fromDate:request.data.fromDate,toDate:request.data.toDate
-  });
+  const journals=await readBoundedJournals(org.collection('journals'));
+  return periodFinancialStatements(journals,{fromDate:request.data.fromDate,toDate:request.data.toDate});
 });
 
 export const getProvisionalCashFlow = api(async request => {
   const {org}=await books(request);
-  const snapshot=await org.collection('journals').limit(501).get();
-  if(snapshot.size>500)throw new HttpsError('resource-exhausted','Cash flow reporting needs pagination beyond 500 journals');
-  return provisionalCashFlow(snapshot.docs.map(doc=>doc.data()));
+  const journals=await readBoundedJournals(org.collection('journals'));
+  return provisionalCashFlow(journals);
 });
 
 // Owner-scoped fixed asset registration; asset acquisition accounting remains separate.
