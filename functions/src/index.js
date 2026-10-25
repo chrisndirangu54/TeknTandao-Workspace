@@ -220,6 +220,15 @@ export const createSale = callable(async request => {
     if (!productSnap.exists || !contactSnap.exists) throw new Error('Select an existing product and customer');
     const product = productSnap.data();
     const total = saleTotal(product, request.data.quantity);
+    const warehouseId = identifier(product.warehouseId || 'main');
+    const warehouseRef = org.collection('warehouseStock').doc(`${warehouseId}__${productRef.id}`);
+    const warehouse = await tx.get(warehouseRef);
+    if (!warehouse.exists) throw new Error('Warehouse balance missing; migrate legacy inventory before sale');
+    const available = warehouse.data().quantity;
+    if (!Number.isSafeInteger(available) || available < request.data.quantity) {
+      throw new Error('Insufficient warehouse stock');
+    }
+    tx.update(warehouseRef, {quantity: available - request.data.quantity, updatedAt: stamp()});
     tx.update(productRef, {stock: product.stock - request.data.quantity, updatedAt: stamp()});
     tx.create(saleRef, {productId: productRef.id, contactId: contactRef.id, quantity: request.data.quantity, total, currency: 'KES', paymentState: 'unpaid', createdAt: stamp(), createdBy: user});
     tx.create(org.collection('events').doc(`sale_${id}`), {type: 'sale.created', saleId: id, createdAt: stamp()});
