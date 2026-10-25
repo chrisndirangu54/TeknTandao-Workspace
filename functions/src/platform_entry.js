@@ -61,3 +61,5 @@ export * from './office_exports.js';
 export * from './whatsapp_workspace_api.js';
 
 export * from './inventory_transactions.js';
+
+export * from './funzi_school_integration.js';
