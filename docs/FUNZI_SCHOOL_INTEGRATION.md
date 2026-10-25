@@ -1,32 +1,21 @@
-# Funzi ↔ TeknTandao School Management read-only integration
+# Funzi ↔ TeknTandao School: linked-student-only feed (v2)
 
-## Setup
+Funzi may fetch learning materials only after the school owner explicitly links a specific TeknTandao student to a Funzi learner identity. The previous class-only endpoint request is no longer accepted.
 
-1. Deploy the two Cloud Functions exported by `functions/src/platform_entry.js` in `europe-west1`.
-2. Provision a dedicated Firebase Auth identity for Funzi's backend, preferably via your IAM-managed service infrastructure. Protect its credentials and rotate them; do not embed them in a mobile or web client.
-3. Sign in as the workspace **owner** (with an active school subscription) and call `configureFunziSchoolAccess` with:
-   ```json
-   {"orgId":"WORKSPACE_ID","funziUid":"FUNZI_FIREBASE_UID","classNames":["Form 1"],"active":true}
-   ```
-4. From Funzi's authenticated backend, call `funziSchoolFeed` with:
-   ```json
-   {"orgId":"WORKSPACE_ID","type":"assignments","className":"Form 1","limit":50}
-   ```
-5. For more records, pass the returned `nextCursor` as `afterId`. Null means the page is exhausted. Types: `lessons`, `assignments`, `announcements`.
+1. Deploy the updated Firebase callable functions from `functions/src/platform_entry.js` to `europe-west1`.
+2. As workspace owner, call `configureFunziSchoolAccess` to authorize a dedicated Funzi Firebase Auth UID, the allowed classes, and active=true.
+3. With school-side authorization and applicable student/guardian consent, call `linkFunziStudent` as owner:
+```json
+{"orgId":"WORKSPACE_ID","funziLearnerId":"FUNZI_LEARNER_ID","studentId":"TEKNTANDAO_STUDENT_ID","active":true,"linkApproved":true}
+```
+4. From Funzi's *server* authenticated as the configured Funzi UID, call `funziSchoolFeed`:
+```json
+{"orgId":"WORKSPACE_ID","funziLearnerId":"FUNZI_LEARNER_ID","type":"assignments","limit":50}
+```
+Types: lessons, assignments, announcements. The backend resolves the class from the linked student's school record; callers cannot choose a class. Pagination: `nextCursor` / `afterId`. The v2 response includes `funziLearnerId` but no student ID, class roster, marks, attendance, contact information, financial data, or raw free-text notes.
 
-Calls use **Firebase callable functions** authentication (Firebase ID token); this is not an unauthenticated REST endpoint. You may call callable functions through the Firebase SDK or implement the HTTPS callable request envelope correctly on Funzi's server.
+The material is class curriculum relevant to the *linked student*, not uniquely assigned individual learning activities. Add explicit individual-assignment filtering before enabling personalized private assignment records.
 
-## Security contract
+To revoke, the owner calls `linkFunziStudent` with the same identifiers and `active:false`. Revoking the integration globally via `configureFunziSchoolAccess` with `active:false` blocks every linked learner.
 
-- No student identities, grades, attendance, contacts, billing, or medical records are returned.
-- Only owner-approved class names and curriculum types are readable.
-- Revocation: owner calls `configureFunziSchoolAccess` with the same Funzi UID and `active:false`.
-- The feed is read-only; no writes to school records are performed.
-- Existing school subscription is checked on every request.
-- Data is read live at request time, subject to pagination; it is **not** automatically pushed or synchronized into Funzi's database.
-- Composite Firestore indexes may be required for kind/className/ID queries. Validate them in the emulator or deployment logs.
-- Use normal organizational governance and obtain school authorization before enabling access; records may contain sensitive information in free-text notes, which should be reviewed before sharing.
-
-## Next milestones
-
-Add Funzi-side scheduled pulls/webhook ingestion with idempotent cursors, selective field mapping and observability; support roster/grades only under a separate consented and identity-scoped contract. 
+Security: use a dedicated backend-held Firebase identity, never client-embedded credentials. The service credential is trusted to request content for existing approved learner links; Funzi must enforce that its own logged-in learner corresponds to the requested `funziLearnerId`. No automated imports, background jobs, or production deployment have been verified.
