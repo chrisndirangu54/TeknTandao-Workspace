@@ -6,6 +6,7 @@ import {buildReversal, buildCredit, planNetting, applyNetting} from './accountin
 import {creditJournal, trialBalance} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
+import {provisionalFinancialStatements} from './financial_statements_domain.js';
 
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
@@ -94,6 +95,13 @@ export const getTrialBalance = api(async request => {
       'Trial balance exceeds the 500-journal reporting limit. Export or paginate the complete ledger before closing accounts.');
   }
   return {...trialBalance(page.docs.map(doc => doc.data())), truncated: false};
+});
+
+export const getProvisionalFinancialStatements = api(async request => {
+  const {org}=await books(request);
+  const snapshot=await org.collection('journals').limit(501).get();
+  if(snapshot.size>500)throw new HttpsError('resource-exhausted','Full financial statements require paginated journal reporting above 500 entries');
+  return provisionalFinancialStatements(snapshot.docs.map(doc=>doc.data()));
 });
 
 export const netInvoices = api(async request => {
