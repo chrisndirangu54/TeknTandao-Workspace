@@ -6,6 +6,7 @@ import {planStockTransfer, planPurchaseReceipt} from './inventory_procurement_do
 import {planBatchReceipt, allocateBatchesFEFO} from './inventory_batches_domain.js';
 import {reconcileInventory} from './inventory_reconciliation_domain.js';
 import {planSupplierInvoiceMatch} from './supplier_invoice_domain.js';
+import {supplierBillJournal} from './ledger_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -327,5 +328,35 @@ export const matchSupplierInvoice = callable(async request => {
       paymentState:'unpaid'});
     tx.update(po,{invoiced:plan.invoicedTotal,updatedAt:stamp()});
     return {id,status:plan.status,totalMinor:plan.totalMinor,replayed:false};
+  });
+});
+
+
+// Posting is separate from three-way match and cannot imply tax compliance or payment.
+// The journal and state transition are atomic and idempotent.
+export const postMatchedSupplierBill = callable(async request => {
+  const {org,uid}=await authorized(request,'procurement');
+  await authorized(request,'accounting');
+  const member=await org.collection('members').doc(uid).get();
+  if(member.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required to post supplier bill');
+  const id=identifier(request.data.invoiceId);
+  const invoiceRef=org.collection('supplierInvoices').doc(id);
+  const journalRef=org.collection('journals').doc(`supplier_bill_${id}`);
+  return db.runTransaction(async tx=>{
+    const [invoice,journal]=await Promise.all([tx.get(invoiceRef),tx.get(journalRef)]);
+    if(!invoice.exists)throw new Error('Matched supplier invoice not found');
+    const bill=invoice.data();
+    if(bill.accountingState==='posted'){
+      if(!journal.exists)throw new Error('Posted bill has no journal; reconcile ledger manually');
+      return {id,status:'posted',replayed:true};
+    }
+    if(bill.status!=='matched_pending_accounting'||bill.accountingState!=='not_posted'||journal.exists)
+      throw new Error('Bill cannot be posted in current state');
+    if(bill.currency!=='KES'||bill.paymentState!=='unpaid')throw new Error('Unexpected supplier bill state');
+    const entry=supplierBillJournal(bill.totalMinor);
+    tx.create(journalRef,{...entry,sourceType:'supplier_bill',sourceId:id,
+      createdBy:uid,createdAt:stamp()});
+    tx.update(invoiceRef,{accountingState:'posted',postedBy:uid,postedAt:stamp(),updatedAt:stamp()});
+    return {id,status:'posted',replayed:false,totalMinor:entry.total};
   });
 });
