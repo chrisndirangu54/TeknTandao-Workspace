@@ -31,6 +31,34 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> assignStockBatch() async {
+    final values = await recordForm(context, 'Assign tracked stock batch',
+      ['SKU Code', 'Warehouse ID', 'Batch ID', 'Units', 'Expiry date YYYY-MM-DD (optional)']);
+    if (values == null || values.length < 5) return;
+    final units = int.tryParse(values[3].trim());
+    if (units == null || units <= 0) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a positive batch quantity.')));
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      await widget.store.call('assignWarehouseStockBatch', {
+        'requestId': 'batch_${DateTime.now().microsecondsSinceEpoch}',
+        'sku': values[0].trim(), 'warehouseId': values[1].trim(),
+        'batchId': values[2].trim(), 'quantity': units,
+        'expiryAt': values[4].trim().isEmpty ? null : values[4].trim(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Batch assigned to existing warehouse stock.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Batch assignment failed: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> approvePurchaseOrder() async {
     final values = await recordForm(context, 'Approve purchase order',
       ['Purchase order ID']);
@@ -261,6 +289,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : approvePurchaseOrder,
                 icon: const Icon(Icons.verified_outlined),
                 label: const Text('Approve draft purchase order (owner)'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : assignStockBatch,
+                icon: const Icon(Icons.qr_code_2_rounded),
+                label: const Text('Assign stock batch / expiry'),
               ),
             ),
             const SizedBox(height:20),
