@@ -72,8 +72,9 @@ export const receivePurchaseOrderStock = callable(async request => {
   const movement=org.collection('inventoryMovements').doc(id);
   const po=org.collection('purchaseOrders').doc(orderId);
   const stock=inventoryRef(org,warehouse,product);
+  const productRef=org.collection('products').doc(product);
   return db.runTransaction(async tx=>{
-    const [prior,poSnap,stockSnap]=await Promise.all([tx.get(movement),tx.get(po),tx.get(stock)]);
+    const [prior,poSnap,stockSnap,productSnap]=await Promise.all([tx.get(movement),tx.get(po),tx.get(stock),tx.get(productRef)]);
     if(prior.exists) {
       const d=prior.data();
       if(d.type!=='receipt' || d.purchaseOrderId!==orderId || d.sku!==product ||
@@ -86,9 +87,13 @@ export const receivePurchaseOrderStock = callable(async request => {
       throw new Error('Approved matching purchase order required');
     const plan=planPurchaseReceipt({requestId:id,purchaseOrderId:orderId,sku:product,
       ordered:quantity(order.ordered),receivedPreviously:quantity(order.received || 0),receiving});
+    if(!productSnap.exists) throw new Error('Existing product SKU required');
+    const productOnHand=quantity(productSnap.data().stock);
+    if(productOnHand+receiving>1000000000) throw new Error('Product stock overflow');
     const onHand=quantity(stockSnap.data()?.quantity ?? 0);
     if(!Number.isSafeInteger(onHand+receiving) || onHand+receiving>1000000000)
       throw new Error('Stock quantity overflow');
+    tx.update(productRef,{stock:productOnHand+receiving,updatedAt:stamp()});
     tx.update(po,{received:plan.receivedTotal,status:plan.status,updatedAt:stamp()});
     tx.set(stock,{warehouseId:warehouse,sku:product,quantity:onHand+receiving,updatedAt:stamp()},{merge:true});
     tx.create(movement,{type:'receipt',purchaseOrderId:orderId,warehouseId:warehouse,
