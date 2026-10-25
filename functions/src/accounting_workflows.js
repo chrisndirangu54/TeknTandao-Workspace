@@ -128,7 +128,7 @@ export const freezeProvisionalPeriodReport = api(async request => {
     const [state,prior]=await Promise.all([tx.get(periodRef),tx.get(ref)]);
     if(state.data()?.status!=='closed')throw new Error('Accounting period is no longer closed');
     if(prior.exists)return {period,digest:prior.data().digest,replayed:true,provisional:true};
-    tx.create(ref,{period,digest,report,sourceJournalCount:journals.length,
+    tx.create(ref,{period,digest,summary:{profitAndLoss:report.profitAndLoss,balanceSheet:report.balanceSheet,periodJournalCount:report.periodJournalCount,cumulativeJournalCount:report.cumulativeJournalCount,warnings:report.warnings},sourceJournalCount:journals.length,
       frozenBy:user,frozenAt:stamp(),provisional:true,
       limitations:'Not a transactionally isolated journal snapshot; legacy posting paths and concurrent writes require reconciliation.'});
     return {period,digest,replayed:false,provisional:true};
