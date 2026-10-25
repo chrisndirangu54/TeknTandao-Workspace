@@ -7,6 +7,7 @@ import {creditJournal, trialBalance} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
 import {provisionalFinancialStatements} from './financial_statements_domain.js';
+import {provisionalCashFlow} from './cash_flow_domain.js';
 
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
@@ -102,6 +103,13 @@ export const getProvisionalFinancialStatements = api(async request => {
   const snapshot=await org.collection('journals').limit(501).get();
   if(snapshot.size>500)throw new HttpsError('resource-exhausted','Full financial statements require paginated journal reporting above 500 entries');
   return provisionalFinancialStatements(snapshot.docs.map(doc=>doc.data()));
+});
+
+export const getProvisionalCashFlow = api(async request => {
+  const {org}=await books(request);
+  const snapshot=await org.collection('journals').limit(501).get();
+  if(snapshot.size>500)throw new HttpsError('resource-exhausted','Cash flow reporting needs pagination beyond 500 journals');
+  return provisionalCashFlow(snapshot.docs.map(doc=>doc.data()));
 });
 
 export const netInvoices = api(async request => {
