@@ -454,4 +454,22 @@ test('warehouse transfer moves tracked FEFO lots with aggregate quantities', asy
   assert.equal((await api.transferWarehouseStock.run(req(command))).replayed,true);
 });
 
+
+test('procurement cancellation requires owner and refuses received orders', async () => {
+  const tenant=`po_cancel_${Date.now()}`;
+  const req=(data,uid=tenant)=>({data:{orgId:tenant,...data},auth:{uid}});
+  await api.createOrganization.run(req({name:'PO cancellation'}));
+  await api.installApp.run(req({appId:'procurement'}));
+  await api.grantMember.run(req({uid:'buyer',apps:['procurement']}));
+  await api.createWarehousePurchaseOrder.run(req({requestId:'po1',sku:'tea',warehouseId:'east',ordered:10}));
+  await assert.rejects(api.cancelWarehousePurchaseOrder.run(req({purchaseOrderId:'po1'},'buyer')),/Owner required/);
+  const cancelled=await api.cancelWarehousePurchaseOrder.run(req({purchaseOrderId:'po1'}));
+  assert.equal(cancelled.status,'cancelled');
+  assert.equal((await api.cancelWarehousePurchaseOrder.run(req({purchaseOrderId:'po1'}))).replayed,true);
+  await api.createWarehousePurchaseOrder.run(req({requestId:'po2',sku:'tea',warehouseId:'east',ordered:10}));
+  const org=db.doc(`organizations/${tenant}`);
+  await org.collection('purchaseOrders').doc('po2').update({status:'partially_received',received:1});
+  await assert.rejects(api.cancelWarehousePurchaseOrder.run(req({purchaseOrderId:'po2'})),/Cannot cancel/);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
