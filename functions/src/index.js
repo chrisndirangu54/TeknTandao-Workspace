@@ -9,6 +9,7 @@ import {prepareModuleRecord} from './module_records.js';
 import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expandRequiredApps, sanitizeRecord} from './domain.js';
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
 import {invoiceJournal} from './ledger_domain.js';
+import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -260,17 +261,25 @@ export const saleAutomation = onDocumentCreated({document: 'organizations/{orgId
   const saleId = identifier(event.data.data().saleId);
   await db.runTransaction(async tx => {
     const runRef = org.collection('automationRuns').doc(event.params.eventId);
-    const [run, saleSnap, books, crm] = await Promise.all([
+    const postingDate = new Date().toISOString().slice(0,10);
+    const period = accountingPeriod(postingDate);
+    const [run, saleSnap, books, crm, periodLock] = await Promise.all([
       tx.get(runRef),
       tx.get(org.collection('sales').doc(saleId)),
       tx.get(org.collection('apps').doc('accounting')),
-      tx.get(org.collection('apps').doc('crm'))
+      tx.get(org.collection('apps').doc('crm')),
+      tx.get(org.collection('accountingPeriods').doc(period))
     ]);
     if (run.exists || !saleSnap.exists) return;
     const sale = saleSnap.data();
+    if (books.data()?.expiresAt?.toMillis() > Date.now() && periodLock.data()?.status === 'closed') {
+      tx.create(runRef, {status:'blocked_closed_period',saleId,period,blockedAt:stamp()});
+      return;
+    }
     if (books.data()?.expiresAt?.toMillis() > Date.now()) {
+      assertOpenPeriod(period,periodLock.data());
       tx.create(org.collection('invoices').doc(saleId), {saleId, contactId: sale.contactId, total: sale.total, currency: sale.currency, paymentState: 'unpaid', status: 'draft', taxStatus: 'requires_tax_configuration', createdAt: stamp()});
-      tx.create(org.collection('journals').doc(`invoice_${saleId}`), {...invoiceJournal(sale.total), source: 'sale', sourceId: saleId, createdAt: stamp()});
+      tx.create(org.collection('journals').doc(`invoice_${saleId}`), {...invoiceJournal(sale.total), source: 'sale', sourceId: saleId, postingDate, period, createdAt: stamp()});
       tx.create(org.collection('taxOutbox').doc(saleId), {invoiceId: saleId, status: 'blocked_configuration', provider: 'kra-etims', createdAt: stamp()});
     }
     if (crm.data()?.expiresAt?.toMillis() > Date.now()) tx.create(org.collection('tasks').doc(`followup_${saleId}`), {name: 'Follow up after sale', contactId: sale.contactId, saleId, status: 'open', createdAt: stamp()});
