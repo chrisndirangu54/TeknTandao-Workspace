@@ -11,6 +11,11 @@ export function preparePosting({postingDate,periodState,sourceType,sourceId,jour
     if(existing.sourceType!==type || existing.sourceId!==id ||
        existing.period!==period || existing.postingDate!==postingDate)
       throw new Error('Journal ID has conflicting source or accounting period');
+    trialBalance([journal]);
+    trialBalance([existing]);
+    if(existing.currency!==journal.currency || existing.total!==journal.total ||
+       JSON.stringify(existing.lines)!==JSON.stringify(journal.lines))
+      throw new Error('Journal ID has conflicting financial content');
     return {replayed:true,period};
   }
   assertOpenPeriod(period,periodState);
