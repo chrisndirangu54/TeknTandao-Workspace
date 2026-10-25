@@ -1,5 +1,7 @@
 import {randomBytes,createHash} from 'node:crypto';
-import {onCall,HttpsError} from 'firebase-functions/v2/https';
+import {onCall,onRequest,HttpsError} from 'firebase-functions/v2/https';
+import {initializeApp,getApp} from 'firebase-admin/app';
+import {getAuth} from 'firebase-admin/auth';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {identifier,canAccess} from './domain.js';
 
@@ -158,4 +160,45 @@ export const funziSchoolFeed=api(async request=>{
  });
  return {schemaVersion:2,orgId:org.id,funziLearnerId,type,
   items,nextCursor:result.size>count?page.at(-1)?.id??null:null,readOnly:true};
+});
+
+// Direct cross-project redemption. Funzi Firebase bearer token is verified by
+// the official Admin SDK against the separately configured Funzi project.
+// A valid code proves control of the school-side authenticated session.
+export const redeemFunziLinkFromFunzi=onRequest({region:'europe-west1',cors:true},async (req,res)=>{
+ if(req.method!=='POST'){res.status(405).json({error:'Method not allowed'});return;}
+ const projectId=process.env.FUNZI_FIREBASE_PROJECT_ID;
+ if(!projectId){res.status(503).json({error:'Funzi project not configured'});return;}
+ try{
+  const bearer=req.headers.authorization;
+  if(typeof bearer!=='string'||!bearer.startsWith('Bearer '))
+    {res.status(401).json({error:'Funzi login required'});return;}
+  let app;
+  try{app=getApp('funzi-verifier');}
+  catch{app=initializeApp({projectId},'funzi-verifier');}
+  const user=await getAuth(app).verifyIdToken(bearer.slice(7),true);
+  const orgId=identifier(req.body?.orgId);
+  const requestId=identifier(req.body?.requestId);
+  const code=req.body?.code;
+  if(typeof code!=='string'||! /^[A-Za-z0-9_-]{32,64}$/.test(code))
+    {res.status(400).json({error:'Invalid linking code'});return;}
+  const org=db.doc('organizations/'+orgId);
+  const ref=org.collection('funziLinkRequests').doc(requestId);
+  const linked=org.collection('funziStudentLinks').doc(user.uid);
+  const integration=org.collection('integrations').doc('funziSchool');
+  const result=await db.runTransaction(async tx=>{
+   const [pending,config,prior]=await Promise.all([tx.get(ref),tx.get(integration),tx.get(linked)]);
+   const data=pending.data();
+   if(!config.data()?.active||!data||data.used||data.expiresAt<=Date.now()||
+       data.codeHash!==createHash('sha256').update(code).digest('hex'))
+     throw new Error('Expired or invalid linking request');
+   if(prior.exists&&prior.data().active&&prior.data().studentId!==data.studentId)
+     throw new Error('Funzi account already linked to another student');
+   tx.set(linked,{funziLearnerId:user.uid,studentId:data.studentId,
+    active:true,linkedAt:stamp(),linkedBy:'dual_authenticated_code',requestId});
+   tx.update(ref,{used:true,usedAt:stamp(),linkedLearnerId:user.uid});
+   return {linked:true,funziLearnerId:user.uid};
+  });
+  res.status(200).json(result);
+ }catch(error){res.status(403).json({error:'Unable to verify or complete link'});}
 });
