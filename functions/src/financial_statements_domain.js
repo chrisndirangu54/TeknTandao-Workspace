@@ -25,3 +25,26 @@ export function provisionalFinancialStatements(journals) {
     warnings:['Provisional report: chart mapping and closing adjustments require review',
       ...(sections.unclassified.length?['Unclassified ledger accounts exist']:[])]};
 }
+
+export function periodFinancialStatements(journals,{fromDate,toDate}={}) {
+  const valid=date=>typeof date==='string' && /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    Number.isFinite(Date.parse(date+'T00:00:00Z')) &&
+    new Date(date+'T00:00:00Z').toISOString().slice(0,10)===date;
+  if(!valid(fromDate)||!valid(toDate)||fromDate>toDate)throw new Error('Valid report date range required');
+  if(!Array.isArray(journals))throw new Error('Journals must be an array');
+  // Validate all source entries and disallow undated legacy records in this report.
+  trialBalance(journals);
+  for(const journal of journals)if(!valid(journal.postingDate))
+    throw new Error('Undated journal prevents reliable period statements');
+  const toDateJournals=journals.filter(j=>j.postingDate<=toDate);
+  const inPeriod=toDateJournals.filter(j=>j.postingDate>=fromDate);
+  const cumulative=provisionalFinancialStatements(toDateJournals);
+  const period=provisionalFinancialStatements(inPeriod);
+  return {currency:'KES',provisional:true,fromDate,toDate,asOf:toDate,
+    profitAndLoss:period.profitAndLoss,
+    balanceSheet:cumulative.balanceSheet,
+    periodJournalCount:inPeriod.length,cumulativeJournalCount:toDateJournals.length,
+    warnings:[...new Set([...cumulative.warnings,
+      'Balance sheet is cumulative through report end; profit and loss is for the selected date range.',
+      'Opening balances, closing entries, and historical journal completeness must be verified.'])]};
+}
