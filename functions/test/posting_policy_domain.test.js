@@ -13,6 +13,10 @@ test('rejects closed periods and tampered unbalanced entries',()=>{
  assert.throws(()=>preparePosting({...input,journal:{...input.journal,lines:[{...input.journal.lines[0],debit:400},input.journal.lines[1]]}}),/balance/);
 });
 test('only exactly matching journal requests may replay',()=>{
- assert.equal(preparePosting({...input,existing:{sourceType:'sale',sourceId:'s1',period:'2026-10',postingDate:'2026-10-25'}}).replayed,true);
+ assert.equal(preparePosting({...input,existing:{...input.journal,sourceType:'sale',sourceId:'s1',period:'2026-10',postingDate:'2026-10-25'}}).replayed,true);
  assert.throws(()=>preparePosting({...input,existing:{sourceType:'sale',sourceId:'s2',period:'2026-10',postingDate:'2026-10-25'}}),/conflicting/);
+});
+
+test('replay rejects same source with modified financial amount',()=>{
+ assert.throws(()=>preparePosting({...input,existing:{...invoiceJournal(999),sourceType:'sale',sourceId:'s1',period:'2026-10',postingDate:'2026-10-25'}}),/conflicting financial content/);
 });
