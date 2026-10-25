@@ -318,6 +318,7 @@ test('warehouse transactions are tenant-scoped, atomic and replay safe', async (
   await api.installApp.run(req({appId:'inventory'}));
   await api.installApp.run(req({appId:'procurement'}));
   const root = db.doc(`organizations/${orgId}`);
+  await root.collection('products').doc('tea').set({name:'Tea',sku:'tea',stock:14,price:100,warehouseId:'east'});
   await root.collection('warehouseStock').doc('east__tea').set({warehouseId:'east',sku:'tea',quantity:12});
   await root.collection('warehouseStock').doc('west__tea').set({warehouseId:'west',sku:'tea',quantity:2});
   const input={requestId:'transfer_1',sku:'tea',fromWarehouse:'east',toWarehouse:'west',quantity:3};
