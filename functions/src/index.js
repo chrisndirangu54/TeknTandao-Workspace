@@ -16,6 +16,7 @@ import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js'
 import {preparePosting} from './posting_policy_domain.js';
 import {buildPosSaleSnapshot,posReceipt} from './pos_receipts_domain.js';
 import {validatePosCart,pricePosCart} from './pos_cart_domain.js';
+import {tillReconciliation} from './pos_till_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -426,6 +427,60 @@ export const createSale = callable(async request => {
     tx.create(org.collection('events').doc(`sale_${id}`), {type: 'sale.created', saleId: id, createdAt: stamp()});
     return {id, total};
   });
+});
+
+export const openPosTill = callable(async request=>{
+ const {org,user}=await authorize(request,'pos');
+ const tillId=identifier(request.data.tillId);
+ const openingMinor=money(request.data.openingMinor);
+ const ref=org.collection('posTills').doc(tillId);
+ await ref.create({cashierUid:user,status:'open',openingMinor,currency:'KES',openedAt:stamp()});
+ return {tillId,status:'open',openingMinor};
+});
+export const recordPosTillMovement = callable(async request=>{
+ const {org,user}=await authorize(request,'pos');
+ const tillId=identifier(request.data.tillId),movementId=identifier(request.data.movementId);
+ const amountMinor=money(request.data.amountMinor),type=request.data.type;
+ if(!['cash_in','cash_out'].includes(type)||amountMinor<=0)throw new Error('Invalid cash movement');
+ const reason=textValue(request.data.reason,200);
+ const till=org.collection('posTills').doc(tillId);
+ const movement=till.collection('movements').doc(movementId);
+ return db.runTransaction(async tx=>{
+  const [state,prior]=await Promise.all([tx.get(till),tx.get(movement)]);
+  if(!state.exists||state.data().status!=='open'||state.data().cashierUid!==user)
+   throw new HttpsError('permission-denied','Own open till required');
+  if(prior.exists){
+   if(prior.data().amountMinor!==amountMinor||prior.data().type!==type||prior.data().reason!==reason)
+    throw new Error('Conflicting till movement ID');
+   return {movementId,replayed:true};
+  }
+  tx.create(movement,{type,amountMinor,reason,cashierUid:user,createdAt:stamp(),
+    verified:false,source:'manual_adjustment'});
+  return {movementId,replayed:false};
+ });
+});
+export const closePosTill = callable(async request=>{
+ const {org,user}=await authorize(request,'pos');
+ const tillId=identifier(request.data.tillId),countedMinor=money(request.data.countedMinor);
+ const till=org.collection('posTills').doc(tillId);
+ // Explicitly bounded movement list; no implicit cash attribution from unpaid
+ // sales, M-Pesa initiations or unverified payment status.
+ return db.runTransaction(async tx=>{
+  const state=await tx.get(till);
+  if(!state.exists||state.data().cashierUid!==user)
+   throw new HttpsError('permission-denied','Till owner required');
+  if(state.data().status==='closed'){
+   if(state.data().reconciliation?.countedMinor!==countedMinor)throw new Error('Till closed with different count');
+   return {tillId,...state.data().reconciliation,replayed:true};
+  }
+  if(state.data().status!=='open')throw new Error('Till unavailable');
+  const movements=await tx.get(till.collection('movements').limit(1001));
+  if(movements.size>1000)throw new Error('Till exceeds reconciliation movement limit');
+  const reconciliation=tillReconciliation(state.data().openingMinor,
+   movements.docs.map(doc=>doc.data()),countedMinor);
+  tx.update(till,{status:'closed',closedAt:stamp(),closedBy:user,reconciliation});
+  return {tillId,...reconciliation,replayed:false};
+ });
 });
 
 export const createPosCartSale = callable(async request=>{
