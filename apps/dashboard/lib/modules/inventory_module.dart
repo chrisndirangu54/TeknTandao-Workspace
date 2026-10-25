@@ -145,6 +145,46 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }
   }
 
+  Future<void> viewPayablesAging() async {
+    setState(() => saving = true);
+    try {
+      final now = DateTime.now().toUtc();
+      final asOf = '${now.year.toString().padLeft(4, '0')}-'
+          '${now.month.toString().padLeft(2, '0')}-'
+          '${now.day.toString().padLeft(2, '0')}';
+      final report = await widget.store.call('getSupplierPayablesAging', {'asOf': asOf});
+      if (!mounted) return;
+      final buckets = Map<String, dynamic>.from(report['buckets'] as Map);
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Supplier payable aging (KES minor units)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final entry in buckets.entries)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Text('${entry.key}: ${entry.value}'),
+                ),
+              const Divider(),
+              Text('Total outstanding: ${report['totalOutstandingMinor'] ?? 0}'),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payables report unavailable: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> postSupplierBill() async {
     final values = await recordForm(context, 'Post matched supplier bill',
       ['Supplier invoice ID']);
@@ -423,6 +463,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : postSupplierBill,
                 icon: const Icon(Icons.account_balance_outlined),
                 label: const Text('Post matched bill to payables (owner)'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : viewPayablesAging,
+                icon: const Icon(Icons.analytics_outlined),
+                label: const Text('View supplier payable aging (owner)'),
               ),
             ),
             const SizedBox(height: 8),
