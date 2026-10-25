@@ -7,6 +7,7 @@ import {planBatchReceipt, allocateBatchesFEFO} from './inventory_batches_domain.
 import {reconcileInventory} from './inventory_reconciliation_domain.js';
 import {planSupplierInvoiceMatch} from './supplier_invoice_domain.js';
 import {supplierBillJournal} from './ledger_domain.js';
+import {supplierPayablesAging} from './payables_aging_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -324,7 +325,9 @@ export const matchSupplierInvoice = callable(async request => {
       supplierId:order.supplierId,sku:order.sku,warehouseId:order.warehouseId,
       units,unitPriceMinor,received:quantity(order.received||0),
       previouslyInvoiced:quantity(order.invoiced||0),ordered:quantity(order.ordered),status:order.status});
-    tx.create(invoice,{...plan,createdBy:uid,createdAt:stamp(),accountingState:'not_posted',
+    const dueDate=request.data.dueDate;
+    if(typeof dueDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)||!Number.isFinite(Date.parse(dueDate+'T00:00:00Z'))) throw new Error('Valid supplier invoice dueDate YYYY-MM-DD required');
+    tx.create(invoice,{...plan,dueDate,settledMinor:0,createdBy:uid,createdAt:stamp(),accountingState:'not_posted',
       paymentState:'unpaid'});
     tx.update(po,{invoiced:plan.invoicedTotal,updatedAt:stamp()});
     return {id,status:plan.status,totalMinor:plan.totalMinor,replayed:false};
@@ -359,4 +362,15 @@ export const postMatchedSupplierBill = callable(async request => {
     tx.update(invoiceRef,{accountingState:'posted',postedBy:uid,postedAt:stamp(),updatedAt:stamp()});
     return {id,status:'posted',replayed:false,totalMinor:entry.total};
   });
+});
+
+
+export const getSupplierPayablesAging = callable(async request => {
+  const {org,uid}=await authorized(request,'accounting');
+  const member=await org.collection('members').doc(uid).get();
+  if(member.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required for payable aging');
+  const docs=await org.collection('supplierInvoices').limit(501).get();
+  if(docs.size>500)throw new HttpsError('resource-exhausted','Use paginated payables reporting for more than 500 bills');
+  const asOf=request.data.asOf;
+  return supplierPayablesAging(docs.docs.map(d=>({id:d.id,...d.data()})),asOf);
 });
