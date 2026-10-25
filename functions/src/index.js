@@ -156,6 +156,22 @@ export const saveRecord = callable(async request => {
     data.stock = input.stock;
   }
   data = {...data, updatedAt: stamp(), updatedBy: user};
+  if (app === 'inventory') {
+    // Initial warehouse stock must be created together with the product.
+    // Subsequent quantities are managed through dedicated stock transactions.
+    const warehouseId = identifier(input.warehouseId || 'main');
+    const warehouseRef = org.collection('warehouseStock').doc(`${warehouseId}__${id}`);
+    const productRef = collection.doc(id);
+    await db.runTransaction(async tx => {
+      const [existing, warehouse] = await Promise.all([tx.get(productRef), tx.get(warehouseRef)]);
+      if (existing.exists || warehouse.exists) {
+        throw new Error('Existing inventory cannot be overwritten; use stock movement workflows');
+      }
+      tx.create(productRef, {...data, warehouseId, sku: id});
+      tx.create(warehouseRef, {warehouseId, sku: id, quantity: input.stock, createdAt: stamp(), updatedAt: stamp()});
+    });
+    return {id};
+  }
   await collection.doc(id).set(data, {merge: true});
   return {id};
 });
