@@ -31,6 +31,44 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> auditInventory() async {
+    setState(() => saving = true);
+    try {
+      final audit = await widget.store.call('auditWarehouseInventory', {});
+      if (!mounted) return;
+      final raw = audit['issues'];
+      final issues = raw is List ? raw : const [];
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(audit['ok'] == true ? 'Inventory reconciled' : 'Inventory discrepancies'),
+          content: SizedBox(
+            width: 550,
+            child: issues.isEmpty
+                ? const Text('No discrepancies detected in the scanned inventory.')
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: issues.length,
+                    itemBuilder: (_, i) {
+                      final issue = Map<String, dynamic>.from(issues[i] as Map);
+                      return ListTile(
+                        title: Text(issue['type']?.toString() ?? 'Discrepancy'),
+                        subtitle: Text('SKU: ${issue['sku'] ?? 'unknown'}; warehouse: ${issue['warehouseId'] ?? 'all'}'),
+                      );
+                    },
+                  ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+        ),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Audit unsuccessful: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> assignStockBatch() async {
     final values = await recordForm(context, 'Assign tracked stock batch',
       ['SKU Code', 'Warehouse ID', 'Batch ID', 'Units', 'Expiry date YYYY-MM-DD (optional)']);
@@ -298,6 +336,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : assignStockBatch,
                 icon: const Icon(Icons.qr_code_2_rounded),
                 label: const Text('Assign stock batch / expiry'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : auditInventory,
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('Audit stock reconciliation (owner)'),
               ),
             ),
             const SizedBox(height:20),
