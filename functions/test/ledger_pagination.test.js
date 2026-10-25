@@ -32,3 +32,18 @@ test('fails safely instead of silently truncating ledgers',async()=>{
  const docs=Array.from({length:12},(_,i)=>({id:'j'+i,data:{amount:i}}));
  await assert.rejects(readBoundedJournals(fakeCollection(docs),{pageSize:5,maxJournals:10}),/exceeds bounded/);
 });
+
+test('reports exactly at the configured journal cap without truncation',async()=>{
+ const docs=Array.from({length:10},(_,i)=>({id:'j'+String(i).padStart(2,'0'),data:{amount:i}}));
+ const rows=await readBoundedJournals(fakeCollection(docs),{pageSize:5,maxJournals:10});
+ assert.equal(rows.length,10);
+});
+test('rejects duplicate or unordered IDs from inconsistent pages',async()=>{
+ let call=0;
+ const collection={orderBy(){return {limit(){return {startAfter(){return this;},async get(){
+   call++;
+   const docs=call===1?[{id:'j2',data:()=>({})}]:[{id:'j2',data:()=>({})}];
+   return {docs,size:docs.length,empty:false};
+ }}};}}};
+ await assert.rejects(readBoundedJournals(collection,{pageSize:1,maxJournals:3}),/duplicate or unordered/);
+});
