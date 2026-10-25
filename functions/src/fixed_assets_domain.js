@@ -37,3 +37,12 @@ export function planAssetDisposal({costMinor,accumulatedMinor,proceedsMinor=0}){
  if(lossMinor)lines.push({account:'6900',name:'Loss on disposal',debit:lossMinor,credit:0});
  return {bookValueMinor,gainMinor,lossMinor,journal:balanced(lines,'Fixed asset disposal')};
 }
+
+export function assetAcquisitionJournal(costMinor){
+ const cost=money(costMinor);
+ if(!cost)throw new Error('Asset acquisition cost must be positive');
+ return balanced([
+  {account:'1500',name:'Fixed assets at cost',debit:cost,credit:0},
+  {account:'2290',name:'Unreconciled asset acquisition clearing',debit:0,credit:cost}
+ ],'Asset acquisition pending settlement reconciliation');
+}
