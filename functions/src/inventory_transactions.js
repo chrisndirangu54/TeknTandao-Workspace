@@ -96,3 +96,22 @@ export const receivePurchaseOrderStock = callable(async request => {
     return {requestId:id,status:'committed',replayed:false,remaining:plan.remaining};
   });
 });
+
+ 
+// Bounded read model for a workspace inventory screen. No cross-tenant reads.
+export const getWarehouseInventoryOverview = callable(async request => {
+  const {org} = await authorized(request,'inventory');
+  const [stock,movements,orders] = await Promise.all([
+    org.collection('warehouseStock').limit(200).get(),
+    org.collection('inventoryMovements').limit(100).get(),
+    org.collection('purchaseOrders').limit(100).get()
+  ]);
+  return {
+    stock:stock.docs.map(d=>({id:d.id,warehouseId:d.data().warehouseId,sku:d.data().sku,quantity:d.data().quantity})),
+    movements:movements.docs.map(d=>({id:d.id,type:d.data().type,sku:d.data().sku,quantity:d.data().quantity,status:d.data().status})),
+    purchaseOrders:orders.docs.map(d=>({id:d.id,sku:d.data().sku,warehouseId:d.data().warehouseId,
+      status:d.data().status,ordered:d.data().ordered,received:d.data().received||0})),
+    limits:{stock:200,movements:100,purchaseOrders:100},
+    truncated:{stock:stock.size===200,movements:movements.size===100,purchaseOrders:orders.size===100}
+  };
+});
