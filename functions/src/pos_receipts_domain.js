@@ -15,6 +15,17 @@ export function posReceipt(sale,id){
  if(!sale||!id)throw new Error('Sale required');
  if(sale.currency!=='KES'||sale.paymentState==='paid' && sale.paymentVerified!==true)
   throw new Error('Unverified sale settlement');
+ if(sale.kind==='pos_cart'){
+  if(!Array.isArray(sale.lines)||sale.lines.length===0||
+     sale.lines.reduce((n,l)=>n+l.totalMinor,0)!==sale.total)
+    throw new Error('Cart receipt lines unavailable or inconsistent');
+  return {receiptId:'POS-'+id,currency:'KES',lines:sale.lines.map(l=>({
+    productId:l.productId,name:l.name,quantity:l.quantity,
+    unitPriceMinor:l.unitPriceMinor,totalMinor:l.totalMinor
+  })),totalMinor:sale.total,createdAt:sale.createdAt||null,
+  paymentState:sale.paymentState,paid:sale.paymentState==='paid'&&sale.paymentVerified===true,
+  taxInvoice:false,notice:'Sale record only; payment and fiscal tax invoice not confirmed.'};
+ }
  const snapshot=sale.receiptSnapshot;
  if(!snapshot||snapshot.saleId!==id||snapshot.totalMinor!==sale.total||
     snapshot.quantity!==sale.quantity||snapshot.productId!==sale.productId)
