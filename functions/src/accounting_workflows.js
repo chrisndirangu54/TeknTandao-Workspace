@@ -131,7 +131,7 @@ export const postFixedAssetDepreciation = api(async request => {
   const membership=await org.collection('members').doc(user).get();
   if(membership.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required');
   const id=identifier(request.data.assetId),period=request.data.period;
-  if(typeof period!=='string'||!/^\\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+  if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
   const ref=org.collection('fixedAssets').doc(id);
   const journalRef=org.collection('journals').doc(`depreciation_${id}_${period}`);
   return db.runTransaction(async tx=>{
