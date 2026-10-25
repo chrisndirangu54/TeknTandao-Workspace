@@ -484,7 +484,7 @@ test('supplier bill posting requires accounting entitlement and is idempotent', 
     received:5,invoiced:0,status:'partially_received'
   });
   await api.matchSupplierInvoice.run(req({
-    invoiceId:'bill1',purchaseOrderId:'po1',units:3,unitPriceMinor:200
+    invoiceId:'bill1',purchaseOrderId:'po1',units:3,unitPriceMinor:200,dueDate:'2026-11-30'
   }));
   await assert.rejects(api.postMatchedSupplierBill.run(req({invoiceId:'bill1'})));
   await api.installApp.run(req({appId:'accounting'}));
