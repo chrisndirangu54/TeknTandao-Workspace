@@ -23,3 +23,19 @@ export function depreciationJournal(expenseMinor){
    {account:'1590',name:'Accumulated depreciation',debit:0,credit:amount}
  ],'Monthly straight-line depreciation');
 }
+
+export function planAssetDisposal({costMinor,accumulatedMinor,proceedsMinor=0}){
+ const cost=money(costMinor),accumulated=money(accumulatedMinor),proceeds=money(proceedsMinor);
+ if(!cost||accumulated>cost)throw new Error('Invalid asset accumulated depreciation');
+ const bookValueMinor=cost-accumulated;
+ const gainMinor=Math.max(0,proceeds-bookValueMinor);
+ const lossMinor=Math.max(0,bookValueMinor-proceeds);
+ const lines=[
+  {account:'1590',name:'Accumulated depreciation',debit:accumulated,credit:0},
+  {account:'1500',name:'Fixed assets at cost',debit:0,credit:cost}
+ ];
+ if(proceeds)lines.push({account:'1000',name:'Cash',debit:proceeds,credit:0});
+ if(gainMinor)lines.push({account:'4900',name:'Gain on disposal',debit:0,credit:gainMinor});
+ if(lossMinor)lines.push({account:'6900',name:'Loss on disposal',debit:lossMinor,credit:0});
+ return {bookValueMinor,gainMinor,lossMinor,journal:balanced(lines,'Fixed asset disposal')};
+}
