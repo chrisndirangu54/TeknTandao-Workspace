@@ -8,7 +8,7 @@ import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js'
 import {preparePosting} from './posting_policy_domain.js';
 import {provisionalFinancialStatements} from './financial_statements_domain.js';
 import {provisionalCashFlow} from './cash_flow_domain.js';
-import {depreciationSchedule,depreciationJournal} from './fixed_assets_domain.js';
+import {depreciationSchedule,depreciationJournal,planAssetDisposal} from './fixed_assets_domain.js';
 
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
@@ -148,6 +148,23 @@ export const postFixedAssetDepreciation = api(async request => {
     tx.create(journalRef,{...posting.journal,createdBy:user,createdAt:stamp()});
     return {assetId:id,period,expenseMinor:entry.expenseMinor,replayed:false};
   });
+});
+
+// Preview only: disposal cannot be posted until acquisition and accumulated
+// depreciation have been reconciled against the general ledger.
+export const previewFixedAssetDisposal = api(async request => {
+  const {org,user}=await books(request);
+  const member=await org.collection('members').doc(user).get();
+  if(member.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required');
+  const id=identifier(request.data.assetId);
+  const asset=await org.collection('fixedAssets').doc(id).get();
+  if(!asset.exists)throw new Error('Asset unavailable');
+  if(asset.data().disposedAt)throw new Error('Asset already disposed');
+  const plan=planAssetDisposal({costMinor:asset.data().costMinor,
+    accumulatedMinor:request.data.accumulatedMinor,
+    proceedsMinor:request.data.proceedsMinor||0});
+  return {assetId:id,...plan,previewOnly:true,
+    warning:'Accumulated depreciation is caller supplied and must be independently reconciled. No disposal is posted.'};
 });
 
 export const netInvoices = api(async request => {
