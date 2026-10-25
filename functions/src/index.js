@@ -19,6 +19,7 @@ import {validatePosCart,pricePosCart} from './pos_cart_domain.js';
 import {tillReconciliation} from './pos_till_domain.js';
 import {maintenanceTicket,transitionMaintenance} from './property_maintenance_domain.js';
 import {validateLease,leaseOverlaps,rentCharge} from './property_leases_domain.js';
+import {propertyTenantStatement} from './property_statements_domain.js';
 
 initializeApp();
 const db = getFirestore();
@@ -527,6 +528,24 @@ export const issuePropertyRentCharge = callable(async request=>{
   tx.create(chargeRef,{...charge,status:'issued',issuedBy:user,issuedAt:stamp()});
   return {chargeId:chargeRef.id,amountMinor:charge.amountMinor,replayed:false};
  });
+});
+
+export const getPropertyTenantStatement = callable(async request=>{
+ const {org,member}=await authorize(request,'property');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Property owner required');
+ const leaseId=identifier(request.data.leaseId);
+ const asOf=request.data.asOf;
+ const lease=await org.collection('propertyLeases').doc(leaseId).get();
+ if(!lease.exists)throw new Error('Lease not found');
+ const charges=await org.collection('propertyRentCharges').where('leaseId','==',leaseId).limit(501).get();
+ if(charges.size>500)throw new Error('Charge history exceeds bounded report');
+ // Payment allocation integration is not yet available. Reporting zero verified
+ // allocations avoids fabricating rent collection from unverified statuses.
+ const statement=propertyTenantStatement(
+   charges.docs.map(d=>({chargeId:d.id,...d.data()})),[],{asOf});
+ return {leaseId,tenantId:lease.data().tenantId,...statement,
+  reconciliationStatus:'payments_not_integrated',
+  limitations:'Outstanding charges are shown without verified settlement allocations. Confirm bank and mobile-money receipts independently.'};
 });
 
 export const createPropertyMaintenanceTicket = callable(async request=>{
