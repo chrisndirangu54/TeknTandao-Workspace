@@ -17,11 +17,13 @@ export function provisionalCashFlow(journals){
       x.account.startsWith('3')?'financingMinor':
       x.account.startsWith('15')||x.account.startsWith('16')?'investingMinor':
       ['1','2','4','5','6'].includes(x.account[0])?'operatingMinor':'unclassifiedMinor'));
+    // Transfers between recognized cash accounts are not operating/investing/financing flows.
+    // Mixed-purpose journals cannot be allocated reliably without line-level matching.
     const classification=classifications.size===1?[...classifications][0]:'unclassifiedMinor';
     sections[classification]+=cashChange;
   }
   return {currency:'KES',provisional:true,sections,cashMovementMinor,
     reconciles:cashMovementMinor===Object.values(sections).reduce((a,b)=>a+b,0),
-    warnings:['Provisional cash movements only; indirect cash flow, opening balances, restricted cash and account classifications require review.'],
+    warnings:['Provisional cash movements only; indirect cash flow, opening balances, restricted cash and account classifications require review.', 'M-Pesa (1120) and Paystack (1130) are clearing accounts, not confirmed cash; they are excluded until provider settlement is verified.'],
     recognizedCashAccounts:[...cashAccounts]};
 }
