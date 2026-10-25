@@ -187,7 +187,12 @@ export const createSale = callable(async request => {
   const saleRef = org.collection('sales').doc(id);
   return db.runTransaction(async tx => {
     const [existing, productSnap, contactSnap] = await Promise.all([tx.get(saleRef), tx.get(productRef), tx.get(contactRef)]);
-    if (existing.exists) return {id, total: existing.data().total};
+    if (existing.exists) {
+      const prior = existing.data();
+      if (prior.productId !== productRef.id || prior.contactId !== contactRef.id ||
+          prior.quantity !== request.data.quantity) throw new Error('Sale request ID already used for different inputs');
+      return {id, total: prior.total};
+    }
     if (!productSnap.exists || !contactSnap.exists) throw new Error('Select an existing product and customer');
     const product = productSnap.data();
     const total = saleTotal(product, request.data.quantity);
@@ -213,11 +218,11 @@ export const saleAutomation = onDocumentCreated({document: 'organizations/{orgId
     if (run.exists || !saleSnap.exists) return;
     const sale = saleSnap.data();
     if (books.data()?.expiresAt?.toMillis() > Date.now()) {
-      tx.set(org.collection('invoices').doc(saleId), {saleId, contactId: sale.contactId, total: sale.total, currency: sale.currency, paymentState: 'unpaid', status: 'draft', taxStatus: 'requires_tax_configuration', createdAt: stamp()});
-      tx.set(org.collection('journals').doc(`invoice_${saleId}`), {...invoiceJournal(sale.total), source: 'sale', sourceId: saleId, createdAt: stamp()});
-      tx.set(org.collection('taxOutbox').doc(saleId), {invoiceId: saleId, status: 'blocked_configuration', provider: 'kra-etims', createdAt: stamp()});
+      tx.create(org.collection('invoices').doc(saleId), {saleId, contactId: sale.contactId, total: sale.total, currency: sale.currency, paymentState: 'unpaid', status: 'draft', taxStatus: 'requires_tax_configuration', createdAt: stamp()});
+      tx.create(org.collection('journals').doc(`invoice_${saleId}`), {...invoiceJournal(sale.total), source: 'sale', sourceId: saleId, createdAt: stamp()});
+      tx.create(org.collection('taxOutbox').doc(saleId), {invoiceId: saleId, status: 'blocked_configuration', provider: 'kra-etims', createdAt: stamp()});
     }
-    if (crm.data()?.expiresAt?.toMillis() > Date.now()) tx.set(org.collection('tasks').doc(`followup_${saleId}`), {name: 'Follow up after sale', contactId: sale.contactId, saleId, status: 'open', createdAt: stamp()});
+    if (crm.data()?.expiresAt?.toMillis() > Date.now()) tx.create(org.collection('tasks').doc(`followup_${saleId}`), {name: 'Follow up after sale', contactId: sale.contactId, saleId, status: 'open', createdAt: stamp()});
     tx.create(runRef, {status: 'completed', completedAt: stamp()});
   });
 });
