@@ -18,6 +18,7 @@ import {buildPosSaleSnapshot,posReceipt} from './pos_receipts_domain.js';
 import {validatePosCart,pricePosCart} from './pos_cart_domain.js';
 import {tillReconciliation} from './pos_till_domain.js';
 import {maintenanceTicket,transitionMaintenance} from './property_maintenance_domain.js';
+import {leaveRequest,overlappingLeave,leaveDecision} from './hr_leave_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -485,6 +486,56 @@ export const closePosTill = callable(async request=>{
   tx.update(till,{status:'closed',closedAt:stamp(),closedBy:user,reconciliation});
   return {tillId,...reconciliation,replayed:false};
  });
+});
+
+export const requestHrLeave = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const id=identifier(request.data.requestId||randomUUID());
+ const leave=leaveRequest(request.data);
+ const employeeRef=org.collection('employees').doc(leave.employeeId);
+ const ref=org.collection('hrLeaveRequests').doc(id);
+ return db.runTransaction(async tx=>{
+  const [employee,prior,others]=await Promise.all([
+   tx.get(employeeRef),tx.get(ref),
+   tx.get(org.collection('hrLeaveRequests').where('employeeId','==',leave.employeeId).limit(501))
+  ]);
+  if(!employee.exists)throw new Error('Employee not found');
+  if(employee.data().portalUid!==user&&member.role!=='owner')
+   throw new HttpsError('permission-denied','Employee identity not linked');
+  if(prior.exists)throw new Error('Leave request ID already used');
+  if(others.size>500)throw new Error('Leave history exceeds safe scan');
+  if(overlappingLeave(leave,others.docs.map(d=>d.data())))throw new Error('Overlapping leave request');
+  // Serialize competing leave requests for the same employee.
+  tx.update(employeeRef,{leaveRevision:FieldValue.increment(1)});
+  tx.create(ref,{...leave,requestedBy:user,createdAt:stamp()});
+  return {requestId:id,status:'requested',calendarDays:leave.calendarDays};
+ });
+});
+export const decideHrLeave = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR approval requires owner');
+ const id=identifier(request.data.requestId),ref=org.collection('hrLeaveRequests').doc(id);
+ return db.runTransaction(async tx=>{
+  const previous=await tx.get(ref);
+  if(!previous.exists)throw new Error('Leave request unavailable');
+  const decision=leaveDecision(previous.data(),request.data.status,request.data.reason);
+  tx.update(ref,{...decision,decidedBy:user,decidedAt:stamp()});
+  tx.create(ref.collection('audit').doc(randomUUID()),{
+   from:previous.data().status,to:decision.status,actor:user,at:stamp(),
+   decisionReason:decision.decisionReason});
+  return {requestId:id,status:decision.status};
+ });
+});
+export const listHrLeaveRequests = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId);
+ const employee=await org.collection('employees').doc(employeeId).get();
+ if(!employee.exists)throw new Error('Employee not found');
+ if(member.role!=='owner'&&employee.data().portalUid!==user)
+  throw new HttpsError('permission-denied','Employee identity not linked');
+ const result=await org.collection('hrLeaveRequests').where('employeeId','==',employeeId).limit(100).get();
+ return {requests:result.docs.map(d=>({id:d.id,startDate:d.data().startDate,endDate:d.data().endDate,
+  leaveType:d.data().leaveType,status:d.data().status,calendarDays:d.data().calendarDays}))};
 });
 
 export const createPropertyLease = callable(async request=>{
