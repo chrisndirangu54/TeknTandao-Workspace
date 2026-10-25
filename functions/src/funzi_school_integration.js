@@ -94,6 +94,7 @@ export const redeemFunziLinkCode=api(async request=>{
 // School owner explicitly links one student to one Funzi learner identity.
 // Do not provide a roster endpoint or broad class feed.
 export const linkFunziStudent=api(async request=>{
+ if(request.data.active!==false)throw new HttpsError('permission-denied','New links must use dual-account verification');
  const {org,uid}=access(request);
  const [member,installation,config]=await Promise.all([
   org.collection('members').doc(uid).get(),
