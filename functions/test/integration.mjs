@@ -339,4 +339,21 @@ test('warehouse transactions are tenant-scoped, atomic and replay safe', async (
     purchaseOrderId:'po1',sku:'tea',warehouseId:'east',receiving:1})),/Approved matching purchase order required/);
 });
 
+
+test('purchase order approval requires workspace owner and is replay safe', async () => {
+  const tenant = `po_approval_${Date.now()}`;
+  const req = (data, uid=tenant) => ({data:{orgId:tenant,...data},auth:{uid}});
+  await api.createOrganization.run(req({name:'PO approval'}));
+  await api.installApp.run(req({appId:'procurement'}));
+  await api.grantMember.run(req({uid:'po_clerk',apps:['procurement']}));
+  const data = {requestId:'order_1',sku:'tea',warehouseId:'east',ordered:10};
+  const created=await api.createWarehousePurchaseOrder.run(req(data,'po_clerk'));
+  assert.equal(created.status,'draft');
+  await assert.rejects(api.createWarehousePurchaseOrder.run(req({...data,ordered:11})),/already used/);
+  await assert.rejects(api.approveWarehousePurchaseOrder.run(req({purchaseOrderId:'order_1'},'po_clerk')),/owner approval required/);
+  const approved=await api.approveWarehousePurchaseOrder.run(req({purchaseOrderId:'order_1'}));
+  assert.equal(approved.status,'approved');
+  assert.equal((await api.approveWarehousePurchaseOrder.run(req({purchaseOrderId:'order_1'}))).replayed,true);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
