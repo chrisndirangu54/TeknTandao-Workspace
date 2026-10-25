@@ -166,7 +166,7 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
 
   Future<void> matchSupplierInvoice() async {
     final values = await recordForm(context, 'Match supplier invoice to received goods',
-      ['Supplier invoice ID', 'Purchase order ID', 'Invoiced units', 'Unit price (KES)']);
+      ['Supplier invoice ID', 'Purchase order ID', 'Invoiced units', 'Unit price (KES)', 'Due date YYYY-MM-DD']);
     if (values == null || values.length < 4) return;
     final units = int.tryParse(values[2].trim());
     final price = double.tryParse(values[3].replaceAll(',', '').trim());
@@ -182,6 +182,7 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
         'purchaseOrderId': values[1].trim(),
         'units': units,
         'unitPriceMinor': (price * 100).round(),
+        'dueDate': values.length > 4 ? values[4].trim() : '',
       });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Matched bill ${result['id']}; accounting posting still required.')));
