@@ -18,7 +18,7 @@ import {buildPosSaleSnapshot,posReceipt} from './pos_receipts_domain.js';
 import {validatePosCart,pricePosCart} from './pos_cart_domain.js';
 import {tillReconciliation} from './pos_till_domain.js';
 import {maintenanceTicket,transitionMaintenance} from './property_maintenance_domain.js';
-import {validateLease,leaseOverlaps,rentCharge} from './property_leases_domain.js';
+import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
 
@@ -510,6 +510,42 @@ export const createPropertyLease = callable(async request=>{
   return {leaseId,status:'active'};
  });
 });
+export const changePropertyLease = callable(async request=>{
+ const {org,user,member}=await authorize(request,'property');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Property owner required');
+ const leaseId=identifier(request.data.leaseId),action=request.data.action;
+ if(!['renew','terminate'].includes(action))throw new Error('Invalid lease action');
+ const leaseRef=org.collection('propertyLeases').doc(leaseId);
+ return db.runTransaction(async tx=>{
+  const snapshot=await tx.get(leaseRef);
+  if(!snapshot.exists)throw new Error('Lease not found');
+  const before=snapshot.data();
+  const unit=org.collection('properties').doc(identifier(before.propertyId));
+  const [unitSnap,leases]=await Promise.all([tx.get(unit),
+   tx.get(org.collection('propertyLeases').where('propertyId','==',before.propertyId).limit(501))]);
+  if(!unitSnap.exists||leases.size>500)throw new Error('Cannot safely verify property lease history');
+  let changes;
+  if(action==='renew'){
+   changes=renewLease(before,request.data);
+   const competing=leases.docs.filter(d=>d.id!==leaseId).map(d=>d.data());
+   if(leaseOverlaps({...before,...changes},competing))
+    throw new Error('Renewal overlaps another active lease');
+  }else{
+   changes=terminateLease(before,request.data);
+   // Existing charges are not deleted or reversed by an early termination.
+  }
+  const eventRef=leaseRef.collection('history').doc(randomUUID());
+  tx.update(unit,{leaseRevision:FieldValue.increment(1),leaseUpdatedAt:stamp()});
+  tx.update(leaseRef,{...changes,updatedAt:stamp(),updatedBy:user});
+  tx.create(eventRef,{action,actor:user,at:stamp(),
+   previousEndDate:before.endDate,newEndDate:changes.endDate,
+   previousMonthlyRentMinor:before.monthlyRentMinor,
+   newMonthlyRentMinor:changes.monthlyRentMinor??before.monthlyRentMinor,
+   reason:changes.terminationReason??null});
+  return {leaseId,action,status:changes.status??before.status,endDate:changes.endDate};
+ });
+});
+
 export const issuePropertyRentCharge = callable(async request=>{
  const {org,user,member}=await authorize(request,'property');
  if(member.role!=='owner')throw new HttpsError('permission-denied','Property owner required');
