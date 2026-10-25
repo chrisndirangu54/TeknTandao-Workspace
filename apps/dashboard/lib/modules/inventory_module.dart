@@ -145,6 +145,25 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }
   }
 
+  Future<void> postSupplierBill() async {
+    final values = await recordForm(context, 'Post matched supplier bill',
+      ['Supplier invoice ID']);
+    if (values == null || values.isEmpty || values[0].trim().isEmpty) return;
+    setState(() => saving = true);
+    try {
+      final result = await widget.store.call('postMatchedSupplierBill', {
+        'invoiceId': values[0].trim(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Bill ${result['id']} posted to payables. Payment not recorded.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Posting unsuccessful: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> matchSupplierInvoice() async {
     final values = await recordForm(context, 'Match supplier invoice to received goods',
       ['Supplier invoice ID', 'Purchase order ID', 'Invoiced units', 'Unit price (KES)']);
@@ -394,6 +413,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : matchSupplierInvoice,
                 icon: const Icon(Icons.request_quote_outlined),
                 label: const Text('Match supplier invoice (owner)'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : postSupplierBill,
+                icon: const Icon(Icons.account_balance_outlined),
+                label: const Text('Post matched bill to payables (owner)'),
               ),
             ),
             const SizedBox(height: 8),
