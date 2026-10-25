@@ -10,6 +10,7 @@ import {supplierBillJournal} from './ledger_domain.js';
 import {supplierPayablesAging} from './payables_aging_domain.js';
 import {accountingPeriod,assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
+import {reconcileBankStatement} from './bank_reconciliation_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -396,4 +397,22 @@ export const closeAccountingPeriod = callable(async request => {
     tx.set(ref,{status:'closed',closedBy:uid,closedAt:stamp()});
     return {period,status:'closed',replayed:false};
   });
+});
+
+
+// Compare imported statement rows to an organization's own recorded clearing
+// entries. This is a diagnostic report; it never marks payments settled.
+export const previewBankReconciliation = callable(async request => {
+  const {org,uid}=await authorized(request,'accounting');
+  const member=await org.collection('members').doc(uid).get();
+  if(member.data()?.role!=='owner') throw new HttpsError('permission-denied','Owner required for bank reconciliation');
+  const statement=request.data.statement;
+  if(!Array.isArray(statement)||statement.length>500)
+    throw new Error('Up to 500 statement rows required');
+  const expected=await org.collection('bankLedgerEntries').limit(501).get();
+  if(expected.size>500)
+    throw new HttpsError('resource-exhausted','Paginated reconciliation needed for over 500 entries');
+  const ledger=expected.docs.map(doc=>({reference:doc.id,total:doc.data().total,
+    currency:doc.data().currency,provider:doc.data().provider}));
+  return reconcileBankStatement({ledger,statement});
 });
