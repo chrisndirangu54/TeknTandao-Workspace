@@ -150,17 +150,19 @@ export const createWarehousePurchaseOrder = callable(async request => {
   const id=identifier(request.data.requestId);
   const sku=identifier(request.data.sku),warehouseId=identifier(request.data.warehouseId);
   const ordered=quantity(request.data.ordered);
+  const supplierId=identifier(request.data.supplierId || 'unassigned');
   if(!ordered) throw new Error('Ordered quantity must be positive');
   const ref=org.collection('purchaseOrders').doc(id);
   return db.runTransaction(async tx=>{
-    const prior=await tx.get(ref);
+    const [prior,supplier]=await Promise.all([tx.get(ref),supplierId==='unassigned'?Promise.resolve(null):tx.get(org.collection('suppliers').doc(supplierId))]);
+    if(supplierId!=='unassigned'&&!supplier?.exists) throw new Error('Supplier not found in organization');
     if(prior.exists) {
       const d=prior.data();
-      if(d.sku!==sku || d.warehouseId!==warehouseId || d.ordered!==ordered)
+      if(d.sku!==sku || d.warehouseId!==warehouseId || d.ordered!==ordered || (d.supplierId||'unassigned')!==supplierId)
         throw new Error('Purchase order ID already used');
       return {id,status:d.status,replayed:true};
     }
-    tx.create(ref,{sku,warehouseId,ordered,received:0,status:'draft',createdBy:uid,
+    tx.create(ref,{sku,warehouseId,supplierId,ordered,received:0,status:'draft',createdBy:uid,
       createdAt:stamp(),updatedAt:stamp()});
     return {id,status:'draft',replayed:false};
   });
@@ -180,6 +182,24 @@ export const approveWarehousePurchaseOrder = callable(async request => {
     if(d.status!=='draft' || d.received!==0) throw new Error('Only draft orders can be approved');
     tx.update(ref,{status:'approved',approvedBy:uid,approvedAt:stamp(),updatedAt:stamp()});
     return {id,status:'approved',replayed:false};
+  });
+});
+
+export const cancelWarehousePurchaseOrder = callable(async request => {
+  const {org,uid}=await authorized(request,'procurement');
+  const membership=await org.collection('members').doc(uid).get();
+  if(membership.data()?.role!=='owner') throw new HttpsError('permission-denied','Owner required to cancel purchase orders');
+  const id=identifier(request.data.purchaseOrderId);
+  const ref=org.collection('purchaseOrders').doc(id);
+  return db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    if(!snap.exists) throw new Error('Purchase order not found');
+    const order=snap.data();
+    if(order.status==='cancelled') return {id,status:'cancelled',replayed:true};
+    if(!['draft','approved'].includes(order.status)||quantity(order.received||0)>0)
+      throw new Error('Cannot cancel an order with received stock');
+    tx.update(ref,{status:'cancelled',cancelledBy:uid,cancelledAt:stamp(),updatedAt:stamp()});
+    return {id,status:'cancelled',replayed:false};
   });
 });
 
