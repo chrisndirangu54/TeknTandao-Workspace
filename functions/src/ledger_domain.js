@@ -2,6 +2,8 @@ import {money} from './domain.js';
 
 export const chart = Object.freeze({
   ar: {code: '1100', name: 'Accounts receivable'},
+  inventory: {code: '1200', name: 'Inventory asset'},
+  ap: {code: '2200', name: 'Accounts payable'},
   mpesa: {code: '1120', name: 'M-Pesa clearing'},
   paystack: {code: '1130', name: 'Paystack clearing'},
   revenue: {code: '4000', name: 'Revenue'},
@@ -42,6 +44,11 @@ export function paymentJournal(totalMinor, provider) {
   const clearing = provider === 'mpesa' ? chart.mpesa : provider === 'paystack' ? chart.paystack : null;
   if (!clearing) throw new Error('Unsupported settlement account');
   return balanced([line(clearing, total, 0), line(chart.ar, 0, total)], 'Customer payment');
+}
+
+export function supplierBillJournal(totalMinor) {
+  const total = money(totalMinor);
+  return balanced([line(chart.inventory, total, 0), line(chart.ap, 0, total)], 'Supplier bill for received inventory');
 }
 
 export function payrollJournal(slip) {
