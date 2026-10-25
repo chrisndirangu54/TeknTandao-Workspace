@@ -34,6 +34,35 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> receivePurchaseOrder() async {
+    final values = await recordForm(context, 'Receive purchase order',
+      ['Purchase order ID', 'SKU Code', 'Warehouse ID', 'Received units']);
+    if (values == null || values.length < 4) return;
+    final units = int.tryParse(values[3].trim());
+    if (units == null || units <= 0) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a positive received quantity.')));
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      final response = await widget.store.call('receivePurchaseOrderStock', {
+        'requestId': 'receipt_${DateTime.now().microsecondsSinceEpoch}',
+        'purchaseOrderId': values[0].trim(),
+        'sku': values[1].trim(),
+        'warehouseId': values[2].trim(),
+        'receiving': units,
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Receipt recorded; remaining: ${response['remaining'] ?? 0}')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not receive order: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> createPurchaseOrder() async {
     final values = await recordForm(context, 'New purchase order',
       ['SKU Code', 'Warehouse ID', 'Ordered units']);
@@ -198,6 +227,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : createPurchaseOrder,
                 icon: const Icon(Icons.receipt_long_outlined),
                 label: const Text('Create draft purchase order'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : receivePurchaseOrder,
+                icon: const Icon(Icons.inventory_rounded),
+                label: const Text('Receive approved purchase order'),
               ),
             ),
             const SizedBox(height:20),
