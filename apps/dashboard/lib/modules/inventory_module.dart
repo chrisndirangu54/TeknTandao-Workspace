@@ -187,12 +187,13 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
 
   Future<void> postSupplierBill() async {
     final values = await recordForm(context, 'Post matched supplier bill',
-      ['Supplier invoice ID']);
-    if (values == null || values.isEmpty || values[0].trim().isEmpty) return;
+      ['Supplier invoice ID', 'Posting date YYYY-MM-DD']);
+    if (values == null || values.length < 2 || values[0].trim().isEmpty) return;
     setState(() => saving = true);
     try {
       final result = await widget.store.call('postMatchedSupplierBill', {
         'invoiceId': values[0].trim(),
+        'postingDate': values[1].trim(),
       });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Bill ${result['id']} posted to payables. Payment not recorded.')));
