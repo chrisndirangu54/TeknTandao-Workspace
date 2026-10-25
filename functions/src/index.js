@@ -264,6 +264,11 @@ export const advanceClinicalEncounter = callable(async request => {
   const snap=await tx.get(ref);
   if(!snap.exists)throw new Error('Encounter not found');
   const prior=snap.data();
+  if(member.role!=='owner'){
+   const assignment=(await tx.get(org.collection('professionalAssignments').doc(user))).data();
+   try{requireRecordScope({app:'hospital',member,assignment,record:prior});}
+   catch{throw new HttpsError('permission-denied','Encounter outside assigned patient roster');}
+  }
   const status=transitionEncounter(prior.status,next);
   tx.update(ref,{status,updatedAt:stamp(),updatedBy:user});
   tx.create(org.collection('clinicalEncounterEvents').doc(randomUUID()),
@@ -279,6 +284,11 @@ export const createClinicalEncounter = callable(async request=>{
  await db.runTransaction(async tx=>{
   const patient=await tx.get(org.collection('patients').doc(patientId));
   if(!patient.exists)throw new Error('Patient not found');
+  if(member.role!=='owner'){
+   const assignment=(await tx.get(org.collection('professionalAssignments').doc(user))).data();
+   try{requireRecordScope({app:'hospital',member,assignment,record:{patientId}});}
+   catch{throw new HttpsError('permission-denied','Patient outside assigned roster');}
+  }
   tx.create(ref,{patientId,status:'scheduled',createdBy:user,createdAt:stamp()});
  });
  return {encounterId:id,status:'scheduled'};
@@ -291,6 +301,13 @@ export const publishSchoolAssessment = callable(async request=>{
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref);
   if(!snap.exists)throw new Error('Assessment not found');
+  if(member.role!=='owner'){
+   const [student,assignment]=await Promise.all([
+    tx.get(org.collection('students').doc(snap.data().studentId)),
+    tx.get(org.collection('professionalAssignments').doc(user))]);
+   try{requireRecordScope({app:'school',member,assignment:assignment.data(),record:snap.data(),studentClass:student.data()?.className});}
+   catch{throw new HttpsError('permission-denied','Assessment outside assigned class');}
+  }
   const status=transitionAssessment(snap.data().status,request.data.nextStatus);
   tx.update(ref,{status,updatedBy:user,updatedAt:stamp()});
   tx.create(org.collection('assessmentAuditEvents').doc(randomUUID()),{
@@ -304,7 +321,13 @@ export const createSchoolAssessment = callable(async request=>{
  const id=identifier(request.data.assessmentId),studentId=identifier(request.data.studentId);
  const result=assessmentScore(request.data.score,request.data.maxScore);
  await db.runTransaction(async tx=>{
-  if(!(await tx.get(org.collection('students').doc(studentId))).exists)throw new Error('Student not found');
+  const student=await tx.get(org.collection('students').doc(studentId));
+  if(!student.exists)throw new Error('Student not found');
+  if(member.role!=='owner'){
+   const assignment=(await tx.get(org.collection('professionalAssignments').doc(user))).data();
+   try{requireRecordScope({app:'school',member,assignment,record:{studentId},studentClass:student.data()?.className});}
+   catch{throw new HttpsError('permission-denied','Student outside assigned class');}
+  }
   tx.create(org.collection('schoolAssessments').doc(id),{studentId,...result,status:'draft',
    createdBy:user,createdAt:stamp()});
  });
