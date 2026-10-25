@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
@@ -49,6 +50,34 @@ class _StudentDirectory extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('STUDENT ROSTER & FEE STATUS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.link),
+                  label: const Text('Connect Funzi'),
+                  onPressed: () async {
+                    final details = await recordForm(context, 'Link student with Funzi',
+                      ['Student ID']);
+                    if (details == null || details.isEmpty || details[0].trim().isEmpty) return;
+                    try {
+                      final result = await store.call('createFunziLinkCode',
+                        {'studentId': details[0].trim()});
+                      final code = '${result['requestId']}:${result['code']}';
+                      await Clipboard.setData(ClipboardData(text: code));
+                      if (context.mounted) {
+                        await showDialog<void>(
+                          context: context,
+                          builder: (dialogContext) => AlertDialog(
+                            title: const Text('Funzi linking code copied'),
+                            content: const Text('Sign in to Funzi as the learner or parent, select Connect school, and paste the code. It expires after 5 minutes. Do not share it with anyone else.'),
+                            actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('OK'))],
+                          ),
+                        );
+                      }
+                    } catch (error) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Unable to create Funzi link: $error')));
+                    }
+                  },
+                ),
                 ElevatedButton.icon(
                   onPressed: () async {
                     final details = await recordForm(context, 'Enroll Student', ['Student Name', 'Grade / Class', 'Guardian Name & Phone']);
