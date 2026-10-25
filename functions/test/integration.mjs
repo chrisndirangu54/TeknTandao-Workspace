@@ -285,4 +285,29 @@ test('time tracking scopes jobs and entries to the organization and authenticate
   await assert.rejects(api.mutateTimeRecord.run(requestFor('outsider', {kind: 'jobs', action: 'save', id: 'job1', record: {name: 'Attack', ratePerHour: 1}})));
 });
 
+
+test('accounting rejects credit request replay across customers and self-reversal IDs', async () => {
+  const orgId = `acct_replay_${Date.now()}`;
+  const req = (data) => ({data: {orgId, ...data}, auth: {uid: orgId}});
+  await api.createOrganization.run(req({name: 'Accounting replay checks'}));
+  await api.installApp.run(req({appId: 'accounting'}));
+  await api.installApp.run(req({appId: 'crm'}));
+  await api.saveRecord.run(req({appId: 'crm', id: 'customer_a', record: {name: 'Customer A'}}));
+  await api.saveRecord.run(req({appId: 'crm', id: 'customer_b', record: {name: 'Customer B'}}));
+  await api.issueCreditNote.run(req({requestId: 'credit_1', name: 'Return', total: 2500, contactId: 'customer_a'}));
+  await assert.rejects(
+    api.issueCreditNote.run(req({requestId: 'credit_1', name: 'Return', total: 2500, contactId: 'customer_b'})),
+    /Request ID already used/
+  );
+  assert.equal((await db.doc(`organizations/${orgId}/invoices/credit_1`).get()).data().contactId, 'customer_a');
+  await assert.rejects(
+    api.reverseInvoice.run(req({invoiceId: 'credit_1', requestId: 'credit_1'})),
+    /Reversal must have a different ID/
+  );
+  await assert.rejects(
+    api.netInvoices.run(req({leftId: 'credit_1', rightId: 'credit_1', requestId: 'net_1'})),
+    /Cannot net an invoice against itself/
+  );
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
