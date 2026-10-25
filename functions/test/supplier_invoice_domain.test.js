@@ -12,3 +12,12 @@ test('supplier invoice rejects overbilling, invalid status and overflow',()=>{
  assert.throws(()=>planSupplierInvoiceMatch({...base,status:'draft'}),/not eligible/);
  assert.throws(()=>planSupplierInvoiceMatch({...base,unitPriceMinor:900000000}),/limit/);
 });
+
+import {supplierBillJournal,trialBalance} from '../src/ledger_domain.js';
+test('supplier bill posts a balanced inventory asset and accounts payable journal',()=>{
+ const journal=supplierBillJournal(50000);
+ assert.equal(journal.total,50000);
+ assert.equal(journal.lines[0].account,'1200');
+ assert.equal(journal.lines[1].account,'2200');
+ assert.equal(trialBalance([journal]).journalCount,1);
+});
