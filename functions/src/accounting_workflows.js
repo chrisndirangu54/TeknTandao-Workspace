@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {identifier, canAccess} from './domain.js';
 import {buildReversal, buildCredit, planNetting, applyNetting} from './accounting_domain.js';
 import {creditJournal, trialBalance} from './ledger_domain.js';
+import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
@@ -36,18 +37,21 @@ export const reverseInvoice = api(async request => {
   const invoiceRef = org.collection('invoices').doc(identifier(request.data.invoiceId));
   const reversalRef = org.collection('invoices').doc(identifier(request.data.requestId));
   if (invoiceRef.id === reversalRef.id) throw new Error('Reversal must have a different ID from its source invoice');
+  const postingDate = request.data.postingDate;
+  const period = accountingPeriod(postingDate);
   await db.runTransaction(async tx => {
-    const [invoiceSnap, existing] = await Promise.all([tx.get(invoiceRef), tx.get(reversalRef)]);
+    const [invoiceSnap, existing, lock] = await Promise.all([tx.get(invoiceRef), tx.get(reversalRef), tx.get(org.collection('accountingPeriods').doc(period))]);
     if (existing.exists) {
       if (existing.data().reverses !== invoiceRef.id) throw new Error('Request ID already used');
       return;
     }
+    assertOpenPeriod(period, lock.data());
     const invoice = invoiceSnap.data();
     if (!invoice) throw new Error('Invoice unavailable');
     const reversal = buildReversal({...invoice, id: invoiceRef.id}, reversalRef.id);
     tx.create(reversalRef, {...reversal, createdAt: stamp(), createdBy: user});
     tx.update(invoiceRef, {paymentState: 'reversed', reversedBy: reversalRef.id, updatedAt: stamp()});
-    tx.create(org.collection('journals').doc(`reversal_${reversalRef.id}`), {...creditJournal(reversal.total), source: 'reversal', sourceId: reversalRef.id, memo: `Reversal of ${invoiceRef.id}`, createdAt: stamp()});
+    tx.create(org.collection('journals').doc(`reversal_${reversalRef.id}`), {...creditJournal(reversal.total), source: 'reversal', sourceId: reversalRef.id, memo: `Reversal of ${invoiceRef.id}`, postingDate, period, createdAt: stamp()});
   });
   return {id: reversalRef.id};
 });
@@ -56,8 +60,10 @@ export const issueCreditNote = api(async request => {
   const {db, org, user} = await books(request);
   const credit = buildCredit(request.data);
   const ref = org.collection('invoices').doc(identifier(request.data.requestId || randomUUID()));
+  const postingDate = request.data.postingDate;
+  const period = accountingPeriod(postingDate);
   await db.runTransaction(async tx => {
-    const existing = await tx.get(ref);
+    const [existing, lock] = await Promise.all([tx.get(ref), tx.get(org.collection('accountingPeriods').doc(period))]);
     if (existing.exists) {
       const data = existing.data();
       if (data.kind !== 'reversal' || data.paymentState !== 'reversal' || data.name !== credit.name ||
@@ -67,9 +73,10 @@ export const issueCreditNote = api(async request => {
       }
       return;
     }
+    assertOpenPeriod(period, lock.data());
     await partyExists(tx, org, credit);
     tx.create(ref, {...credit, createdAt: stamp(), createdBy: user});
-    tx.create(org.collection('journals').doc(`credit_${ref.id}`), {...creditJournal(credit.total), source: 'credit', sourceId: ref.id, createdAt: stamp()});
+    tx.create(org.collection('journals').doc(`credit_${ref.id}`), {...creditJournal(credit.total), source: 'credit', sourceId: ref.id, postingDate, period, createdAt: stamp()});
   });
   return {id: ref.id};
 });
