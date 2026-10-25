@@ -135,6 +135,25 @@ export const freezeProvisionalPeriodReport = api(async request => {
   });
 });
 
+// Diagnostic integrity verification only. Matching hashes are not evidence
+// of a transactionally isolated snapshot or authorized underlying payments.
+export const verifyProvisionalPeriodReport = api(async request => {
+  const {org,user}=await books(request);
+  const membership=await org.collection('members').doc(user).get();
+  if(membership.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required');
+  const period=request.data.period;
+  assertOpenPeriod(period);
+  const saved=await org.collection('periodReportSnapshots').doc(period).get();
+  if(!saved.exists)throw new Error('No frozen report exists for this period');
+  const journals=await readBoundedJournals(org.collection('journals'));
+  const currentDigest=createHash('sha256').update(JSON.stringify(journals)).digest('hex');
+  const recorded=saved.data();
+  return {period,unchanged:recorded.digest===currentDigest,
+    recordedDigest:recorded.digest,currentDigest,
+    recordedJournalCount:recorded.sourceJournalCount,currentJournalCount:journals.length,
+    provisional:true,warning:'Hash comparison detects ledger changes between scans but does not prove completeness under concurrent writes.'};
+});
+
 export const getProvisionalCashFlow = api(async request => {
   const {org}=await books(request);
   const journals=await readBoundedJournals(org.collection('journals'));
