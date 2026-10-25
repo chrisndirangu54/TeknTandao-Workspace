@@ -7,7 +7,7 @@ import {defineSecret} from 'firebase-functions/params';
 import {randomUUID} from 'node:crypto';
 import {prepareModuleRecord} from './module_records.js';
 import {transitionEncounter,transitionAssessment,assessmentScore} from './vertical_workflows_domain.js';
-import {requireVerticalPermission} from './vertical_permissions_domain.js';
+import {requireVerticalPermission,requireRecordScope} from './vertical_permissions_domain.js';
 import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expandRequiredApps, sanitizeRecord} from './domain.js';
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
 import {invoiceJournal} from './ledger_domain.js';
@@ -198,6 +198,17 @@ export const saveModuleRecord = callable(async request => {
     catch{throw new HttpsError('permission-denied','Professional assignment required');}
   }
   const {record, reference} = prepareModuleRecord(app, request.data.kind, request.data.record);
+  if(member.role!=='owner' && ((app==='hospital' && ['prescription','clinicalNote','labTest'].includes(record.kind)) ||
+      (app==='school' && record.kind==='grade'))){
+    const assignment=(await org.collection('professionalAssignments').doc(user).get()).data();
+    let studentClass;
+    if(app==='school'){
+      const student=(await org.collection('students').doc(record.studentId).get()).data();
+      studentClass=student?.className;
+    }
+    try{requireRecordScope({app,member,assignment,record,studentClass});}
+    catch{throw new HttpsError('permission-denied','Record is outside professional assignment');}
+  }
   const id = identifier(request.data.id || randomUUID());
   const target = org.collection('modules').doc(app).collection('records').doc(id);
   await db.runTransaction(async tx => {
