@@ -512,4 +512,21 @@ test('closed accounting periods reject new credit notes', async () => {
   );
 });
 
+
+test('closed current accounting period blocks sale automation journal', async () => {
+  const tenant = `sale_close_${Date.now()}`;
+  const req = data => ({data:{orgId:tenant,...data},auth:{uid:tenant}});
+  await api.createOrganization.run(req({name:'Sale close'}));
+  await api.installApp.run(req({appId:'accounting'}));
+  const now = new Date().toISOString().slice(0,10);
+  await api.closeAccountingPeriod.run(req({period:now.slice(0,7)}));
+  const org=db.doc(`organizations/${tenant}`);
+  await org.collection('sales').doc('sale_closed').set({contactId:'person',total:100,currency:'KES'});
+  await api.saleAutomation.run({params:{orgId:tenant,eventId:'event_sale_closed'},
+    data:{data:()=>({type:'sale.created',saleId:'sale_closed'})}});
+  const run=(await org.collection('automationRuns').doc('event_sale_closed').get()).data();
+  assert.equal(run.status,'blocked_closed_period');
+  assert.equal((await org.collection('journals').doc('invoice_sale_closed').get()).exists,false);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
