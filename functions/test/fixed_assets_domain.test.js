@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {depreciationSchedule,depreciationJournal} from '../src/fixed_assets_domain.js';
+import {depreciationSchedule,depreciationJournal,planAssetDisposal} from '../src/fixed_assets_domain.js';
 import {trialBalance} from '../src/ledger_domain.js';
 test('straight line schedule allocates exact depreciable cost',()=>{
  const rows=depreciationSchedule({assetId:'laptop',costMinor:12001,residualMinor:1,lifeMonths:7,startMonth:'2026-10'});
@@ -12,4 +12,14 @@ test('straight line schedule allocates exact depreciable cost',()=>{
 test('rejects invalid lives and residuals',()=>{
  assert.throws(()=>depreciationSchedule({assetId:'a',costMinor:10,residualMinor:10,lifeMonths:1,startMonth:'2026-01'}));
  assert.throws(()=>depreciationSchedule({assetId:'a',costMinor:10,lifeMonths:0,startMonth:'2026-01'}));
+});
+
+test('disposal recognizes gain or loss and produces balanced journals',()=>{
+ const gain=planAssetDisposal({costMinor:10000,accumulatedMinor:4000,proceedsMinor:8000});
+ assert.equal(gain.gainMinor,2000);
+ assert.equal(gain.bookValueMinor,6000);
+ assert.equal(trialBalance([gain.journal]).journalCount,1);
+ const loss=planAssetDisposal({costMinor:10000,accumulatedMinor:0,proceedsMinor:5000});
+ assert.equal(loss.lossMinor,5000);
+ assert.equal(trialBalance([loss.journal]).journalCount,1);
 });
