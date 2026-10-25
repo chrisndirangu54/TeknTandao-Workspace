@@ -1,0 +1,75 @@
+import {onCall,HttpsError} from 'firebase-functions/v2/https';
+import {getFirestore,FieldValue} from 'firebase-admin/firestore';
+import {identifier,canAccess} from './domain.js';
+
+const db=getFirestore(),stamp=()=>FieldValue.serverTimestamp();
+const api=handler=>onCall({region:'europe-west1'},async request=>{
+ try{return await handler(request);}
+ catch(error){if(error instanceof HttpsError)throw error;
+  throw new HttpsError('failed-precondition',error.message||'School integration error');}
+});
+const types={lessons:'lesson',assignments:'assignment',announcements:'announcement'};
+function access(request){
+ if(!request.auth?.uid)throw new HttpsError('unauthenticated','Firebase authentication required');
+ return {org:db.doc('organizations/'+identifier(request.data?.orgId)),uid:request.auth.uid};
+}
+export const configureFunziSchoolAccess=api(async request=>{
+ const {org,uid}=access(request);
+ const [member,installed]=await Promise.all([org.collection('members').doc(uid).get(),
+  org.collection('apps').doc('school').get()]);
+ if(member.data()?.role!=='owner'||!canAccess(member.data(),'school',installed.data()))
+   throw new HttpsError('permission-denied','School owner required');
+ const funziUid=identifier(request.data.funziUid);
+ if(funziUid===uid)throw new Error('Use a dedicated Funzi service identity');
+ const classNames=request.data.classNames;
+ if(!Array.isArray(classNames)||!classNames.length||classNames.length>100||
+   classNames.some(x=>typeof x!=='string'||!x.trim()||x.length>100))
+   throw new Error('Explicit allowed classes required');
+ const active=request.data.active;
+ if(typeof active!=='boolean')throw new Error('Active flag required');
+ await org.collection('integrations').doc('funziSchool').set({
+  funziUid,classNames:[...new Set(classNames)],active,
+  allowedTypes:['lessons','assignments','announcements'],
+  updatedBy:uid,updatedAt:stamp()});
+ return {active,funziUid,classNames:[...new Set(classNames)],
+  allowedTypes:['lessons','assignments','announcements']};
+});
+
+// Read-only, explicit class-scoped curriculum endpoint. Never exports names,
+// student records, grades, health records, payments or attendance.
+export const funziSchoolFeed=api(async request=>{
+ const {org,uid}=access(request);
+ const [integration,installation]=await Promise.all([
+   org.collection('integrations').doc('funziSchool').get(),
+   org.collection('apps').doc('school').get()]);
+ const config=integration.data();
+ if(!config?.active||config.funziUid!==uid)
+   throw new HttpsError('permission-denied','Funzi identity not authorized');
+ if(!installation.data()?.expiresAt?.toMillis || installation.data().expiresAt.toMillis()<=Date.now())
+   throw new HttpsError('permission-denied','Active school subscription required');
+ const type=request.data.type,className=request.data.className;
+ if(!Object.hasOwn(types,type)||!config.allowedTypes?.includes(type))
+   throw new Error('Unsupported Funzi feed type');
+ if(typeof className!=='string'||!config.classNames?.includes(className))
+   throw new HttpsError('permission-denied','Class not permitted');
+ const count=request.data.limit??50;
+ if(!Number.isInteger(count)||count<1||count>100)throw new Error('Limit must be 1 to 100');
+ const after=request.data.afterId;
+ if(after!==undefined)identifier(after);
+ const collection=org.collection('modules').doc('school').collection('records');
+ // Query only selected class/kind. Stable ID cursors, never arbitrary offsets.
+ let query=collection.where('kind','==',types[type]).where('className','==',className)
+    .orderBy('__name__').limit(count+1);
+ if(after)query=query.startAfter(collection.doc(after));
+ const result=await query.get();
+ const page=result.docs.slice(0,count);
+ const pick=d=>{
+  const x=d.data(),base={id:d.id,type,className:x.className,name:x.name};
+  if(type==='lessons')return {...base,subject:x.subject,notes:x.notes||''};
+  if(type==='assignments')return {...base,subject:x.subject,dueAt:x.dueAt,notes:x.notes||''};
+  return {...base,notes:x.notes||''};
+ };
+ return {schemaVersion:1,orgId:org.id,type,className,
+   items:page.map(pick),nextCursor:result.size>count?page.at(-1)?.id??null:null,
+   readOnly:true};
+});
