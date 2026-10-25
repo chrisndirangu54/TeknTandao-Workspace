@@ -6,6 +6,7 @@ import {buildReversal, buildCredit, planNetting, applyNetting} from './accountin
 import {creditJournal, trialBalance} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
+import {verifyAssetAcquisition} from './asset_acquisition_reconciliation_domain.js';
 import {provisionalFinancialStatements} from './financial_statements_domain.js';
 import {provisionalCashFlow} from './cash_flow_domain.js';
 import {depreciationSchedule,depreciationJournal,planAssetDisposal,assetAcquisitionJournal} from './fixed_assets_domain.js';
@@ -158,6 +159,19 @@ export const postFixedAssetAcquisition = api(async request => {
     return {assetId:id,posted:true,replayed:false,settlementState:'unreconciled'};
   });
 });
+export const auditFixedAssetAcquisition = api(async request => {
+  const {org,user}=await books(request);
+  const member=await org.collection('members').doc(user).get();
+  if(member.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required');
+  const id=identifier(request.data.assetId);
+  const [asset,journal]=await Promise.all([
+    org.collection('fixedAssets').doc(id).get(),
+    org.collection('journals').doc(`asset_acquisition_${id}`).get()
+  ]);
+  if(!asset.exists||!journal.exists)throw new Error('Acquisition accounting incomplete');
+  return verifyAssetAcquisition(asset.data(),journal.data());
+});
+
 export const postFixedAssetDepreciation = api(async request => {
   const {db,org,user}=await books(request);
   const membership=await org.collection('members').doc(user).get();
