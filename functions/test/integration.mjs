@@ -486,11 +486,11 @@ test('supplier bill posting requires accounting entitlement and is idempotent', 
   await api.matchSupplierInvoice.run(req({
     invoiceId:'bill1',purchaseOrderId:'po1',units:3,unitPriceMinor:200,dueDate:'2026-11-30'
   }));
-  await assert.rejects(api.postMatchedSupplierBill.run(req({invoiceId:'bill1'})));
+  await assert.rejects(api.postMatchedSupplierBill.run(req({invoiceId:'bill1',postingDate:'2026-10-25'})));
   await api.installApp.run(req({appId:'accounting'}));
-  const posted=await api.postMatchedSupplierBill.run(req({invoiceId:'bill1'}));
+  const posted=await api.postMatchedSupplierBill.run(req({invoiceId:'bill1',postingDate:'2026-10-25'}));
   assert.equal(posted.totalMinor,600);
-  assert.equal((await api.postMatchedSupplierBill.run(req({invoiceId:'bill1'}))).replayed,true);
+  assert.equal((await api.postMatchedSupplierBill.run(req({invoiceId:'bill1',postingDate:'2026-10-25'}))).replayed,true);
   const journal=(await org.collection('journals').doc('supplier_bill_bill1').get()).data();
   assert.equal(journal.lines[0].account,'1200');
   assert.equal(journal.lines[1].account,'2200');
