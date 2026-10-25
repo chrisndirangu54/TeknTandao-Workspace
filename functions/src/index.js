@@ -20,6 +20,7 @@ import {tillReconciliation} from './pos_till_domain.js';
 import {maintenanceTicket,transitionMaintenance} from './property_maintenance_domain.js';
 import {leaveRequest,overlappingLeave,leaveDecision} from './hr_leave_domain.js';
 import {validateLeavePolicy,chargeableLeaveDays,availableAnnualLeave} from './hr_leave_policy_domain.js';
+import {leaveYear,consumeLeave,validateLeaveLedger} from './hr_leave_ledger_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -519,6 +520,37 @@ export const configureHrLeavePolicy = callable(async request=>{
  await org.collection('hrSettings').doc('leavePolicy').set({...policy,updatedBy:user,updatedAt:stamp()});
  return {policy};
 });
+export const grantHrAnnualLeave = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),year=String(request.data.year);
+ if(!/^\\d{4}$/.test(year))throw new Error('Invalid leave year');
+ const days=request.data.days;
+ if(!Number.isSafeInteger(days)||days<1||days>365)throw new Error('Invalid grant days');
+ const balanceRef=org.collection('hrLeaveBalances').doc(employeeId+'_'+year);
+ return db.runTransaction(async tx=>{
+  const [employee,existing]=await Promise.all([tx.get(org.collection('employees').doc(employeeId)),tx.get(balanceRef)]);
+  if(!employee.exists)throw new Error('Employee not found');
+  if(existing.exists)throw new Error('Entitlement already initialized; adjustments require a separate audited workflow');
+  tx.create(balanceRef,{employeeId,year,grantedDays:days,usedDays:0,
+    createdBy:user,createdAt:stamp()});
+  tx.create(org.collection('hrLeaveLedgerEvents').doc(employeeId+'_'+year+'_opening'),{
+   employeeId,year,action:'grant',days,actor:user,at:stamp()});
+  return {employeeId,year,grantedDays:days,remainingDays:days};
+ });
+});
+export const getHrAnnualLeaveBalance = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId),year=String(request.data.year);
+ if(!/^\\d{4}$/.test(year))throw new Error('Invalid leave year');
+ const employee=await org.collection('employees').doc(employeeId).get();
+ if(!employee.exists||(member.role!=='owner'&&employee.data().portalUid!==user))
+  throw new HttpsError('permission-denied','Employee balance unavailable');
+ const balance=await org.collection('hrLeaveBalances').doc(employeeId+'_'+year).get();
+ if(!balance.exists)return {employeeId,year,configured:false};
+ return {employeeId,year,configured:true,grantedDays:balance.data().grantedDays,
+  usedDays:balance.data().usedDays,remainingDays:validateLeaveLedger(balance.data())};
+});
 export const decideHrLeave = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
  if(member.role!=='owner')throw new HttpsError('permission-denied','HR approval requires owner');
@@ -529,18 +561,21 @@ export const decideHrLeave = callable(async request=>{
   const decision=leaveDecision(previous.data(),request.data.status,request.data.reason);
   let policyDays=null;
   if(decision.status==='approved'&&previous.data().leaveType==='annual'){
-   const employeeRef=org.collection('employees').doc(identifier(previous.data().employeeId));
-   const [settings,employee,history]=await Promise.all([
-    tx.get(org.collection('hrSettings').doc('leavePolicy')),tx.get(employeeRef),
-    tx.get(org.collection('hrLeaveRequests').where('employeeId','==',previous.data().employeeId).limit(501))
-   ]);
-   if(!settings.exists||!employee.exists||history.size>500)throw new Error('Leave policy, employee or complete history unavailable');
+   const employeeId=identifier(previous.data().employeeId);
+   const year=leaveYear(previous.data().startDate);
+   if(leaveYear(previous.data().endDate)!==year)
+    throw new Error('Split cross-year leave into separate requests');
+   const balanceRef=org.collection('hrLeaveBalances').doc(employeeId+'_'+year);
+   const [settings,balance]=await Promise.all([
+    tx.get(org.collection('hrSettings').doc('leavePolicy')),tx.get(balanceRef)]);
+   if(!settings.exists||!balance.exists)throw new Error('Leave policy and annual entitlement must be configured');
    const policy=validateLeavePolicy(settings.data());
    policyDays=chargeableLeaveDays(previous.data(),policy);
-   const approvedDays=history.docs.filter(d=>d.id!==id&&d.data().status==='approved'&&d.data().leaveType==='annual')
-      .reduce((total,d)=>total+chargeableLeaveDays(d.data(),policy),0);
-   availableAnnualLeave({allowanceDays:policy.annualAllowanceDays,approvedDays,requestedDays:policyDays});
-   tx.update(employeeRef,{leaveApprovalRevision:FieldValue.increment(1)});
+   if(policyDays<1)throw new Error('Annual leave must include chargeable working days');
+   const nextBalance=consumeLeave(balance.data(),policyDays);
+   tx.update(balanceRef,{usedDays:nextBalance.usedDays,updatedAt:stamp()});
+   tx.create(org.collection('hrLeaveLedgerEvents').doc('leave_'+id),{
+    employeeId,year,requestId:id,action:'consume',days:policyDays,actor:user,at:stamp()});
   }
   tx.update(ref,{...decision,...(policyDays===null?{}:{approvedWorkingDays:policyDays}),decidedBy:user,decidedAt:stamp()});
   tx.create(ref.collection('audit').doc(randomUUID()),{
