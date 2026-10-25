@@ -9,6 +9,7 @@ import {planSupplierInvoiceMatch} from './supplier_invoice_domain.js';
 import {supplierBillJournal} from './ledger_domain.js';
 import {supplierPayablesAging} from './payables_aging_domain.js';
 import {accountingPeriod,assertOpenPeriod} from './accounting_period_domain.js';
+import {preparePosting} from './posting_policy_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -361,9 +362,9 @@ export const postMatchedSupplierBill = callable(async request => {
     if(bill.status!=='matched_pending_accounting'||bill.accountingState!=='not_posted'||journal.exists)
       throw new Error('Bill cannot be posted in current state');
     if(bill.currency!=='KES'||bill.paymentState!=='unpaid')throw new Error('Unexpected supplier bill state');
-    const entry=supplierBillJournal(bill.totalMinor);
-    tx.create(journalRef,{...entry,sourceType:'supplier_bill',sourceId:id,postingDate,period,
-      createdBy:uid,createdAt:stamp()});
+    const posting=preparePosting({postingDate,periodState:lock.data(),
+      sourceType:'supplier_bill',sourceId:id,journal:supplierBillJournal(bill.totalMinor)});
+    tx.create(journalRef,{...posting.journal,createdBy:uid,createdAt:stamp()});
     tx.update(invoiceRef,{accountingState:'posted',postedBy:uid,postedAt:stamp(),updatedAt:stamp()});
     return {id,status:'posted',replayed:false,totalMinor:entry.total};
   });
