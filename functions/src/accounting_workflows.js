@@ -35,6 +35,7 @@ export const reverseInvoice = api(async request => {
   const {db, org, user} = await books(request);
   const invoiceRef = org.collection('invoices').doc(identifier(request.data.invoiceId));
   const reversalRef = org.collection('invoices').doc(identifier(request.data.requestId));
+  if (invoiceRef.id === reversalRef.id) throw new Error('Reversal must have a different ID from its source invoice');
   await db.runTransaction(async tx => {
     const [invoiceSnap, existing] = await Promise.all([tx.get(invoiceRef), tx.get(reversalRef)]);
     if (existing.exists) {
@@ -59,7 +60,11 @@ export const issueCreditNote = api(async request => {
     const existing = await tx.get(ref);
     if (existing.exists) {
       const data = existing.data();
-      if (data.kind !== 'reversal' || data.paymentState !== 'reversal' || data.name !== credit.name || data.total !== credit.total) throw new Error('Request ID already used');
+      if (data.kind !== 'reversal' || data.paymentState !== 'reversal' || data.name !== credit.name ||
+          data.total !== credit.total || data.currency !== credit.currency ||
+          data.contactId !== credit.contactId || data.patientId !== credit.patientId) {
+        throw new Error('Request ID already used');
+      }
       return;
     }
     await partyExists(tx, org, credit);
@@ -86,6 +91,7 @@ export const netInvoices = api(async request => {
   const leftRef = org.collection('invoices').doc(identifier(request.data.leftId));
   const rightRef = org.collection('invoices').doc(identifier(request.data.rightId));
   const nettingRef = org.collection('accountingNettings').doc(identifier(request.data.requestId));
+  if (leftRef.id === rightRef.id) throw new Error('Cannot net an invoice against itself');
   await db.runTransaction(async tx => {
     const [leftSnap, rightSnap, existing] = await Promise.all([tx.get(leftRef), tx.get(rightRef), tx.get(nettingRef)]);
     if (existing.exists) {
