@@ -406,4 +406,28 @@ test('batch assignments must remain within counted stock and cannot be replayed 
   assert.equal((await org.collection('inventoryBatches').doc('east__tea__lot1').get()).data().quantity,7);
 });
 
+
+test('POS allocates tracked lots in earliest-expiry order and blocks exhausted tracked stock', async () => {
+  const tenant = `fefo_sale_${Date.now()}`;
+  const req = data => ({data:{orgId:tenant,...data},auth:{uid:tenant}});
+  await api.createOrganization.run(req({name:'Tracked POS'}));
+  for (const appId of ['pos','crm']) await api.installApp.run(req({appId}));
+  await api.saveRecord.run(req({appId:'crm',id:'buyer',record:{name:'Buyer'}}));
+  await api.saveRecord.run(req({appId:'inventory',id:'tea',record:{
+    name:'Tea',sku:'tea',warehouseId:'east',stock:10,price:100}}));
+  const org=db.doc(`organizations/${tenant}`);
+  await org.collection('inventoryBatches').doc('east__tea__first').set({
+    batchId:'first',sku:'tea',warehouseId:'east',expiryAt:'2026-12-01',quantity:3
+  });
+  await org.collection('inventoryBatches').doc('east__tea__last').set({
+    batchId:'last',sku:'tea',warehouseId:'east',expiryAt:'2027-01-01',quantity:4
+  });
+  await api.createSale.run(req({requestId:'saleA',productId:'tea',contactId:'buyer',quantity:5}));
+  const sale=(await org.collection('sales').doc('saleA').get()).data();
+  assert.deepEqual(sale.batchAllocations,[{batchId:'first',quantity:3},{batchId:'last',quantity:2}]);
+  assert.equal((await org.collection('inventoryBatches').doc('east__tea__first').get()).data().quantity,0);
+  await assert.rejects(api.createSale.run(req({requestId:'saleB',productId:'tea',contactId:'buyer',quantity:3})),
+    /Insufficient non-expired batch stock/);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
