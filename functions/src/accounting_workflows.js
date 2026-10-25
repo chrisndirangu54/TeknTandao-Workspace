@@ -7,7 +7,7 @@ import {creditJournal, trialBalance} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
 import {verifyAssetAcquisition} from './asset_acquisition_reconciliation_domain.js';
-import {provisionalFinancialStatements} from './financial_statements_domain.js';
+import {provisionalFinancialStatements,periodFinancialStatements} from './financial_statements_domain.js';
 import {provisionalCashFlow} from './cash_flow_domain.js';
 import {depreciationSchedule,depreciationJournal,planAssetDisposal,assetAcquisitionJournal} from './fixed_assets_domain.js';
 
@@ -105,6 +105,16 @@ export const getProvisionalFinancialStatements = api(async request => {
   const snapshot=await org.collection('journals').limit(501).get();
   if(snapshot.size>500)throw new HttpsError('resource-exhausted','Full financial statements require paginated journal reporting above 500 entries');
   return provisionalFinancialStatements(snapshot.docs.map(doc=>doc.data()));
+});
+
+export const getPeriodFinancialStatements = api(async request => {
+  const {org}=await books(request);
+  const snapshot=await org.collection('journals').limit(501).get();
+  if(snapshot.size>500)throw new HttpsError('resource-exhausted',
+    'Period reporting needs full paginated ledger data beyond 500 journals');
+  return periodFinancialStatements(snapshot.docs.map(doc=>doc.data()),{
+    fromDate:request.data.fromDate,toDate:request.data.toDate
+  });
 });
 
 export const getProvisionalCashFlow = api(async request => {
