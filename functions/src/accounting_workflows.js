@@ -170,6 +170,7 @@ export const postFixedAssetDepreciation = api(async request => {
     const [asset,existing,lock]=await Promise.all([tx.get(ref),tx.get(journalRef),
       tx.get(org.collection('accountingPeriods').doc(period))]);
     if(!asset.exists)throw new Error('Asset unavailable');
+    if(!asset.data().acquisitionJournalId)throw new Error('Asset acquisition must be posted before depreciation');
     if(existing.exists)return {assetId:id,period,replayed:true};
     if(asset.data().disposedAt || asset.data().status==='disposed')throw new Error('Cannot depreciate a disposed asset');
     assertOpenPeriod(period,lock.data());
@@ -192,6 +193,7 @@ export const previewFixedAssetDisposal = api(async request => {
   const id=identifier(request.data.assetId);
   const asset=await org.collection('fixedAssets').doc(id).get();
   if(!asset.exists)throw new Error('Asset unavailable');
+  if(!asset.data().acquisitionJournalId)throw new Error('Asset acquisition must be posted before disposal preview');
   if(asset.data().disposedAt || asset.data().status==='disposed')throw new Error('Asset already disposed');
   const schedule=asset.data().schedule;
   if(!Array.isArray(schedule))throw new Error('Asset depreciation schedule unavailable');
