@@ -34,6 +34,35 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> transferStock() async {
+    final values = await recordForm(context, 'Transfer warehouse stock',
+      ['SKU Code', 'From warehouse ID', 'To warehouse ID', 'Units']);
+    if (values == null || values.length < 4) return;
+    final units = int.tryParse(values[3].trim());
+    if (units == null || units <= 0) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a positive number of units.')));
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      await widget.store.call('transferWarehouseStock', {
+        'requestId': 'transfer_${DateTime.now().microsecondsSinceEpoch}',
+        'sku': values[0].trim(),
+        'fromWarehouse': values[1].trim(),
+        'toWarehouse': values[2].trim(),
+        'quantity': units,
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Warehouse transfer recorded.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Transfer unsuccessful: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
     appBar:AppBar(title:const Row(children:[Icon(Icons.inventory_2_rounded,color:Color(0xFFF59E0B)),SizedBox(width:10),Text('Inventory & Warehouses')])),
@@ -71,6 +100,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 _InventoryMetric(label:'Low stock',value:low.toString(),icon:Icons.warning_amber_rounded),
                 _InventoryMetric(label:'Out of stock',value:out.toString(),icon:Icons.remove_shopping_cart_rounded),
               ]),
+            ),
+            const SizedBox(height:16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : transferStock,
+                icon: const Icon(Icons.swap_horiz_rounded),
+                label: const Text('Transfer between warehouses'),
+              ),
             ),
             const SizedBox(height:20),
             TextField(
