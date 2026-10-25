@@ -34,6 +34,25 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> approvePurchaseOrder() async {
+    final values = await recordForm(context, 'Approve purchase order',
+      ['Purchase order ID']);
+    if (values == null || values.isEmpty || values[0].trim().isEmpty) return;
+    setState(() => saving = true);
+    try {
+      await widget.store.call('approveWarehousePurchaseOrder', {
+        'purchaseOrderId': values[0].trim(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Purchase order approved.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Approval unsuccessful: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> receivePurchaseOrder() async {
     final values = await recordForm(context, 'Receive purchase order',
       ['Purchase order ID', 'SKU Code', 'Warehouse ID', 'Received units']);
@@ -236,6 +255,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : receivePurchaseOrder,
                 icon: const Icon(Icons.inventory_rounded),
                 label: const Text('Receive approved purchase order'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : approvePurchaseOrder,
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('Approve draft purchase order (owner)'),
               ),
             ),
             const SizedBox(height:20),
