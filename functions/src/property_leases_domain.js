@@ -28,3 +28,19 @@ export function rentCharge(lease,period){
   period,amountMinor:lease.monthlyRentMinor,currency:'KES',paymentState:'unpaid',
   pricingPolicy:'full_month_no_proration'};
 }
+
+export function renewLease(current,{newEndDate,newMonthlyRentMinor}){
+ if(current?.status!=='active')throw new Error('Only active leases may be renewed');
+ const end=day(newEndDate);
+ if(end<=current.endDate)throw new Error('Renewal must extend lease end date');
+ const rent=money(newMonthlyRentMinor);
+ if(rent<=0)throw new Error('Renewal rent must be positive');
+ return {endDate:end,monthlyRentMinor:rent};
+}
+export function terminateLease(current,{terminationDate,reason}){
+ if(current?.status!=='active')throw new Error('Only active leases may be terminated');
+ const end=day(terminationDate);
+ if(end<=current.startDate||end>current.endDate)throw new Error('Termination date outside lease');
+ if(typeof reason!=='string'||!reason.trim()||reason.length>500)throw new Error('Termination reason required');
+ return {status:'terminated',endDate:end,terminationReason:reason.trim()};
+}
