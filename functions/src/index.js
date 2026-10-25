@@ -215,6 +215,22 @@ export const saveModuleRecord = callable(async request => {
 
 // Separate lifecycle records retain authorization and a transition history.
 // Clinical notes and student scores are not exposed in the response.
+export const setProfessionalAssignment = callable(async request=>{
+ const app=identifier(request.data.appId);
+ if(!['hospital','school'].includes(app))throw new Error('Unsupported professional app');
+ const {org,member,user}=await authorize(request,app,true);
+ const staffUid=identifier(request.data.staffUid);
+ const role=request.data.role;
+ const options=app==='hospital'?['clinician','receptionist','lab_technician']:['teacher','principal'];
+ if(!options.includes(role))throw new Error('Unknown professional role');
+ if(typeof request.data.active!=='boolean')throw new Error('Active flag required');
+ const staff=await org.collection('members').doc(staffUid).get();
+ if(!staff.exists)throw new Error('Assign an existing organization member');
+ await org.collection('professionalAssignments').doc(staffUid).set({
+  app,role,active:request.data.active,assignedBy:user,updatedAt:stamp()
+ });
+ return {staffUid,app,role,active:request.data.active};
+});
 export const advanceClinicalEncounter = callable(async request => {
  const {org,user,member}=await authorize(request,'hospital');
  if(member.role!=='owner')throw new HttpsError('permission-denied','Clinical encounter owner authorization required');
