@@ -139,6 +139,7 @@ export const postFixedAssetDepreciation = api(async request => {
       tx.get(org.collection('accountingPeriods').doc(period))]);
     if(!asset.exists)throw new Error('Asset unavailable');
     if(existing.exists)return {assetId:id,period,replayed:true};
+    if(asset.data().disposedAt || asset.data().status==='disposed')throw new Error('Cannot depreciate a disposed asset');
     assertOpenPeriod(period,lock.data());
     const entry=asset.data().schedule.find(row=>row.period===period);
     if(!entry)throw new Error('Period outside asset useful life');
@@ -159,12 +160,29 @@ export const previewFixedAssetDisposal = api(async request => {
   const id=identifier(request.data.assetId);
   const asset=await org.collection('fixedAssets').doc(id).get();
   if(!asset.exists)throw new Error('Asset unavailable');
-  if(asset.data().disposedAt)throw new Error('Asset already disposed');
+  if(asset.data().disposedAt || asset.data().status==='disposed')throw new Error('Asset already disposed');
+  const schedule=asset.data().schedule;
+  if(!Array.isArray(schedule))throw new Error('Asset depreciation schedule unavailable');
+  const journalRefs=schedule.filter(row=>row.expenseMinor>0).map(row=>
+    org.collection('journals').doc(`depreciation_${id}_${row.period}`));
+  if(journalRefs.length>500)throw new HttpsError('resource-exhausted','Depreciation reconciliation exceeds supported period count');
+  const journals=await Promise.all(journalRefs.map(ref=>ref.get()));
+  let accumulatedMinor=0;
+  for(let i=0;i<journals.length;i++){
+    const journal=journals[i];
+    if(!journal.exists)continue;
+    const data=journal.data();
+    if(data.sourceType!=='depreciation'||data.sourceId!==id+'_'+schedule.filter(r=>r.expenseMinor>0)[i].period)
+      throw new Error('Depreciation journal source mismatch');
+    const amount=data.lines?.filter(line=>line.account==='1590').reduce((sum,line)=>sum+line.credit-line.debit,0);
+    if(!Number.isSafeInteger(amount)||amount!==schedule.filter(r=>r.expenseMinor>0)[i].expenseMinor)
+      throw new Error('Depreciation journal amount mismatch');
+    accumulatedMinor+=amount;
+  }
   const plan=planAssetDisposal({costMinor:asset.data().costMinor,
-    accumulatedMinor:request.data.accumulatedMinor,
-    proceedsMinor:request.data.proceedsMinor||0});
-  return {assetId:id,...plan,previewOnly:true,
-    warning:'Accumulated depreciation is caller supplied and must be independently reconciled. No disposal is posted.'};
+    accumulatedMinor,proceedsMinor:request.data.proceedsMinor||0});
+  return {assetId:id,accumulatedMinor,...plan,previewOnly:true,
+    warning:'Preview uses recorded depreciation journals but asset acquisition and disposal proceeds have not been independently verified. No disposal is posted.'};
 });
 
 export const netInvoices = api(async request => {
