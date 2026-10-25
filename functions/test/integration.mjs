@@ -356,4 +356,19 @@ test('purchase order approval requires workspace owner and is replay safe', asyn
   assert.equal((await api.approveWarehousePurchaseOrder.run(req({purchaseOrderId:'order_1'}))).replayed,true);
 });
 
+
+test('product creation initializes a single warehouse balance and rejects direct stock overwrite', async () => {
+  const tenant = `product_seed_${Date.now()}`;
+  const req = data => ({data:{orgId:tenant,...data},auth:{uid:tenant}});
+  await api.createOrganization.run(req({name:'Product seed test'}));
+  await api.installApp.run(req({appId:'inventory'}));
+  const input={appId:'inventory',id:'tea',record:{name:'Tea',sku:'tea',warehouseId:'east',stock:7,price:100}};
+  await api.saveRecord.run(req(input));
+  const stock=await db.doc(`organizations/${tenant}/warehouseStock/east__tea`).get();
+  assert.equal(stock.data().quantity,7);
+  await assert.rejects(api.saveRecord.run(req({...input,record:{...input.record,stock:90}})),
+    /Existing inventory cannot be overwritten/);
+  assert.equal((await db.doc(`organizations/${tenant}/warehouseStock/east__tea`).get()).data().quantity,7);
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
