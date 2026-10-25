@@ -496,4 +496,20 @@ test('supplier bill posting requires accounting entitlement and is idempotent', 
   assert.equal(journal.lines[1].account,'2200');
 });
 
+
+test('closed accounting periods reject new credit notes', async () => {
+  const tenant = `close_credit_${Date.now()}`;
+  const req = data => ({data:{orgId:tenant,...data},auth:{uid:tenant}});
+  await api.createOrganization.run(req({name:'Closed period control'}));
+  await api.installApp.run(req({appId:'accounting'}));
+  await api.installApp.run(req({appId:'crm'}));
+  await api.saveRecord.run(req({appId:'crm',id:'customer1',record:{name:'Customer'}}));
+  await api.closeAccountingPeriod.run(req({period:'2026-09'}));
+  await assert.rejects(
+    api.issueCreditNote.run(req({requestId:'credit_closed',postingDate:'2026-09-15',
+      name:'Adjustment',total:100,contactId:'customer1'})),
+    /Accounting period is closed/
+  );
+});
+
 after(async () => { await Promise.all(getApps().map(deleteApp)); });
