@@ -145,9 +145,28 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
     }
   }
 
+  Future<void> cancelPurchaseOrder() async {
+    final values = await recordForm(context, 'Cancel unreceived purchase order',
+      ['Purchase order ID']);
+    if (values == null || values.isEmpty || values[0].trim().isEmpty) return;
+    setState(() => saving = true);
+    try {
+      await widget.store.call('cancelWarehousePurchaseOrder', {
+        'purchaseOrderId': values[0].trim(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Purchase order cancelled.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cancellation unsuccessful: $error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> createPurchaseOrder() async {
     final values = await recordForm(context, 'New purchase order',
-      ['SKU Code', 'Warehouse ID', 'Ordered units']);
+      ['SKU Code', 'Warehouse ID', 'Ordered units', 'Supplier ID (optional)']);
     if (values == null || values.length < 3) return;
     final units = int.tryParse(values[2].trim());
     if (units == null || units <= 0) {
@@ -162,6 +181,7 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
         'sku': values[0].trim(),
         'warehouseId': values[1].trim(),
         'ordered': units,
+        'supplierId': values.length > 3 && values[3].trim().isNotEmpty ? values[3].trim() : 'unassigned',
       });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Draft PO created: ${result['id']}')));
@@ -327,6 +347,15 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
                 onPressed: saving ? null : approvePurchaseOrder,
                 icon: const Icon(Icons.verified_outlined),
                 label: const Text('Approve draft purchase order (owner)'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : cancelPurchaseOrder,
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text('Cancel unreceived purchase order (owner)'),
               ),
             ),
             const SizedBox(height: 8),
