@@ -4,6 +4,7 @@ import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {identifier, canAccess} from './domain.js';
 import {planStockTransfer, planPurchaseReceipt} from './inventory_procurement_domain.js';
 import {planBatchReceipt, allocateBatchesFEFO} from './inventory_batches_domain.js';
+import {reconcileInventory} from './inventory_reconciliation_domain.js';
 
 const db = getFirestore();
 const stamp = () => FieldValue.serverTimestamp();
@@ -253,5 +254,24 @@ export const assignWarehouseStockBatch = callable(async request => {
     tx.create(movement,{type:'batch_assignment',sku:product,warehouseId:warehouse,batchId:batch,
       expiryAt,quantity:count,createdBy:uid,createdAt:stamp(),status:'committed'});
     return {requestId:id,status:'committed',replayed:false};
+  });
+});
+
+ 
+export const auditWarehouseInventory = callable(async request => {
+  const {org,uid}=await authorized(request,'inventory');
+  const member=await org.collection('members').doc(uid).get();
+  if(member.data()?.role!=='owner') throw new HttpsError('permission-denied','Owner required for reconciliation');
+  const [products,warehouses,batches]=await Promise.all([
+    org.collection('products').limit(501).get(),
+    org.collection('warehouseStock').limit(501).get(),
+    org.collection('inventoryBatches').limit(501).get()
+  ]);
+  if([products,warehouses,batches].some(s=>s.size>500))
+    throw new HttpsError('resource-exhausted','Reconciliation requires paginated processing above 500 records');
+  return reconcileInventory({
+    products:products.docs.map(d=>({sku:d.id,stock:d.data().stock})),
+    warehouses:warehouses.docs.map(d=>d.data()),
+    batches:batches.docs.map(d=>d.data())
   });
 });
