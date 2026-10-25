@@ -8,6 +8,7 @@ import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js'
 import {preparePosting} from './posting_policy_domain.js';
 import {provisionalFinancialStatements} from './financial_statements_domain.js';
 import {provisionalCashFlow} from './cash_flow_domain.js';
+import {depreciationSchedule,depreciationJournal} from './fixed_assets_domain.js';
 
 const region = 'europe-west1';
 const stamp = () => FieldValue.serverTimestamp();
@@ -110,6 +111,43 @@ export const getProvisionalCashFlow = api(async request => {
   const snapshot=await org.collection('journals').limit(501).get();
   if(snapshot.size>500)throw new HttpsError('resource-exhausted','Cash flow reporting needs pagination beyond 500 journals');
   return provisionalCashFlow(snapshot.docs.map(doc=>doc.data()));
+});
+
+// Owner-scoped fixed asset registration; asset acquisition accounting remains separate.
+export const registerFixedAsset = api(async request => {
+  const {db,org,user}=await books(request);
+  const membership=await org.collection('members').doc(user).get();
+  if(membership.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required');
+  const id=identifier(request.data.assetId);
+  const schedule=depreciationSchedule({...request.data,assetId:id});
+  const ref=org.collection('fixedAssets').doc(id);
+  await ref.create({assetId:id,costMinor:request.data.costMinor,residualMinor:request.data.residualMinor||0,
+    lifeMonths:request.data.lifeMonths,startMonth:request.data.startMonth,schedule,
+    createdBy:user,createdAt:stamp()});
+  return {assetId:id,periodCount:schedule.length};
+});
+export const postFixedAssetDepreciation = api(async request => {
+  const {db,org,user}=await books(request);
+  const membership=await org.collection('members').doc(user).get();
+  if(membership.data()?.role!=='owner')throw new HttpsError('permission-denied','Owner required');
+  const id=identifier(request.data.assetId),period=request.data.period;
+  if(typeof period!=='string'||!/^\\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+  const ref=org.collection('fixedAssets').doc(id);
+  const journalRef=org.collection('journals').doc(`depreciation_${id}_${period}`);
+  return db.runTransaction(async tx=>{
+    const [asset,existing,lock]=await Promise.all([tx.get(ref),tx.get(journalRef),
+      tx.get(org.collection('accountingPeriods').doc(period))]);
+    if(!asset.exists)throw new Error('Asset unavailable');
+    if(existing.exists)return {assetId:id,period,replayed:true};
+    assertOpenPeriod(period,lock.data());
+    const entry=asset.data().schedule.find(row=>row.period===period);
+    if(!entry)throw new Error('Period outside asset useful life');
+    if(entry.expenseMinor===0)return {assetId:id,period,skippedZero:true};
+    const posting=preparePosting({postingDate:period+'-01',periodState:lock.data(),
+      sourceType:'depreciation',sourceId:id+'_'+period,journal:depreciationJournal(entry.expenseMinor)});
+    tx.create(journalRef,{...posting.journal,createdBy:user,createdAt:stamp()});
+    return {assetId:id,period,expenseMinor:entry.expenseMinor,replayed:false};
+  });
 });
 
 export const netInvoices = api(async request => {
