@@ -20,3 +20,9 @@ test('only exactly matching journal requests may replay',()=>{
 test('replay rejects same source with modified financial amount',()=>{
  assert.throws(()=>preparePosting({...input,existing:{...invoiceJournal(999),sourceType:'sale',sourceId:'s1',period:'2026-10',postingDate:'2026-10-25'}}),/conflicting financial content/);
 });
+
+test('replay rejects tampered account allocations even when total matches',()=>{
+ const existing={...invoiceJournal(500),sourceType:'sale',sourceId:'s1',period:'2026-10',postingDate:'2026-10-25'};
+ existing.lines=existing.lines.map((line,i)=>i===0?{...line,account:'1500'}:line);
+ assert.throws(()=>preparePosting({...input,existing}),/conflicting financial content/);
+});
