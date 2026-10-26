@@ -21,6 +21,7 @@ import {maintenanceTicket,transitionMaintenance} from './property_maintenance_do
 import {leaveRequest,overlappingLeave,leaveDecision} from './hr_leave_domain.js';
 import {validateLeavePolicy,chargeableLeaveDays,availableAnnualLeave} from './hr_leave_policy_domain.js';
 import {leaveYear,consumeLeave,validateLeaveLedger} from './hr_leave_ledger_domain.js';
+import {validateAccrualPolicy,accrueAnnualLeave,carryForwardLeave} from './hr_accrual_domain.js';
 import {authorizeLeaveApprover,validateLeaveManagerAssignment} from './hr_approvals_domain.js';
 import {leaveApprovalTransition} from './hr_multilevel_approval_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
@@ -541,6 +542,53 @@ export const grantHrAnnualLeave = callable(async request=>{
   return {employeeId,year,grantedDays:days,remainingDays:days};
  });
 });
+export const configureHrAccrualPolicy = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const policy=validateAccrualPolicy(request.data.policy);
+ await org.collection('hrSettings').doc('accrualPolicy').set({...policy,updatedBy:user,updatedAt:stamp()});
+ return {policy};
+});
+export const postHrMonthlyAccrual = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid accrual period');
+ const year=period.slice(0,4),balanceRef=org.collection('hrLeaveBalances').doc(employeeId+'_'+year);
+ const eventRef=org.collection('hrLeaveLedgerEvents').doc(employeeId+'_'+period+'_accrual');
+ return db.runTransaction(async tx=>{
+  const [employee,policy,balance,event]=await Promise.all([
+   tx.get(org.collection('employees').doc(employeeId)),
+   tx.get(org.collection('hrSettings').doc('accrualPolicy')),tx.get(balanceRef),tx.get(eventRef)]);
+  if(!employee.exists||!policy.exists||!balance.exists)throw new Error('Employee, accrual policy or entitlement unavailable');
+  if(event.exists)return {employeeId,period,replayed:true,days:event.data().days};
+  const result=accrueAnnualLeave(balance.data(),policy.data(),period);
+  tx.update(balanceRef,{grantedDays:result.grantedDays,updatedAt:stamp()});
+  tx.create(eventRef,{employeeId,year,period,action:'accrual',days:result.days,actor:user,at:stamp()});
+  return {employeeId,period,replayed:false,days:result.days,remainingDays:result.remainingDays};
+ });
+});
+export const carryForwardHrAnnualLeave = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),year=String(request.data.year);
+ if(!/^\\d{4}$/.test(year)||+year<2001)throw new Error('Invalid carryover year');
+ const priorRef=org.collection('hrLeaveBalances').doc(employeeId+'_'+(+year-1));
+ const nextRef=org.collection('hrLeaveBalances').doc(employeeId+'_'+year);
+ const eventRef=org.collection('hrLeaveLedgerEvents').doc(employeeId+'_'+year+'_carryover');
+ return db.runTransaction(async tx=>{
+  const [employee,policy,prior,next,event]=await Promise.all([
+   tx.get(org.collection('employees').doc(employeeId)),
+   tx.get(org.collection('hrSettings').doc('accrualPolicy')),tx.get(priorRef),tx.get(nextRef),tx.get(eventRef)]);
+  if(!employee.exists||!policy.exists||!prior.exists||!next.exists)throw new Error('Employee, policy or both entitlement years unavailable');
+  if(event.exists)return {employeeId,year,replayed:true,days:event.data().days};
+  const result=carryForwardLeave(prior.data(),next.data(),policy.data());
+  tx.update(nextRef,{grantedDays:result.grantedDays,updatedAt:stamp()});
+  tx.create(eventRef,{employeeId,year,action:'carryover',days:result.days,actor:user,at:stamp()});
+  return {employeeId,year,replayed:false,days:result.days};
+ });
+});
+
 export const getHrAnnualLeaveBalance = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
  const employeeId=identifier(request.data.employeeId),year=String(request.data.year);
