@@ -603,6 +603,11 @@ export const decideHrTimesheet = callable(async request=>{
  return db.runTransaction(async tx=>{
   const sheet=await tx.get(ref);
   if(!sheet.exists)throw new Error('Timesheet not found');
+  const shift=await tx.get(org.collection('hrShifts').doc(id));
+  if(!shift.exists)throw new Error('Timesheet shift missing');
+  const period=shift.data().startAt.slice(0,7);
+  if((await tx.get(org.collection('hrPayrollTimeLocks').doc(sheet.data().employeeId+'_'+period))).exists)
+   throw new Error('Payroll time period locked; controlled correction required');
   const decision=decideTimesheet(sheet.data(),request.data.status,request.data.note);
   if(sheet.data().submittedBy===user)
    throw new HttpsError('permission-denied','Cannot approve or reject own timesheet');
@@ -641,6 +646,11 @@ export const decideHrOvertime = callable(async request=>{
   if(!previous.exists)throw new Error('Overtime request unavailable');
   if(previous.data().submittedBy===user)
    throw new HttpsError('permission-denied','Self-approval prohibited');
+  const shift=await tx.get(org.collection('hrShifts').doc(id));
+  if(!shift.exists)throw new Error('Overtime shift missing');
+  const period=shift.data().startAt.slice(0,7);
+  if((await tx.get(org.collection('hrPayrollTimeLocks').doc(previous.data().employeeId+'_'+period))).exists)
+   throw new Error('Payroll time period locked; controlled correction required');
   const decision=decideOvertime(previous.data(),request.data.status,request.data.note);
   tx.update(ref,{...decision,decidedBy:user,decidedAt:stamp()});
   tx.create(ref.collection('audit').doc(randomUUID()),{
