@@ -237,6 +237,32 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> agingReport() async {
+    try {
+      final report=await widget.store.call('getCrmPipelineAging',{'thresholdDays':14});
+      if(!mounted)return;
+      final rows=(report['rows'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Stalled deal analysis'),
+        content:SizedBox(width:620,height:440,child:ListView(children:[
+          Text('Open: ${report['openDeals']} · Stalled 14+ days: ${report['stalledDeals']} · Unknown age: ${report['unknownAgeDeals']}'),
+          const Text('Legacy deals without recorded stage-entry dates are not assigned an invented age.'),
+          const Divider(),
+          for(final row in rows)
+            ListTile(
+              title:Text(row['title']?.toString()??'Opportunity'),
+              subtitle:Text('Stage: ${row['stage']} · Owner: ${row['ownerUid']??'unassigned'}'),
+              trailing:Text(row['stageDays']==null?'Unknown':'${row['stageDays']} days'),
+            ),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Aging report unavailable: $error')));
+    }
+  }
+
   Future<void> quotasAndTerritories() async {
     final periodValues=await recordForm(context,'Sales quota dashboard',['Period YYYY-MM']);
     if(periodValues==null)return;
@@ -505,7 +531,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
