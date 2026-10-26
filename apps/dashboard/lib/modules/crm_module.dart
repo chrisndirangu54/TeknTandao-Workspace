@@ -237,6 +237,67 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> quotasAndTerritories() async {
+    final periodValues=await recordForm(context,'Sales quota dashboard',['Period YYYY-MM']);
+    if(periodValues==null)return;
+    final period=periodValues[0].trim();
+    try {
+      final report=await widget.store.call('getCrmQuotaDashboard',{'period':period});
+      if(!mounted)return;
+      final attainment=(report['attainment'] as List?)??[];
+      final territories=(report['territories'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text('Sales quotas · $period'),
+        content:SizedBox(width:630,height:430,child:ListView(children:[
+          const Text('Based on won opportunities with recorded close dates, not realized sales revenue.'),
+          const Divider(),
+          const Text('QUOTA ATTAINMENT',style:TextStyle(fontWeight:FontWeight.bold)),
+          if(attainment.isEmpty)const Text('No quota targets for this month.'),
+          for(final item in attainment)
+            ListTile(title:Text('Owner ${item['ownerUid']} · ${item['attainmentPercent']}%'),
+              subtitle:Text('Target ${item['targetMinor']} · Won value ${item['wonOpportunityMinor']} (minor units)')),
+          const Divider(),
+          const Text('TERRITORIES',style:TextStyle(fontWeight:FontWeight.bold)),
+          for(final territory in territories)
+            ListTile(title:Text(territory['name'].toString()),
+              subtitle:Text('Assigned owner: ${territory['ownerUid']}')),
+        ])),
+        actions:[
+          TextButton(onPressed:() async {
+            final fields=await recordForm(dialogContext,'Set sales quota',['Sales member user ID','Target KES (whole shillings)']);
+            if(fields==null)return;
+            final amount=int.tryParse(fields[1].trim());
+            if(amount==null||amount<=0)return;
+            try{
+              await widget.store.call('setCrmSalesQuota',{
+                'ownerUid':fields[0].trim(),'period':period,'targetMinor':amount*100});
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Quota update failed: $error')));
+            }
+          },child:const Text('Set quota')),
+          TextButton(onPressed:() async {
+            final fields=await recordForm(dialogContext,'Assign territory',['Territory name','Sales member user ID']);
+            if(fields==null)return;
+            try {
+              await widget.store.call('setCrmSalesTerritory',{
+                'name':fields[0].trim(),'ownerUid':fields[1].trim()});
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Territory update failed: $error')));
+            }
+          },child:const Text('Assign territory')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Quota report unavailable: $error')));
+    }
+  }
+
   Future<void> teamPerformance() async {
     try{
       final result=await widget.store.call('getCrmTeamPerformance',{});
@@ -444,7 +505,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
