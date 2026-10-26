@@ -12,3 +12,9 @@ test('unknown timestamps stay unknown rather than estimated',()=>{
  assert.equal(r.unknownAgeDeals,1);assert.equal(r.rows[0].stalled,null);
  assert.throws(()=>crmAgingReport([],'bad'),/Invalid/);
 });
+
+test('legacy deal uses creation timestamp when stage entry is missing',()=>{
+ const r=crmAgingReport([{id:'old',stage:'proposal',createdAt:{seconds:1790812800}}],'2026-10-26T00:00:00Z',14);
+ assert.equal(r.unknownAgeDeals,0);
+ assert.equal(r.stalledDeals,1);
+});
