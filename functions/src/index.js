@@ -39,6 +39,7 @@ import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_g
 import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} from './crm_pipeline_domain.js';
 import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {crmBoardMetrics} from './crm_board_domain.js';
+import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
 import {sequencePlan,sequenceEnrollment,stopSequence} from './crm_sequences_domain.js';
 import {crmSuppression,allowedCrmContact,appendCrmSequenceStep} from './crm_suppression_domain.js';
@@ -190,15 +191,17 @@ export const createCrmOpportunity = callable(async request=>{
  const id=identifier(request.data.opportunityId||randomUUID()),ref=org.collection('crmOpportunities').doc(id);
  const contact=await org.collection('contacts').doc(identifier(proposed.contactId)).get();
  if(!contact.exists)throw new Error('CRM contact not found');
- await ref.create({...proposed,createdBy:user,createdAt:stamp(),updatedAt:stamp()});
+ await ref.create({...proposed,ownerUid:user,createdBy:user,createdAt:stamp(),updatedAt:stamp()});
  return {id,stage:proposed.stage};
 });
 export const advanceCrmOpportunity = callable(async request=>{
- const {org,user}=await authorize(request,'crm');
+ const {org,user,member}=await authorize(request,'crm');
  const id=identifier(request.data.opportunityId),ref=org.collection('crmOpportunities').doc(id);
  return db.runTransaction(async tx=>{
   const current=await tx.get(ref);
   if(!current.exists)throw new Error('Opportunity not found');
+  if(member.role!=='owner'&&(current.data().ownerUid||current.data().createdBy)!==user)
+   throw new HttpsError('permission-denied','Deal owner or sales administrator required');
   const next=crmAdvanceOpportunity(current.data(),request.data.stage,request.data.reason);
   tx.update(ref,{...next,updatedBy:user,updatedAt:stamp()});
   tx.create(ref.collection('history').doc(randomUUID()),{
@@ -207,6 +210,31 @@ export const advanceCrmOpportunity = callable(async request=>{
   return {id,stage:next.stage};
  });
 });
+export const assignCrmDealOwner = callable(async request=>{
+ const {org,user,member}=await authorize(request,'crm');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Sales administrator required');
+ const id=identifier(request.data.opportunityId),newOwner=identifier(request.data.ownerUid);
+ const ref=org.collection('crmOpportunities').doc(id);
+ return db.runTransaction(async tx=>{
+  const [deal,assignee]=await Promise.all([tx.get(ref),tx.get(org.collection('members').doc(newOwner))]);
+  if(!deal.exists||!assignee.exists)throw new Error('Deal or workspace member missing');
+  const change=assignDealOwner(deal.data(),newOwner,request.data.reason);
+  tx.update(ref,{...change,updatedBy:user,updatedAt:stamp()});
+  tx.create(ref.collection('history').doc(randomUUID()),{
+   action:'owner_assigned',from:deal.data().ownerUid||deal.data().createdBy||null,
+   to:newOwner,reason:change.assignmentReason,actor:user,at:stamp()});
+  return {opportunityId:id,ownerUid:newOwner};
+ });
+});
+export const getCrmTeamPerformance = callable(async request=>{
+ const {org,member}=await authorize(request,'crm');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Sales administrator required');
+ const deals=await org.collection('crmOpportunities').limit(501).get();
+ if(deals.size>500)throw new Error('Sales reporting requires pagination');
+ return {team:crmTeamPerformance(deals.docs.map(d=>d.data())),
+  scope:'Current stored opportunity snapshot, not realized revenue.'};
+});
+
 export const createCrmFollowUp = callable(async request=>{
  const {org,user}=await authorize(request,'crm');
  const opportunityId=identifier(request.data.opportunityId);
