@@ -237,6 +237,39 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> commerceSummary() async {
+    try {
+      final report=await widget.store.call('getCrmCommerceSummary',{});
+      if(!mounted)return;
+      final customers=(report['customers'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('CRM · POS · Accounting'),
+        content:SizedBox(width:680,height:480,child:ListView(children:[
+          const Text('Read-only snapshot. POS sales, invoices and won deals may refer to the same transaction. Do not add their values together.'),
+          if(customers.isEmpty)const Text('No customer records available.'),
+          for(final customer in customers)ExpansionTile(
+            title:Text(customer['name']?.toString()??'Customer'),
+            subtitle:Text('POS sales: ${customer['posSaleCount']} · Invoices: ${customer['invoiceCount']}'),
+            children:[
+              ListTile(title:const Text('Won opportunity value'),
+                trailing:Text('${customer['wonOpportunityMinor']} minor units')),
+              ListTile(title:const Text('POS recorded sales'),
+                trailing:Text('${customer['posSaleMinor']} minor units')),
+              ListTile(title:const Text('Invoiced amount'),
+                trailing:Text('${customer['invoiceMinor']} minor units')),
+              ListTile(title:const Text('Invoices marked paid (unverified)'),
+                trailing:Text('${customer['paidInvoiceStatusCount']}')),
+            ],
+          ),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Commerce summary unavailable: $error')));
+    }
+  }
+
   Future<void> campaignEfficiencyReport() async {
     try {
       final report=await widget.store.call('getCrmCampaignEfficiency',{});
@@ -665,7 +698,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:campaignEfficiencyReport,icon:const Icon(Icons.price_check_outlined),label:const Text('Campaign costs')),TextButton.icon(onPressed:campaignReport,icon:const Icon(Icons.campaign_outlined),label:const Text('Campaigns')),TextButton.icon(onPressed:salesCycleReport,icon:const Icon(Icons.timeline_outlined),label:const Text('Sales cycle')),TextButton.icon(onPressed:conversionReport,icon:const Icon(Icons.analytics_outlined),label:const Text('Win/loss')),TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:commerceSummary,icon:const Icon(Icons.receipt_long_outlined),label:const Text('Commerce')),TextButton.icon(onPressed:campaignEfficiencyReport,icon:const Icon(Icons.price_check_outlined),label:const Text('Campaign costs')),TextButton.icon(onPressed:campaignReport,icon:const Icon(Icons.campaign_outlined),label:const Text('Campaigns')),TextButton.icon(onPressed:salesCycleReport,icon:const Icon(Icons.timeline_outlined),label:const Text('Sales cycle')),TextButton.icon(onPressed:conversionReport,icon:const Icon(Icons.analytics_outlined),label:const Text('Win/loss')),TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
