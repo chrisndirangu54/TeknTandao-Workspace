@@ -42,6 +42,7 @@ import {crmBoardMetrics} from './crm_board_domain.js';
 import {crmAgingReport} from './crm_aging_domain.js';
 import {crmConversionReport} from './crm_conversion_domain.js';
 import {crmSalesCycleReport} from './crm_cycle_domain.js';
+import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
@@ -189,13 +190,33 @@ export const listCrmSequences = callable(async request=>{
   automaticSending:false};
 });
 
+export const createCrmCampaign = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const campaign=crmCampaign(request.data),id=identifier(request.data.campaignId||randomUUID());
+ await org.collection('crmCampaigns').doc(id).create({...campaign,createdBy:user,createdAt:stamp()});
+ return {campaignId:id};
+});
+export const getCrmCampaignAttribution = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const [campaigns,deals]=await Promise.all([
+  org.collection('crmCampaigns').limit(201).get(),org.collection('crmOpportunities').limit(501).get()]);
+ if(campaigns.size>200||deals.size>500)throw new Error('Attribution requires pagination');
+ return {campaigns:crmAttribution(deals.docs.map(d=>d.data()),
+   campaigns.docs.map(d=>({id:d.id,...d.data()}))),
+  method:'Single source selected on opportunity creation; won deal value is not recognized revenue.'};
+});
+
 export const createCrmOpportunity = callable(async request=>{
  const {org,user}=await authorize(request,'crm');
  const proposed=crmOpportunity(request.data);
  const id=identifier(request.data.opportunityId||randomUUID()),ref=org.collection('crmOpportunities').doc(id);
- const contact=await org.collection('contacts').doc(identifier(proposed.contactId)).get();
+ const campaignId=request.data.campaignId?identifier(request.data.campaignId):null;
+ const [contact,campaign]=await Promise.all([
+  org.collection('contacts').doc(identifier(proposed.contactId)).get(),
+  campaignId?org.collection('crmCampaigns').doc(campaignId).get():Promise.resolve(null)]);
+ if(campaignId&&(!campaign.exists||campaign.data().status!=='active'))throw new Error('Active campaign required');
  if(!contact.exists)throw new Error('CRM contact not found');
- await ref.create({...proposed,ownerUid:user,createdBy:user,createdAt:stamp(),stageEnteredAt:new Date().toISOString(),updatedAt:stamp()});
+ await ref.create({...proposed,campaignId,ownerUid:user,createdBy:user,createdAt:stamp(),stageEnteredAt:new Date().toISOString(),updatedAt:stamp()});
  return {id,stage:proposed.stage};
 });
 export const advanceCrmOpportunity = callable(async request=>{
