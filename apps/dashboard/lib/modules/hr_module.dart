@@ -474,6 +474,32 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _attendanceReconciliation() async {
+    final employeeId=selectedId;
+    if(employeeId==null)return;
+    try {
+      final data=await widget.store.call('getHrShiftAttendanceReconciliation',{'employeeId':employeeId});
+      if(!mounted)return;
+      final rows=(data['results'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Shift & attendance exceptions'),
+        content:SizedBox(width:570,height:390,child:ListView(children:[
+          const Text('Raw clock events only. No hours here are approved for payroll.'),
+          if(rows.isEmpty)const Text('No scheduled shifts to compare.'),
+          for(final entry in rows)
+            ListTile(
+              title:Text('${entry['status']} · ${entry['startAt']}'),
+              subtitle:Text('Scheduled: ${entry['scheduledMinutes']} min · Recorded: ${entry['workedMinutes'] ?? 'missing'} min\nLate: ${entry['lateMinutes'] ?? '—'} min · Early: ${entry['earlyDepartureMinutes'] ?? '—'} min'),
+            ),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Reconciliation unavailable: $error')));
+    }
+  }
+
   Future<void> _shiftPlanner() async {
     final employeeId = selectedId;
     if (employeeId == null) {
@@ -583,6 +609,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _attendanceReconciliation,
+                  icon: const Icon(Icons.rule_outlined),
+                  label: const Text('Attendance exceptions'),
+                ),
                 OutlinedButton.icon(
                   onPressed: selectedId == null ? null : _shiftPlanner,
                   icon: const Icon(Icons.schedule_outlined),
