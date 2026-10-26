@@ -65,3 +65,5 @@ export * from './inventory_transactions.js';
 export * from './funzi_school_integration.js';
 
 export * from './crm_sales_agent_schedule.js';
+
+export * from './inventory_agent.js';
