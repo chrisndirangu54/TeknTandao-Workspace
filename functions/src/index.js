@@ -31,6 +31,7 @@ import {reconcileShiftPunches} from './hr_shift_reconciliation_domain.js';
 import {draftTimesheet,decideTimesheet} from './hr_timesheets_domain.js';
 import {proposeOvertime,decideOvertime} from './hr_overtime_domain.js';
 import {payrollTimeRegister} from './hr_payroll_time_domain.js';
+import {payrollTimeSnapshot} from './hr_time_lock_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -667,6 +668,43 @@ export const getHrPayrollTimeRegister = callable(async request=>{
   overtime.docs.map(d=>({id:d.id,...d.data(),period:assignPeriod(d.data().timesheetId)})));
  return {employeeId,...statement,
   note:'For HR reconciliation only. Not verified for payroll posting, wage valuation, or statutory filing.'};
+});
+
+export const lockHrPayrollTimeRegister = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const lockRef=org.collection('hrPayrollTimeLocks').doc(employeeId+'_'+period);
+ return db.runTransaction(async tx=>{
+  const [employee,existing,sheets,overtime,shifts]=await Promise.all([
+   tx.get(org.collection('employees').doc(employeeId)),tx.get(lockRef),
+   tx.get(org.collection('hrTimesheets').where('employeeId','==',employeeId).limit(501)),
+   tx.get(org.collection('hrOvertimeRequests').where('employeeId','==',employeeId).limit(501)),
+   tx.get(org.collection('hrShifts').where('employeeId','==',employeeId).limit(501))]);
+  if(!employee.exists||sheets.size>500||overtime.size>500||shifts.size>500)
+   throw new Error('Incomplete employee history prevents time locking');
+  const periodByShift=new Map(shifts.docs.map(d=>[d.id,d.data().startAt?.slice(0,7)]));
+  const register=payrollTimeRegister(period,
+   sheets.docs.map(d=>({id:d.id,...d.data(),period:periodByShift.get(d.data().shiftId)})),
+   overtime.docs.map(d=>({id:d.id,...d.data(),period:periodByShift.get(d.data().timesheetId)})));
+  const snapshot=payrollTimeSnapshot(register);
+  if(existing.exists){
+   if(existing.data().digest!==snapshot.digest)
+    throw new Error('Previously locked time register differs from current approved records');
+   return {employeeId,period,digest:snapshot.digest,replayed:true};
+  }
+  tx.create(lockRef,{...snapshot,employeeId,lockedBy:user,lockedAt:stamp()});
+  return {employeeId,period,digest:snapshot.digest,replayed:false};
+ });
+});
+export const getHrPayrollTimeLock = callable(async request=>{
+ const {org,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const record=await org.collection('hrPayrollTimeLocks').doc(employeeId+'_'+period).get();
+ return record.exists?{locked:true,...record.data()}:{locked:false};
 });
 
 export const listHrOvertime = callable(async request=>{
