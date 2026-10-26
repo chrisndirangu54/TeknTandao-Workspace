@@ -63,3 +63,5 @@ export * from './whatsapp_workspace_api.js';
 export * from './inventory_transactions.js';
 
 export * from './funzi_school_integration.js';
+
+export * from './crm_sales_agent_schedule.js';
