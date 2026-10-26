@@ -90,7 +90,21 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
           for(final template in templates)ListTile(
             title:Text(template['name']?.toString()??'Sequence'),
             subtitle:Text('Status: ${template['status']} · Steps: ${(template['steps'] as List?)?.length??0}'),
-            trailing:template['status']=='draft'?TextButton(
+            trailing:template['status']=='draft'?Wrap(mainAxisSize:MainAxisSize.min,children:[
+              TextButton(onPressed:() async {
+                final v=await recordForm(dialogContext,'Add sequence step',['Channel email / whatsapp / call','Delay days','Subject','Message']);
+                if(v==null)return;
+                final days=int.tryParse(v[1].trim());
+                if(days==null)return;
+                try {
+                  await widget.store.call('addCrmSequenceStep',{'sequenceId':template['id'],
+                    'step':{'channel':v[0].trim().toLowerCase(),'delayDays':days,'subject':v[2].trim(),'body':v[3].trim()}});
+                  if(dialogContext.mounted)Navigator.pop(dialogContext);
+                }catch(error){
+                  if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Step failed: $error')));
+                }
+              },child:const Text('Add step')),
+              TextButton(
               onPressed:() async {
                 try{
                   await widget.store.call('activateCrmSequence',{'sequenceId':template['id']});
@@ -98,7 +112,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
                 }catch(error){
                   if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Activation failed: $error')));
                 }
-              },child:const Text('Activate')):null,
+              },child:const Text('Activate'))]):null,
           ),
           const Divider(),
           const Text('ENROLLMENTS',style:TextStyle(fontWeight:FontWeight.bold)),
@@ -152,6 +166,19 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
               if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Enrollment failed: $error')));
             }
           },child:const Text('Enroll contact')),
+          TextButton(onPressed:() async {
+            final v=await recordForm(dialogContext,'Suppress outreach channel',
+              ['Contact ID','Channel: email / whatsapp / call / all','Reason for opt-out']);
+            if(v==null)return;
+            try {
+              await widget.store.call('suppressCrmContactChannel',{
+                'contactId':v[0].trim(),'channel':v[1].trim().toLowerCase(),'reason':v[2].trim()});
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Suppression failed: $error')));
+            }
+          },child:const Text('Record opt-out')),
           TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
         ],
       ));
