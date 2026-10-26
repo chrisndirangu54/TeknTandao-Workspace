@@ -27,6 +27,53 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> contactTimeline(Map<String,dynamic> contact) async {
+    final contactId=contact['id']?.toString();
+    if(contactId==null||contactId.isEmpty){
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Contact record ID unavailable.')));
+      return;
+    }
+    try {
+      final data=await widget.store.call('listCrmActivityTimeline',{'contactId':contactId});
+      if(!mounted)return;
+      final rows=(data['activities'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text('Activity · ${contact['name']??'Contact'}'),
+        content:SizedBox(width:570,height:410,child:ListView(children:[
+          const Text('Manually logged interactions; no mailbox or WhatsApp synchronization.'),
+          if(rows.isEmpty)const Text('No interactions logged.'),
+          for(final item in rows)
+            ListTile(title:Text('${item['type']} · ${item['occurredAt']}'),
+              subtitle:Text(item['summary']?.toString()??'')),
+        ])),
+        actions:[
+          TextButton(onPressed:() async {
+            final details=await recordForm(dialogContext,'Log interaction',
+              ['Type: call / meeting / email / whatsapp / note','Interaction summary']);
+            if(details==null)return;
+            try{
+              final now=DateTime.now().toUtc().toIso8601String().split('.').first+'Z';
+              await widget.store.call('logCrmActivity',{
+                'contactId':contactId,'type':details[0].trim().toLowerCase(),
+                'summary':details[1].trim(),'occurredAt':now,
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+              if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content:Text('Interaction logged. Reopen timeline to refresh.')));
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Activity could not be logged: $error')));
+            }
+          },child:const Text('Log interaction')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Activity timeline unavailable: $error')));
+    }
+  }
+
   Future<void> leadScores() async {
     try {
       final result=await widget.store.call('getCrmLeadScores',{});
@@ -212,8 +259,8 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
             else
               LayoutBuilder(builder:(context,constraints){
                 final wide=constraints.maxWidth>900;
-                if(!wide)return Column(children:[for(final c in visible)...[_ContactCard(contact:c),const SizedBox(height:10)]]);
-                return Wrap(spacing:12,runSpacing:12,children:[for(final c in visible)SizedBox(width:(constraints.maxWidth-12)/2,child:_ContactCard(contact:c))]);
+                if(!wide)return Column(children:[for(final c in visible)...[_ContactCard(contact:c,onTimeline:()=>contactTimeline(c)),const SizedBox(height:10)]]);
+                return Wrap(spacing:12,runSpacing:12,children:[for(final c in visible)SizedBox(width:(constraints.maxWidth-12)/2,child:_ContactCard(contact:c,onTimeline:()=>contactTimeline(c)))]);
               }),
           ],
         );
@@ -234,7 +281,8 @@ class _Metric extends StatelessWidget{
 
 class _ContactCard extends StatelessWidget{
   final Map<String,dynamic> contact;
-  const _ContactCard({required this.contact});
+  final VoidCallback onTimeline;
+  const _ContactCard({required this.contact,required this.onTimeline});
   @override Widget build(BuildContext context){
     final name=(contact['name']??'Unnamed contact').toString().trim();
     final safeName=name.isEmpty?'Unnamed contact':name;
@@ -255,6 +303,7 @@ class _ContactCard extends StatelessWidget{
           Wrap(spacing:12,runSpacing:4,children:[
             if(phone.isNotEmpty)Text(phone,style:const TextStyle(color:Color(0xFF64748B))),
             if(location.isNotEmpty)Text(location,style:const TextStyle(color:Color(0xFF64748B))),
+            TextButton.icon(onPressed:onTimeline,icon:const Icon(Icons.history_rounded,size:16),label:const Text('Activity timeline')),
           ]),
         ])),
       ]),
