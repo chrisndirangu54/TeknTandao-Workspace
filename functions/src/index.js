@@ -44,6 +44,7 @@ import {crmConversionReport} from './crm_conversion_domain.js';
 import {crmSalesCycleReport} from './crm_cycle_domain.js';
 import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
 import {crmCommerceSummary} from './crm_commerce_domain.js';
+import {crmInvoiceReconciliation} from './crm_invoice_reconciliation_domain.js';
 import {campaignSpend,campaignEfficiency} from './crm_campaign_spend_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
@@ -190,6 +191,24 @@ export const listCrmSequences = callable(async request=>{
  return {templates:templates.docs.map(d=>({id:d.id,...d.data()})),
   enrollments:enrollments.docs.map(d=>({id:d.id,...d.data()})),
   automaticSending:false};
+});
+
+export const getCrmInvoiceReconciliation = callable(async request=>{
+ const {org,member}=await authorize(request,'crm');
+ const [posApp,accountingApp]=await Promise.all([
+  org.collection('apps').doc('pos').get(),org.collection('apps').doc('accounting').get()]);
+ if(!canAccess(member,'pos',posApp.data())||!canAccess(member,'accounting',accountingApp.data()))
+  throw new HttpsError('permission-denied','CRM, POS and Accounting permissions required');
+ const [invoices,sales,contacts]=await Promise.all([
+  org.collection('invoices').limit(501).get(),
+  org.collection('sales').limit(501).get(),
+  org.collection('contacts').limit(501).get()]);
+ if([invoices,sales,contacts].some(x=>x.size>500))
+  throw new Error('Invoice reconciliation requires pagination');
+ return crmInvoiceReconciliation(
+  invoices.docs.map(d=>({id:d.id,...d.data()})),
+  sales.docs.map(d=>({id:d.id,...d.data()})),
+  contacts.docs.map(d=>({id:d.id,...d.data()})));
 });
 
 export const getCrmCommerceSummary = callable(async request=>{
