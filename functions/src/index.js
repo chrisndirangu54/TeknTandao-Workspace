@@ -22,6 +22,7 @@ import {leaveRequest,overlappingLeave,leaveDecision} from './hr_leave_domain.js'
 import {validateLeavePolicy,chargeableLeaveDays,availableAnnualLeave} from './hr_leave_policy_domain.js';
 import {leaveYear,consumeLeave,validateLeaveLedger} from './hr_leave_ledger_domain.js';
 import {authorizeLeaveApprover,validateLeaveManagerAssignment} from './hr_approvals_domain.js';
+import {leaveApprovalTransition} from './hr_multilevel_approval_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -572,9 +573,10 @@ export const decideHrLeave = callable(async request=>{
   if(!employee.exists)throw new Error('Employee unavailable');
   try{authorizeLeaveApprover({member,assignment:assignment.data(),employee:employee.data(),approverUid:user});}
   catch{throw new HttpsError('permission-denied','Not authorized to approve this employee leave');}
-  const decision=leaveDecision(previous.data(),request.data.status,request.data.reason);
+  const stage=leaveApprovalTransition(previous.data(),request.data.status,member.role==='owner'?'owner':'manager');
+  const decision=stage.status==='manager_approved' ? {status:'manager_approved',decisionReason:null} : leaveDecision({...previous.data(),status:'requested'},stage.status,request.data.reason);
   let policyDays=null;
-  if(decision.status==='approved'&&previous.data().leaveType==='annual'){
+  if(stage.final&&previous.data().leaveType==='annual'){
    const employeeId=identifier(previous.data().employeeId);
    const year=leaveYear(previous.data().startDate);
    if(leaveYear(previous.data().endDate)!==year)
@@ -591,7 +593,7 @@ export const decideHrLeave = callable(async request=>{
    tx.create(org.collection('hrLeaveLedgerEvents').doc('leave_'+id),{
     employeeId,year,requestId:id,action:'consume',days:policyDays,actor:user,at:stamp()});
   }
-  tx.update(ref,{...decision,...(policyDays===null?{}:{approvedWorkingDays:policyDays}),decidedBy:user,decidedAt:stamp()});
+  tx.update(ref,{...decision,...(policyDays===null?{}:{approvedWorkingDays:policyDays}),decidedBy:user,decidedAt:stamp(),approvalStage:stage.final?'final':stage.status==='manager_approved'?'hr_review':'closed'});
   tx.create(ref.collection('audit').doc(randomUUID()),{
    from:previous.data().status,to:decision.status,actor:user,at:stamp(),
    decisionReason:decision.decisionReason});
@@ -604,7 +606,7 @@ export const listHrLeaveApprovalInbox = callable(async request=>{
  const assignment=owner?null:(await org.collection('hrLeaveManagers').doc(user).get()).data();
  if(!owner&&(!assignment?.active||assignment.role!=='leave_manager'||assignment.managerUid!==user))
   throw new HttpsError('permission-denied','Active leave manager required');
- const pending=await org.collection('hrLeaveRequests').where('status','==','requested').limit(201).get();
+ const pending=await org.collection('hrLeaveRequests').where('status','in',owner?['requested','manager_approved']:['requested']).limit(201).get();
  if(pending.size>200)throw new Error('Pending inbox exceeds reporting limit');
  const employeeIds=[...new Set(pending.docs.map(d=>identifier(d.data().employeeId)))];
  const employees=await Promise.all(employeeIds.map(id=>org.collection('employees').doc(id).get()));
@@ -612,6 +614,7 @@ export const listHrLeaveApprovalInbox = callable(async request=>{
  const requests=pending.docs.filter(doc=>{
   const employee=byId.get(doc.data().employeeId);
   if(!employee)return false;
+  if(!owner&&doc.data().status!=='requested')return false;
   try{authorizeLeaveApprover({member,assignment,employee,approverUid:user});return true;}
   catch{return false;}
  }).map(doc=>({id:doc.id,employeeId:doc.data().employeeId,
