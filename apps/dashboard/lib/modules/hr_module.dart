@@ -153,7 +153,7 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Pending leave approvals'),
+          title: const Text('Leave approval inbox · Manager / HR'),
           content: SizedBox(
             width: 650,
             height: 430,
@@ -165,7 +165,7 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
                     final item = requests[index] as Map;
                     return ListTile(
                       title: Text('${item['employeeName']} · ${item['leaveType']}'),
-                      subtitle: Text('${item['department']} · ${item['startDate']} – ${item['endDate']}'),
+                      subtitle: Text('${item['department']} · ${item['startDate']} – ${item['endDate']} · ${item['status']}'),
                       trailing: Wrap(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
                         TextButton(
                           onPressed: () async {
@@ -175,7 +175,7 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
                               });
                               if (dialogContext.mounted) Navigator.pop(dialogContext);
                               if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(
-                                const SnackBar(content: Text('Leave approved. Balance checks were applied.')));
+                                const SnackBar(content: Text('Decision saved. Manager approvals await final HR review; leave is deducted only after final approval.')));
                             } catch (error) {
                               if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
                                 SnackBar(content: Text('Approval failed: $error')));
