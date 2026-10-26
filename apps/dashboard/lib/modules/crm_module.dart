@@ -74,6 +74,92 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> salesSequences() async {
+    try {
+      final data=await widget.store.call('listCrmSequences',{});
+      if(!mounted)return;
+      final templates=(data['templates'] as List?)??[];
+      final enrollments=(data['enrollments'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Sales sequences · manual'),
+        content:SizedBox(width:620,height:460,child:ListView(children:[
+          const Text('Planning only: no automatic email, WhatsApp or call sending. Record consent evidence before enrolling contacts.'),
+          const Divider(),
+          const Text('TEMPLATES',style:TextStyle(fontWeight:FontWeight.bold)),
+          if(templates.isEmpty)const Text('No sequences yet.'),
+          for(final template in templates)ListTile(
+            title:Text(template['name']?.toString()??'Sequence'),
+            subtitle:Text('Status: ${template['status']} · Steps: ${(template['steps'] as List?)?.length??0}'),
+            trailing:template['status']=='draft'?TextButton(
+              onPressed:() async {
+                try{
+                  await widget.store.call('activateCrmSequence',{'sequenceId':template['id']});
+                  if(dialogContext.mounted)Navigator.pop(dialogContext);
+                }catch(error){
+                  if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Activation failed: $error')));
+                }
+              },child:const Text('Activate')):null,
+          ),
+          const Divider(),
+          const Text('ENROLLMENTS',style:TextStyle(fontWeight:FontWeight.bold)),
+          for(final item in enrollments)ListTile(
+            title:Text('Contact ${item['contactId']} · ${item['channel']}'),
+            subtitle:Text('Status: ${item['status']}'),
+            trailing:item['status']=='active'?TextButton(onPressed:() async {
+              final values=await recordForm(dialogContext,'Stop sequence',['Reason']);
+              if(values==null||values[0].trim().isEmpty)return;
+              try{
+                await widget.store.call('stopCrmSequenceEnrollment',{'enrollmentId':item['id'],'reason':values[0].trim()});
+                if(dialogContext.mounted)Navigator.pop(dialogContext);
+              }catch(error){
+                if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Stopping failed: $error')));
+              }
+            },child:const Text('Stop')):null,
+          ),
+        ])),
+        actions:[
+          TextButton(onPressed:() async {
+            final fields=await recordForm(dialogContext,'Create sequence template',
+              ['Sequence name','Channel: email / whatsapp / call','Step delay (days)','Subject','Message / talking points']);
+            if(fields==null)return;
+            final delay=int.tryParse(fields[2].trim());
+            if(delay==null)return;
+            try{
+              await widget.store.call('createCrmSequence',{
+                'name':fields[0].trim(),'steps':[{
+                  'channel':fields[1].trim().toLowerCase(),'delayDays':delay,
+                  'subject':fields[3].trim(),'body':fields[4].trim(),
+                }],
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Template failed: $error')));
+            }
+          },child:const Text('New template')),
+          TextButton(onPressed:() async {
+            final fields=await recordForm(dialogContext,'Enroll with documented consent',
+              ['Active sequence ID','Contact ID','Channel','Consent evidence / source']);
+            if(fields==null)return;
+            try{
+              await widget.store.call('enrollCrmSequence',{
+                'sequenceId':fields[0].trim(),'contactId':fields[1].trim(),
+                'channel':fields[2].trim().toLowerCase(),
+                'consent':{'channel':fields[2].trim().toLowerCase(),'granted':true,
+                  'evidence':fields[3].trim()},
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Enrollment failed: $error')));
+            }
+          },child:const Text('Enroll contact')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Sequences unavailable: $error')));
+    }
+  }
+
   Future<void> leadScores() async {
     try {
       final result=await widget.store.call('getCrmLeadScores',{});
@@ -213,7 +299,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
