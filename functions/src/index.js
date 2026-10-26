@@ -25,6 +25,7 @@ import {validateAccrualPolicy,accrueAnnualLeave,carryForwardLeave} from './hr_ac
 import {authorizeLeaveApprover,validateLeaveManagerAssignment} from './hr_approvals_domain.js';
 import {leaveApprovalTransition} from './hr_multilevel_approval_domain.js';
 import {createReview,reviewAssessment} from './hr_performance_domain.js';
+import {candidateApplication,advanceCandidate,onboardingTask} from './hr_recruitment_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -493,6 +494,60 @@ export const closePosTill = callable(async request=>{
   tx.update(till,{status:'closed',closedAt:stamp(),closedBy:user,reconciliation});
   return {tillId,...reconciliation,replayed:false};
  });
+});
+
+export const createHrCandidate = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const applicant=candidateApplication(request.data),id=identifier(request.data.applicationId||randomUUID());
+ await org.collection('hrCandidates').doc(id).create({...applicant,createdBy:user,createdAt:stamp()});
+ return {applicationId:id,stage:'applied'};
+});
+export const advanceHrCandidate = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const id=identifier(request.data.applicationId),ref=org.collection('hrCandidates').doc(id);
+ return db.runTransaction(async tx=>{
+  const previous=await tx.get(ref);
+  if(!previous.exists)throw new Error('Candidate not found');
+  const update=advanceCandidate(previous.data(),request.data.stage,request.data.reason);
+  tx.update(ref,{...update,updatedBy:user,updatedAt:stamp()});
+  tx.create(ref.collection('history').doc(randomUUID()),{
+   from:previous.data().stage,to:update.stage,reason:update.reason,actor:user,at:stamp()});
+  return {applicationId:id,stage:update.stage};
+ });
+});
+export const createHrOnboardingTask = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),id=identifier(request.data.taskId||randomUUID());
+ const task=onboardingTask(request.data);
+ const [employee,assignee]=await Promise.all([
+  org.collection('employees').doc(employeeId).get(),org.collection('members').doc(task.assigneeUid).get()]);
+ if(!employee.exists||!assignee.exists)throw new Error('Employee or task assignee not found');
+ await org.collection('hrOnboardingTasks').doc(id).create({...task,employeeId,createdBy:user,createdAt:stamp()});
+ return {taskId:id,status:'open'};
+});
+export const completeHrOnboardingTask = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const id=identifier(request.data.taskId),ref=org.collection('hrOnboardingTasks').doc(id);
+ return db.runTransaction(async tx=>{
+  const task=await tx.get(ref);
+  if(!task.exists||task.data().status!=='open')throw new Error('Open onboarding task required');
+  if(member.role!=='owner'&&task.data().assigneeUid!==user)
+   throw new HttpsError('permission-denied','Assigned task owner required');
+  tx.update(ref,{status:'completed',completedBy:user,completedAt:stamp()});
+  return {taskId:id,status:'completed'};
+ });
+});
+export const listHrRecruitment = callable(async request=>{
+ const {org,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const [candidates,tasks]=await Promise.all([
+  org.collection('hrCandidates').limit(100).get(),
+  org.collection('hrOnboardingTasks').limit(100).get()]);
+ return {candidates:candidates.docs.map(d=>({id:d.id,...d.data()})),
+  tasks:tasks.docs.map(d=>({id:d.id,...d.data()}))};
 });
 
 export const createHrPerformanceReview = callable(async request=>{
