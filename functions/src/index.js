@@ -45,6 +45,7 @@ import {crmSalesCycleReport} from './crm_cycle_domain.js';
 import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
 import {crmCommerceSummary} from './crm_commerce_domain.js';
 import {crmInvoiceReconciliation} from './crm_invoice_reconciliation_domain.js';
+import {customerSettlementAllocation} from './customer_settlement_transaction_domain.js';
 import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
 import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
 import {campaignSpend,campaignEfficiency} from './crm_campaign_spend_domain.js';
@@ -193,6 +194,40 @@ export const listCrmSequences = callable(async request=>{
  return {templates:templates.docs.map(d=>({id:d.id,...d.data()})),
   enrollments:enrollments.docs.map(d=>({id:d.id,...d.data()})),
   automaticSending:false};
+});
+
+export const allocateVerifiedCustomerSettlement = callable(async request=>{
+ const {org,user,member}=await authorize(request,'accounting');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace finance owner required');
+ const invoiceId=identifier(request.data.invoiceId),
+  settlementId=identifier(request.data.settlementId),
+  allocationId=identifier(request.data.allocationId);
+ const amountMinor=request.data.amountMinor;
+ const invoiceRef=org.collection('invoices').doc(invoiceId);
+ const settlementRef=org.collection('customerSettlements').doc(settlementId);
+ const allocationRef=org.collection('customerAllocations').doc(allocationId);
+ return db.runTransaction(async tx=>{
+  const [invoice,settlement,allocation]=await Promise.all([
+   tx.get(invoiceRef),tx.get(settlementRef),tx.get(allocationRef)]);
+  if(allocation.exists){
+   const recorded=allocation.data();
+   if(recorded.invoiceId!==invoiceId||recorded.settlementId!==settlementId||
+    recorded.amountMinor!==amountMinor)throw new Error('Allocation ID conflict');
+   return {allocationId,status:'already_applied'};
+  }
+  if(!invoice.exists||!settlement.exists)throw new Error('Invoice or verified settlement not found');
+  const result=customerSettlementAllocation(invoice.data(),settlement.data(),amountMinor);
+  tx.create(allocationRef,{invoiceId,settlementId,amountMinor,
+   verificationSource:settlement.data().verificationSource,createdBy:user,createdAt:stamp()});
+  tx.update(invoiceRef,{allocatedMinor:result.invoiceAllocatedMinor,
+   outstandingMinor:result.invoiceOutstandingMinor,
+   paymentState:result.invoiceOutstandingMinor===0?'paid':'partial',
+   updatedAt:stamp()});
+  tx.update(settlementRef,{allocatedMinor:result.settlementAllocatedMinor,
+   availableMinor:result.settlementAvailableMinor,updatedAt:stamp()});
+  return {allocationId,status:'applied',invoiceOutstandingMinor:result.invoiceOutstandingMinor,
+   settlementAvailableMinor:result.settlementAvailableMinor};
+ });
 });
 
 export const getCrmInvoiceReconciliation = callable(async request=>{
