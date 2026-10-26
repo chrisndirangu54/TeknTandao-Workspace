@@ -5,7 +5,8 @@ export function crmAgingReport(deals,asOf,thresholdDays=14){
  !Array.isArray(deals)||deals.length>500)throw new Error('Invalid aging report');
  const open=deals.filter(d=>!['won','lost'].includes(d.stage));
  const rows=open.map(d=>{
-  const start=dateMs(d.stageEnteredAt)||dateMs(d.createdAt);
+  const stageStart=dateMs(d.stageEnteredAt);
+  const start=Number.isFinite(stageStart)?stageStart:dateMs(d.createdAt);
   const stageDays=Number.isFinite(start)?Math.max(0,Math.floor((now-start)/86400000)):null;
   return {id:d.id,title:d.title,stage:d.stage,ownerUid:d.ownerUid||d.createdBy||null,
    stageDays,stalled:stageDays===null?null:stageDays>=thresholdDays};
