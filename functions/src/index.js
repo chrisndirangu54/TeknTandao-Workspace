@@ -41,6 +41,7 @@ import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {crmBoardMetrics} from './crm_board_domain.js';
 import {crmAgingReport} from './crm_aging_domain.js';
 import {crmConversionReport} from './crm_conversion_domain.js';
+import {crmSalesCycleReport} from './crm_cycle_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
@@ -336,6 +337,22 @@ export const getCrmLeadScores = callable(async request=>{
  const scores=rankCrmLeads(contacts.docs.map(d=>({id:d.id,...d.data()})),
   deals.docs.map(d=>({id:d.id,...d.data()})),tasks.docs.map(d=>({id:d.id,...d.data()})),new Date().toISOString());
  return {scores,model:'Rules-based signals from CRM data; not a prediction of purchase intent.'};
+});
+
+export const getCrmSalesCycleReport = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const deals=await org.collection('crmOpportunities').limit(201).get();
+ if(deals.size>200)throw new Error('Report requires pagination for larger workspaces');
+ const records=deals.docs.map(d=>({id:d.id,...d.data()}));
+ const closed=records.filter(d=>['won','lost'].includes(d.stage)&&
+  typeof d.closedAt==='string'&&d.closedAt.slice(0,7)===period);
+ const snapshots=await Promise.all(closed.map(d=>
+  org.collection('crmOpportunities').doc(d.id).collection('history').limit(101).get()));
+ if(snapshots.some(x=>x.size>100))throw new Error('Opportunity history exceeds safe reporting limit');
+ const histories=Object.fromEntries(closed.map((d,i)=>[d.id,snapshots[i].docs.map(x=>x.data())]));
+ return crmSalesCycleReport(records,histories,period);
 });
 
 export const getCrmConversionReport = callable(async request=>{
