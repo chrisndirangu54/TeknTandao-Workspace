@@ -32,6 +32,7 @@ import {draftTimesheet,decideTimesheet} from './hr_timesheets_domain.js';
 import {proposeOvertime,decideOvertime} from './hr_overtime_domain.js';
 import {payrollTimeRegister} from './hr_payroll_time_domain.js';
 import {payrollTimeSnapshot} from './hr_time_lock_domain.js';
+import {proposeHrTimeCorrection,decideHrTimeCorrection} from './hr_time_corrections_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -715,6 +716,60 @@ export const getHrPayrollTimeLock = callable(async request=>{
  if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
  const record=await org.collection('hrPayrollTimeLocks').doc(employeeId+'_'+period).get();
  return record.exists?{locked:true,...record.data()}:{locked:false};
+});
+
+export const requestHrTimeCorrection = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const id=identifier(request.data.correctionId||randomUUID());
+ const employeeRef=org.collection('employees').doc(employeeId);
+ const lockRef=org.collection('hrPayrollTimeLocks').doc(employeeId+'_'+period);
+ const correctionRef=org.collection('hrTimeCorrections').doc(id);
+ return db.runTransaction(async tx=>{
+  const [employee,lock,existing]=await Promise.all([
+   tx.get(employeeRef),tx.get(lockRef),tx.get(correctionRef)]);
+  if(!employee.exists||employee.data().portalUid!==user)
+   throw new HttpsError('permission-denied','Only linked employee can request a correction');
+  if(!lock.exists)throw new Error('Locked register required');
+  if(existing.exists)throw new Error('Correction ID already exists');
+  const correction=proposeHrTimeCorrection(lock.data(),request.data);
+  tx.create(correctionRef,{...correction,employeeId,period,submittedBy:user,submittedAt:stamp()});
+  return {correctionId:id,status:'pending'};
+ });
+});
+export const decideHrTimeCorrection = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const id=identifier(request.data.correctionId),ref=org.collection('hrTimeCorrections').doc(id);
+ return db.runTransaction(async tx=>{
+  const current=await tx.get(ref);
+  if(!current.exists)throw new Error('Correction not found');
+  if(current.data().submittedBy===user)
+   throw new HttpsError('permission-denied','Independent reviewer required');
+  const lock=await tx.get(org.collection('hrPayrollTimeLocks').doc(current.data().employeeId+'_'+current.data().period));
+  if(!lock.exists||lock.data().digest!==current.data().originalDigest)
+   throw new Error('Original locked register changed');
+  const decision=decideHrTimeCorrection(current.data(),request.data.status,request.data.note);
+  tx.update(ref,{...decision,decidedBy:user,decidedAt:stamp()});
+  tx.create(ref.collection('history').doc(randomUUID()),{
+   from:'pending',to:decision.status,actor:user,note:decision.decisionNote,at:stamp()});
+  // Approved corrections are append-only instructions for future reconciliation.
+  // The original lock, source timesheet and payroll journal remain unchanged.
+  return {correctionId:id,status:decision.status,appliedToPayroll:false};
+ });
+});
+export const listHrTimeCorrections = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId);
+ const employee=await org.collection('employees').doc(employeeId).get();
+ if(!employee.exists||member.role!=='owner'&&employee.data().portalUid!==user)
+  throw new HttpsError('permission-denied','Correction history restricted');
+ const rows=await org.collection('hrTimeCorrections').where('employeeId','==',employeeId).limit(100).get();
+ return {corrections:rows.docs.map(d=>({id:d.id,period:d.data().period,
+   timesheetId:d.data().timesheetId,status:d.data().status,
+   regularMinutes:d.data().regularMinutes,approvedOvertimeMinutes:d.data().approvedOvertimeMinutes,
+   reason:d.data().reason})),appliedToPayroll:false};
 });
 
 export const listHrOvertime = callable(async request=>{
