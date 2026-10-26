@@ -38,6 +38,7 @@ import {payrollAuthorizationDraft,authorizePayrollProposal} from './hr_payroll_a
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} from './crm_pipeline_domain.js';
 import {rankCrmLeads} from './crm_lead_scoring_domain.js';
+import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -120,6 +121,36 @@ export const completeCrmFollowUp = callable(async request=>{
   return {id,status:'completed'};
  });
 });
+export const logCrmActivity = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const contactId=identifier(request.data.contactId);
+ const opportunityId=request.data.opportunityId?identifier(request.data.opportunityId):null;
+ const id=identifier(request.data.activityId||randomUUID());
+ const [contact,deal]=await Promise.all([
+  org.collection('contacts').doc(contactId).get(),
+  opportunityId?org.collection('crmOpportunities').doc(opportunityId).get():Promise.resolve(null)]);
+ if(!contact.exists)throw new Error('Contact not found');
+ if(opportunityId&&(!deal.exists||deal.data().contactId!==contactId))
+  throw new Error('Opportunity must belong to contact');
+ const activity=crmActivity(request.data);
+ await org.collection('crmActivities').doc(id).create({
+  ...activity,contactId,opportunityId,createdBy:user,createdAt:stamp()});
+ return {activityId:id,status:'logged'};
+});
+export const listCrmActivityTimeline = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const contactId=identifier(request.data.contactId);
+ const contact=await org.collection('contacts').doc(contactId).get();
+ if(!contact.exists)throw new Error('Contact not found');
+ const history=await org.collection('crmActivities').where('contactId','==',contactId).limit(201).get();
+ if(history.size>200)throw new Error('Timeline exceeds supported page; pagination required');
+ return {contactId,activities:crmActivityTimeline(history.docs.map(d=>({
+  id:d.id,type:d.data().type,summary:d.data().summary,
+  occurredAt:d.data().occurredAt,opportunityId:d.data().opportunityId,
+  createdBy:d.data().createdBy,source:d.data().source
+ }))),source:'manual',automaticallySynced:false};
+});
+
 export const getCrmLeadScores = callable(async request=>{
  const {org}=await authorize(request,'crm');
  const [contacts,deals,tasks]=await Promise.all([
