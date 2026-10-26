@@ -237,6 +237,42 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> campaignReport() async {
+    try{
+      final report=await widget.store.call('getCrmCampaignAttribution',{});
+      if(!mounted)return;
+      final campaigns=(report['campaigns'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Campaign attribution'),
+        content:SizedBox(width:620,height:410,child:ListView(children:[
+          const Text('Single-source attribution to opportunities; won value is not collected revenue.'),
+          if(campaigns.isEmpty)const Text('No campaigns recorded.'),
+          for(final campaign in campaigns)ListTile(
+            title:Text(campaign['name']?.toString()??'Campaign'),
+            subtitle:Text('Source: ${campaign['source']} · Deals: ${campaign['opportunities']} · Won: ${campaign['won']} · Lost: ${campaign['lost']}'),
+            trailing:Text('${campaign['wonOpportunityMinor']} minor units'),
+          ),
+        ])),
+        actions:[
+          TextButton(onPressed:() async {
+            final details=await recordForm(dialogContext,'Create acquisition campaign',
+              ['Campaign name','Source: organic / referral / paid_search / paid_social / email / events / partner / direct / other']);
+            if(details==null)return;
+            try {
+              await widget.store.call('createCrmCampaign',{'name':details[0].trim(),'source':details[1].trim().toLowerCase()});
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Campaign creation failed: $error')));
+            }
+          },child:const Text('New campaign')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Campaign report unavailable: $error')));
+    }
+  }
+
   Future<void> salesCycleReport() async {
     final input=await recordForm(context,'Sales cycle report',['Period YYYY-MM']);
     if(input==null)return;
@@ -540,7 +576,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
         actions:[
           TextButton(onPressed:() async {
             final input=await recordForm(dialogContext,'New opportunity',
-              ['Title','Contact record ID','Amount in KES','Expected close YYYY-MM-DD','Probability 0–100']);
+              ['Title','Contact record ID','Amount in KES','Expected close YYYY-MM-DD','Probability 0–100','Campaign ID (optional)']);
             if(input==null)return;
             final amount=double.tryParse(input[2].trim()),probability=int.tryParse(input[4].trim());
             if(amount==null||!amount.isFinite||probability==null){
@@ -553,6 +589,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
                 'title':input[0].trim(),'contactId':input[1].trim(),
                 'amountMinor':(amount*100).round(),
                 'expectedCloseDate':input[3].trim(),'probability':probability,
+                if(input.length>5&&input[5].trim().isNotEmpty)'campaignId':input[5].trim(),
               });
               if(dialogContext.mounted)Navigator.pop(dialogContext);
             }catch(error){
@@ -586,7 +623,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:salesCycleReport,icon:const Icon(Icons.timeline_outlined),label:const Text('Sales cycle')),TextButton.icon(onPressed:conversionReport,icon:const Icon(Icons.analytics_outlined),label:const Text('Win/loss')),TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:campaignReport,icon:const Icon(Icons.campaign_outlined),label:const Text('Campaigns')),TextButton.icon(onPressed:salesCycleReport,icon:const Icon(Icons.timeline_outlined),label:const Text('Sales cycle')),TextButton.icon(onPressed:conversionReport,icon:const Icon(Icons.analytics_outlined),label:const Text('Win/loss')),TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
