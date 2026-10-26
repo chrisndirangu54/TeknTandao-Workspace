@@ -48,6 +48,7 @@ import {crmInvoiceReconciliation} from './crm_invoice_reconciliation_domain.js';
 import {customerSettlementAllocation} from './customer_settlement_transaction_domain.js';
 import {settlementDisputeDecision} from './customer_settlement_disputes_domain.js';
 import {planCustomerAllocationReversal} from './customer_allocation_reversal_domain.js';
+import {customerReversalReviewState} from './customer_reversal_review_domain.js';
 import {verifiedCustomerPaystackSettlement} from './customer_paystack_settlement_domain.js';
 import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
 import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
@@ -257,13 +258,13 @@ export const requestCustomerAllocationReversalReview = callable(async request=>{
   const [invoice,settlement,priorReview]=await Promise.all([
    tx.get(invoiceRef),tx.get(settlementRef),tx.get(reviewRef)]);
   if(!invoice.exists||!settlement.exists)throw new Error('Linked financial records missing');
-  if(priorReview.exists)return {reviewId:allocationId,status:priorReview.data().status};
+  if(priorReview.exists)return {reviewId:allocationId,status:customerReversalReviewState(priorReview.data(),null).status};
   const decision=planCustomerAllocationReversal(
    {id:invoice.id,...invoice.data()},{id:settlement.id,...settlement.data()},
    {id:allocation.id,...allocation.data()});
-  if(decision.status!=='review_required')throw new Error('Allocation already reversed or pending');
+  const review=customerReversalReviewState(null,decision);
   tx.create(reviewRef,{allocationId,invoiceId:invoice.id,settlementId:settlement.id,
-   amountMinor:decision.reversalMinor,status:'pending_provider_evidence',
+   amountMinor:review.amountMinor,status:review.status,
    createdBy:user,createdAt:stamp(),originalAllocationJournalId:`customer_payment_${allocationId}`,
    note:'A review request is not a refund and cannot authorize financial reversal.'});
   return {reviewId:allocationId,status:'pending_provider_evidence'};
