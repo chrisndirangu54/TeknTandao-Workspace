@@ -1,5 +1,7 @@
+import {eligibleSettlementForAllocation} from './customer_settlement_disputes_domain.js';
 const amount=v=>Number.isSafeInteger(v)&&v>=0?v:null;
 export function customerSettlementAllocation(invoice,settlement,requested){
+ eligibleSettlementForAllocation(settlement);
  const invoiceTotal=amount(invoice?.total),paymentTotal=amount(settlement?.amountMinor);
  if(invoiceTotal===null||paymentTotal===null||invoiceTotal===0||paymentTotal===0)
   throw new Error('Valid invoice and settlement totals required');
