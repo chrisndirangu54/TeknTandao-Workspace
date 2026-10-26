@@ -74,6 +74,28 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> contactPreferences(Map<String,dynamic> contact) async {
+    final id=contact['id']?.toString();
+    if(id==null||id.isEmpty)return;
+    try {
+      final data=await widget.store.call('getCrmContactSuppression',{'contactId':id});
+      if(!mounted)return;
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text('Outreach preferences · ${contact['name']??'Contact'}'),
+        content:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text('Global do-not-contact: ${data['doNotContact']==true?'Yes':'No'}'),
+          Text('Suppressed channels: ${(data['blockedChannels'] as List? ?? []).join(', ')}'),
+          const SizedBox(height:10),
+          const Text('A new opt-out stops matching active enrollments. Messages are not sent automatically.'),
+        ]),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Preferences unavailable: $error')));
+    }
+  }
+
   Future<void> salesSequences() async {
     try {
       final data=await widget.store.call('listCrmSequences',{});
@@ -372,8 +394,8 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
             else
               LayoutBuilder(builder:(context,constraints){
                 final wide=constraints.maxWidth>900;
-                if(!wide)return Column(children:[for(final c in visible)...[_ContactCard(contact:c,onTimeline:()=>contactTimeline(c)),const SizedBox(height:10)]]);
-                return Wrap(spacing:12,runSpacing:12,children:[for(final c in visible)SizedBox(width:(constraints.maxWidth-12)/2,child:_ContactCard(contact:c,onTimeline:()=>contactTimeline(c)))]);
+                if(!wide)return Column(children:[for(final c in visible)...[_ContactCard(contact:c,onTimeline:()=>contactTimeline(c),onPreferences:()=>contactPreferences(c)),const SizedBox(height:10)]]);
+                return Wrap(spacing:12,runSpacing:12,children:[for(final c in visible)SizedBox(width:(constraints.maxWidth-12)/2,child:_ContactCard(contact:c,onTimeline:()=>contactTimeline(c),onPreferences:()=>contactPreferences(c)))]);
               }),
           ],
         );
@@ -394,8 +416,8 @@ class _Metric extends StatelessWidget{
 
 class _ContactCard extends StatelessWidget{
   final Map<String,dynamic> contact;
-  final VoidCallback onTimeline;
-  const _ContactCard({required this.contact,required this.onTimeline});
+  final VoidCallback onTimeline,onPreferences;
+  const _ContactCard({required this.contact,required this.onTimeline,required this.onPreferences});
   @override Widget build(BuildContext context){
     final name=(contact['name']??'Unnamed contact').toString().trim();
     final safeName=name.isEmpty?'Unnamed contact':name;
@@ -417,6 +439,7 @@ class _ContactCard extends StatelessWidget{
             if(phone.isNotEmpty)Text(phone,style:const TextStyle(color:Color(0xFF64748B))),
             if(location.isNotEmpty)Text(location,style:const TextStyle(color:Color(0xFF64748B))),
             TextButton.icon(onPressed:onTimeline,icon:const Icon(Icons.history_rounded,size:16),label:const Text('Activity timeline')),
+            TextButton.icon(onPressed:onPreferences,icon:const Icon(Icons.do_not_disturb_on_outlined,size:16),label:const Text('Outreach preferences')),
           ]),
         ])),
       ]),
