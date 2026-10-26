@@ -213,6 +213,73 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _performanceReviews() async {
+    try {
+      final result = await widget.store.call('listMyHrPerformanceReviews', {});
+      if (!mounted) return;
+      final reviews = (result['reviews'] as List?) ?? [];
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('My performance reviews'),
+          content: SizedBox(width: 620, height: 450,
+            child: reviews.isEmpty
+              ? const Center(child: Text('No reviews assigned to your account.'))
+              : ListView.builder(itemCount: reviews.length, itemBuilder: (context, index) {
+                  final review = reviews[index] as Map;
+                  final goals = (review['goals'] as List?) ?? [];
+                  final role = review['myRole']?.toString() ?? '';
+                  final status = review['status']?.toString() ?? '';
+                  final canSubmit = (role == 'employee' && status == 'self_assessment') ||
+                    (role == 'manager' && status == 'manager_review');
+                  return Card(child: Padding(padding: const EdgeInsets.all(12),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Review: ${review['startDate']} – ${review['endDate']}',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Role: $role · Status: $status'),
+                      for (final goal in goals)
+                        Text('• ${(goal as Map)['title']} (${goal['weight']}%)'),
+                      if (canSubmit) Align(alignment: Alignment.centerRight,
+                        child: FilledButton(onPressed: () async {
+                          final labels = <String>[
+                            for (final goal in goals) 'Rating 1–5: ${(goal as Map)['title']}',
+                            'Written assessment',
+                          ];
+                          final values = await recordForm(dialogContext, 'Submit $role assessment', labels);
+                          if (values == null || values.length != labels.length) return;
+                          final ratings = values.take(goals.length).map((x) => int.tryParse(x.trim())).toList();
+                          if (ratings.any((x) => x == null || x < 1 || x > 5) || values.last.trim().isEmpty) {
+                            if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(content: Text('Enter ratings from 1 to 5 and written feedback.')));
+                            return;
+                          }
+                          try {
+                            await widget.store.call('submitHrPerformanceAssessment', {
+                              'reviewId': review['id'], 'kind': role,
+                              'ratings': ratings.cast<int>(), 'comment': values.last.trim(),
+                            });
+                            if (dialogContext.mounted) Navigator.pop(dialogContext);
+                            if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(content: Text('Assessment submitted successfully.')));
+                          } catch (error) {
+                            if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              SnackBar(content: Text('Assessment failed: $error')));
+                          }
+                        }, child: const Text('Submit assessment')),
+                      ),
+                    ]),
+                  ));
+                }),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+        ),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Performance reviews unavailable: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
@@ -258,6 +325,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: _performanceReviews,
+                  icon: const Icon(Icons.assessment_outlined),
+                  label: const Text('Performance reviews'),
+                ),
                 OutlinedButton.icon(
                   onPressed: _approvalInbox,
                   icon: const Icon(Icons.fact_check_outlined),
