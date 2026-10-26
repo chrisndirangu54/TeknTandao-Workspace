@@ -47,6 +47,7 @@ import {crmCommerceSummary} from './crm_commerce_domain.js';
 import {crmInvoiceReconciliation} from './crm_invoice_reconciliation_domain.js';
 import {customerSettlementAllocation} from './customer_settlement_transaction_domain.js';
 import {settlementDisputeDecision} from './customer_settlement_disputes_domain.js';
+import {planCustomerAllocationReversal} from './customer_allocation_reversal_domain.js';
 import {verifiedCustomerPaystackSettlement} from './customer_paystack_settlement_domain.js';
 import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
 import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
@@ -225,6 +226,22 @@ export const startCustomerInvoicePaystackPayment = callable(async request=>{
   throw error;
  }
 },[paystackSecret]);
+
+export const previewCustomerAllocationReversal = callable(async request=>{
+ const {org,member}=await authorize(request,'accounting');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace finance owner required');
+ const id=identifier(request.data.allocationId);
+ const allocationSnap=await org.collection('customerAllocations').doc(id).get();
+ if(!allocationSnap.exists)throw new HttpsError('not-found','Allocation not found');
+ const allocation=allocationSnap.data();
+ const [invoice,settlement]=await Promise.all([
+  org.collection('invoices').doc(identifier(allocation.invoiceId)).get(),
+  org.collection('customerSettlements').doc(identifier(allocation.settlementId)).get()]);
+ if(!invoice.exists||!settlement.exists)throw new Error('Related invoice or settlement missing');
+ return planCustomerAllocationReversal(
+  {id:invoice.id,...invoice.data()},{id:settlement.id,...settlement.data()},
+  {id:allocationSnap.id,...allocation});
+});
 
 export const freezeDisputedCustomerSettlement = callable(async request=>{
  const {org,user,member}=await authorize(request,'accounting');
