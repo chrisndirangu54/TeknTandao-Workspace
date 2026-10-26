@@ -30,6 +30,7 @@ import {validateShift,shiftConflicts,changeShiftStatus} from './hr_shifts_domain
 import {reconcileShiftPunches} from './hr_shift_reconciliation_domain.js';
 import {draftTimesheet,decideTimesheet} from './hr_timesheets_domain.js';
 import {proposeOvertime,decideOvertime} from './hr_overtime_domain.js';
+import {payrollTimeRegister} from './hr_payroll_time_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -646,6 +647,28 @@ export const decideHrOvertime = callable(async request=>{
   return {overtimeId:id,status:decision.status,payrollPosted:false};
  });
 });
+export const getHrPayrollTimeRegister = callable(async request=>{
+ const {org,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))
+  throw new Error('Invalid payroll period');
+ const [employee,sheets,overtime,shifts]=await Promise.all([
+  org.collection('employees').doc(employeeId).get(),
+  org.collection('hrTimesheets').where('employeeId','==',employeeId).limit(501).get(),
+  org.collection('hrOvertimeRequests').where('employeeId','==',employeeId).limit(501).get(),
+  org.collection('hrShifts').where('employeeId','==',employeeId).limit(501).get()]);
+ if(!employee.exists||sheets.size>500||overtime.size>500||shifts.size>500)
+  throw new Error('Employee unavailable or reporting history exceeds safe bounds');
+ const shiftPeriods=new Map(shifts.docs.map(d=>[d.id,d.data().startAt?.slice(0,7)]));
+ const assignPeriod=(id)=>shiftPeriods.get(id)||null;
+ const statement=payrollTimeRegister(period,
+  sheets.docs.map(d=>({id:d.id,...d.data(),period:assignPeriod(d.data().shiftId)})),
+  overtime.docs.map(d=>({id:d.id,...d.data(),period:assignPeriod(d.data().timesheetId)})));
+ return {employeeId,...statement,
+  note:'For HR reconciliation only. Not verified for payroll posting, wage valuation, or statutory filing.'};
+});
+
 export const listHrOvertime = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
  const employeeId=identifier(request.data.employeeId);
