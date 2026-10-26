@@ -237,6 +237,36 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> salesCycleReport() async {
+    final input=await recordForm(context,'Sales cycle report',['Period YYYY-MM']);
+    if(input==null)return;
+    try{
+      final data=await widget.store.call('getCrmSalesCycleReport',{'period':input[0].trim()});
+      if(!mounted)return;
+      final transitionMap=(data['transitions'] as Map?)??{};
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text('Sales cycle · ${data['period']}'),
+        content:SizedBox(width:540,height:420,child:ListView(children:[
+          Text('Closed deals: ${data['closedDeals']}'),
+          Text('Deals with measurable cycle: ${data['measuredSalesCycles']}'),
+          Text('Average days to close: ${data['averageDaysToClose']??'Unknown'}'),
+          Text('Missing evidence indicators: ${data['unknownEvidenceCount']}'),
+          const SizedBox(height:12),
+          const Text('Recorded stage transitions',style:TextStyle(fontWeight:FontWeight.bold)),
+          for(final stage in transitionMap.entries)
+            for(final next in (stage.value as Map).entries)
+              if(next.value is num && next.value>0)
+                ListTile(dense:true,title:Text('${stage.key} → ${next.key}'),
+                  trailing:Text('${next.value}')),
+          const Text('Only observed transitions for closed deals are counted. This is not a cohort conversion probability.'),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Sales cycle report unavailable: $error')));
+    }
+  }
+
   Future<void> conversionReport() async {
     final input=await recordForm(context,'Win / loss report',['Period YYYY-MM']);
     if(input==null)return;
@@ -556,7 +586,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:conversionReport,icon:const Icon(Icons.analytics_outlined),label:const Text('Win/loss')),TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:salesCycleReport,icon:const Icon(Icons.timeline_outlined),label:const Text('Sales cycle')),TextButton.icon(onPressed:conversionReport,icon:const Icon(Icons.analytics_outlined),label:const Text('Win/loss')),TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
