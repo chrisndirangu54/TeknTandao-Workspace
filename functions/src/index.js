@@ -25,6 +25,7 @@ import {validateAccrualPolicy,accrueAnnualLeave,carryForwardLeave} from './hr_ac
 import {authorizeLeaveApprover,validateLeaveManagerAssignment} from './hr_approvals_domain.js';
 import {leaveApprovalTransition} from './hr_multilevel_approval_domain.js';
 import {createReview,reviewAssessment} from './hr_performance_domain.js';
+import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -549,6 +550,66 @@ export const listMyHrPerformanceReviews = callable(async request=>{
     managerAssessment:doc.data().managerAssessment??null,
     myRole:doc.data().managerUid===user?'manager':'employee'});
  return {reviews:[...map.values()]};
+});
+
+export const addHrContinuousFeedback = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const reviewId=identifier(request.data.reviewId),entryId=identifier(request.data.entryId||randomUUID());
+ const ref=org.collection('hrPerformanceReviews').doc(reviewId);
+ const review=await ref.get();
+ if(!review.exists)throw new Error('Review unavailable');
+ const employee=await org.collection('employees').doc(identifier(review.data().employeeId)).get();
+ if(!employee.exists)throw new Error('Employee unavailable');
+ if(user!==review.data().managerUid&&user!==employee.data().portalUid)
+  throw new HttpsError('permission-denied','Review participants only');
+ const entry=performanceFeedback(request.data);
+ await ref.collection('feedback').doc(entryId).create({...entry,createdBy:user,createdAt:stamp()});
+ return {entryId,reviewId};
+});
+export const createHrDevelopmentPlan = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const reviewId=identifier(request.data.reviewId),planId=identifier(request.data.planId||randomUUID());
+ const ref=org.collection('hrPerformanceReviews').doc(reviewId);
+ const review=await ref.get();
+ if(!review.exists||review.data().managerUid!==user)
+  throw new HttpsError('permission-denied','Assigned manager required');
+ const plan=developmentPlan(request.data);
+ await ref.collection('developmentPlans').doc(planId).create({...plan,createdBy:user,createdAt:stamp()});
+ return {reviewId,planId,status:plan.status};
+});
+export const advanceHrDevelopmentPlan = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const reviewId=identifier(request.data.reviewId),planId=identifier(request.data.planId);
+ const reviewRef=org.collection('hrPerformanceReviews').doc(reviewId);
+ const planRef=reviewRef.collection('developmentPlans').doc(planId);
+ return db.runTransaction(async tx=>{
+  const [review,plan]=await Promise.all([tx.get(reviewRef),tx.get(planRef)]);
+  if(!review.exists||!plan.exists)throw new Error('Plan or review not found');
+  if(review.data().managerUid!==user)
+   throw new HttpsError('permission-denied','Assigned manager required');
+  const update=advanceDevelopmentPlan(plan.data(),request.data.status);
+  tx.update(planRef,{...update,updatedBy:user,updatedAt:stamp()});
+  tx.create(planRef.collection('audit').doc(randomUUID()),{
+   from:plan.data().status,to:update.status,actor:user,at:stamp()});
+  return {reviewId,planId,status:update.status};
+ });
+});
+export const listHrReviewGrowth = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const reviewId=identifier(request.data.reviewId);
+ const ref=org.collection('hrPerformanceReviews').doc(reviewId);
+ const review=await ref.get();
+ if(!review.exists)throw new Error('Review not found');
+ const employee=await org.collection('employees').doc(identifier(review.data().employeeId)).get();
+ if(!employee.exists||user!==review.data().managerUid&&user!==employee.data().portalUid)
+  throw new HttpsError('permission-denied','Review participants only');
+ const [feedback,plans]=await Promise.all([
+  ref.collection('feedback').orderBy('createdAt','desc').limit(100).get(),
+  ref.collection('developmentPlans').limit(100).get()]);
+ return {
+  feedback:feedback.docs.map(d=>({id:d.id,category:d.data().category,message:d.data().message,createdBy:d.data().createdBy})),
+  plans:plans.docs.map(d=>({id:d.id,title:d.data().title,description:d.data().description,dueDate:d.data().dueDate,status:d.data().status}))
+ };
 });
 
 export const requestHrLeave = callable(async request=>{
