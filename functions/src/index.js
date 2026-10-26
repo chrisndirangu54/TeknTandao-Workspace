@@ -38,6 +38,7 @@ import {payrollAuthorizationDraft,authorizePayrollProposal} from './hr_payroll_a
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} from './crm_pipeline_domain.js';
 import {rankCrmLeads} from './crm_lead_scoring_domain.js';
+import {crmBoardMetrics} from './crm_board_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
 import {sequencePlan,sequenceEnrollment,stopSequence} from './crm_sequences_domain.js';
 import {crmSuppression,allowedCrmContact,appendCrmSequenceStep} from './crm_suppression_domain.js';
@@ -279,8 +280,10 @@ export const getCrmPipeline = callable(async request=>{
   org.collection('crmOpportunities').limit(200).get(),
   org.collection('crmFollowUps').limit(200).get()]);
  const opportunities=deals.docs.map(d=>({id:d.id,...d.data()}));
- return {opportunities,followUps:tasks.docs.map(d=>({id:d.id,...d.data()})),
-  summary:crmPipelineSummary(opportunities),truncated:deals.size===200||tasks.size===200};
+ const followUps=tasks.docs.map(d=>({id:d.id,...d.data()}));
+ return {opportunities,followUps,summary:crmPipelineSummary(opportunities),
+  board:crmBoardMetrics(opportunities,followUps,new Date().toISOString()),
+  truncated:deals.size===200||tasks.size===200};
 });
 
 export const getCatalog = callable(async request => {
