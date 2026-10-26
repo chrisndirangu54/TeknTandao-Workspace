@@ -598,6 +598,31 @@ export const decideHrLeave = callable(async request=>{
   return {requestId:id,status:decision.status};
  });
 });
+export const listHrLeaveApprovalInbox = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const owner=member.role==='owner';
+ const assignment=owner?null:(await org.collection('hrLeaveManagers').doc(user).get()).data();
+ if(!owner&&(!assignment?.active||assignment.role!=='leave_manager'||assignment.managerUid!==user))
+  throw new HttpsError('permission-denied','Active leave manager required');
+ const pending=await org.collection('hrLeaveRequests').where('status','==','requested').limit(201).get();
+ if(pending.size>200)throw new Error('Pending inbox exceeds reporting limit');
+ const employeeIds=[...new Set(pending.docs.map(d=>identifier(d.data().employeeId)))];
+ const employees=await Promise.all(employeeIds.map(id=>org.collection('employees').doc(id).get()));
+ const byId=new Map(employees.map(doc=>[doc.id,doc.data()]));
+ const requests=pending.docs.filter(doc=>{
+  const employee=byId.get(doc.data().employeeId);
+  if(!employee)return false;
+  try{authorizeLeaveApprover({member,assignment,employee,approverUid:user});return true;}
+  catch{return false;}
+ }).map(doc=>({id:doc.id,employeeId:doc.data().employeeId,
+  employeeName:byId.get(doc.data().employeeId)?.name||'Employee',
+  department:byId.get(doc.data().employeeId)?.department||'',
+  leaveType:doc.data().leaveType,startDate:doc.data().startDate,
+  endDate:doc.data().endDate,calendarDays:doc.data().calendarDays,
+  status:doc.data().status}));
+ return {requests,limit:200,complete:true};
+});
+
 export const listHrLeaveRequests = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
  const employeeId=identifier(request.data.employeeId);
