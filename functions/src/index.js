@@ -46,6 +46,7 @@ import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
 import {crmCommerceSummary} from './crm_commerce_domain.js';
 import {crmInvoiceReconciliation} from './crm_invoice_reconciliation_domain.js';
 import {customerSettlementAllocation} from './customer_settlement_transaction_domain.js';
+import {settlementDisputeDecision} from './customer_settlement_disputes_domain.js';
 import {verifiedCustomerPaystackSettlement} from './customer_paystack_settlement_domain.js';
 import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
 import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
@@ -224,6 +225,26 @@ export const startCustomerInvoicePaystackPayment = callable(async request=>{
   throw error;
  }
 },[paystackSecret]);
+
+export const freezeDisputedCustomerSettlement = callable(async request=>{
+ const {org,user,member}=await authorize(request,'accounting');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace finance owner required');
+ const settlementId=identifier(request.data.settlementId);
+ const reason=request.data.reason;
+ const ref=org.collection('customerSettlements').doc(settlementId);
+ return db.runTransaction(async tx=>{
+  const snap=await tx.get(ref);
+  if(!snap.exists)throw new HttpsError('not-found','Customer settlement missing');
+  const decision=settlementDisputeDecision(snap.data(),reason);
+  if(decision.status==='already_frozen')return {status:'already_frozen'};
+  tx.update(ref,{disputeState:'frozen',disputeReason:decision.disputeReason,
+   disputedBy:user,disputedAt:stamp()});
+  tx.create(org.collection('customerSettlementDisputes').doc(randomUUID()),{
+   settlementId,reason:decision.disputeReason,createdBy:user,createdAt:stamp(),
+   status:'awaiting_provider_reconciliation'});
+  return {status:'frozen'};
+ });
+});
 
 export const allocateVerifiedCustomerSettlement = callable(async request=>{
  const {org,user,member}=await authorize(request,'accounting');
