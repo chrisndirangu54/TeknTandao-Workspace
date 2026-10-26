@@ -372,6 +372,108 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _recruitmentDashboard() async {
+    try {
+      final data = await widget.store.call('listHrRecruitment', {});
+      if (!mounted) return;
+      final candidates = (data['candidates'] as List?) ?? [];
+      final tasks = (data['tasks'] as List?) ?? [];
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+        title: const Text('Recruitment & onboarding'),
+        content: SizedBox(width: 680, height: 480, child: ListView(children: [
+          Text('Candidates (${candidates.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
+          if (candidates.isEmpty) const Text('No candidate records yet.'),
+          for (final candidate in candidates)
+            ListTile(
+              title: Text('${candidate['name']} · ${candidate['position']}'),
+              subtitle: Text('${candidate['email']} · ${candidate['stage']}'),
+              trailing: PopupMenuButton<String>(
+                tooltip: 'Advance application',
+                onSelected: (stage) async {
+                  String reason = '';
+                  if (stage == 'rejected' || stage == 'withdrawn') {
+                    final input = await recordForm(dialogContext, 'Close application', ['Reason']);
+                    if (input == null || input[0].trim().isEmpty) return;
+                    reason = input[0].trim();
+                  }
+                  try {
+                    await widget.store.call('advanceHrCandidate', {
+                      'applicationId': candidate['id'], 'stage': stage, 'reason': reason,
+                    });
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Candidate updated. Reopen to refresh.')));
+                  } catch (error) {
+                    if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Update failed: $error')));
+                  }
+                },
+                itemBuilder: (_) => <String>['screening','interview','offer','hired','rejected','withdrawn']
+                  .map((stage) => PopupMenuItem(value: stage, child: Text(stage))).toList(),
+              ),
+            ),
+          const Divider(),
+          Text('Onboarding tasks (${tasks.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
+          if (tasks.isEmpty) const Text('No onboarding tasks yet.'),
+          for (final task in tasks)
+            ListTile(title: Text(task['title'].toString()),
+              subtitle: Text('Due ${task['dueDate']} · ${task['status']}'),
+              trailing: task['status'] == 'open' ? TextButton(
+                onPressed: () async {
+                  try {
+                    await widget.store.call('completeHrOnboardingTask', {'taskId': task['id']});
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Onboarding task completed.')));
+                  } catch (error) {
+                    if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Completion failed: $error')));
+                  }
+                }, child: const Text('Complete'),
+              ) : null),
+        ])),
+        actions: [
+          TextButton(onPressed: () async {
+            final input = await recordForm(dialogContext, 'New candidate', ['Full name','Email','Position']);
+            if (input == null) return;
+            try {
+              await widget.store.call('createHrCandidate', {
+                'name':input[0].trim(),'email':input[1].trim(),'position':input[2].trim(),
+              });
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Candidate created.')));
+            } catch (error) {
+              if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content: Text('Candidate creation failed: $error')));
+            }
+          }, child: const Text('Add candidate')),
+          TextButton(onPressed: () async {
+            final input = await recordForm(dialogContext, 'New onboarding task',
+              ['Employee record ID','Task title','Assignee user ID','Due date YYYY-MM-DD']);
+            if (input == null) return;
+            try {
+              await widget.store.call('createHrOnboardingTask', {
+                'employeeId':input[0].trim(),'title':input[1].trim(),
+                'assigneeUid':input[2].trim(),'dueDate':input[3].trim(),
+              });
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Onboarding task created.')));
+            } catch (error) {
+              if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content: Text('Task creation failed: $error')));
+            }
+          }, child: const Text('Add onboarding task')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+        ],
+      ));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Recruitment dashboard unavailable: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
@@ -417,6 +519,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: _recruitmentDashboard,
+                  icon: const Icon(Icons.work_outline),
+                  label: const Text('Recruitment & onboarding'),
+                ),
                 OutlinedButton.icon(
                   onPressed: _performanceReviews,
                   icon: const Icon(Icons.assessment_outlined),
