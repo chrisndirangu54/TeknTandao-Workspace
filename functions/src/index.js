@@ -37,6 +37,7 @@ import {adjustedTimeRegister} from './hr_adjusted_time_domain.js';
 import {payrollAuthorizationDraft,authorizePayrollProposal} from './hr_payroll_authorization_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} from './crm_pipeline_domain.js';
+import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -119,6 +120,19 @@ export const completeCrmFollowUp = callable(async request=>{
   return {id,status:'completed'};
  });
 });
+export const getCrmLeadScores = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const [contacts,deals,tasks]=await Promise.all([
+  org.collection('contacts').limit(201).get(),
+  org.collection('crmOpportunities').limit(501).get(),
+  org.collection('crmFollowUps').limit(501).get()]);
+ if(contacts.size>200||deals.size>500||tasks.size>500)
+  throw new Error('Lead scoring requires pagination for larger workspaces');
+ const scores=rankCrmLeads(contacts.docs.map(d=>({id:d.id,...d.data()})),
+  deals.docs.map(d=>({id:d.id,...d.data()})),tasks.docs.map(d=>({id:d.id,...d.data()})),new Date().toISOString());
+ return {scores,model:'Rules-based signals from CRM data; not a prediction of purchase intent.'};
+});
+
 export const getCrmPipeline = callable(async request=>{
  const {org}=await authorize(request,'crm');
  const [deals,tasks]=await Promise.all([
