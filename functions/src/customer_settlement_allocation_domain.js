@@ -17,6 +17,7 @@ export function invoiceAllocationDecision(invoice,payment,priorAllocations,amoun
  }
  const remaining=invoice.total-allocated;
  if(remaining<amountMinor)throw new Error('Invoice allocation exceeds outstanding value');
+ if(amountMinor>payment.amountMinor)throw new Error('Allocation exceeds verified payment amount');
  return {amountMinor,remainingInvoiceMinor:remaining-amountMinor,status:remaining===amountMinor?'settled':'partial',
   evidenceSource:payment.verificationSource};
 }
