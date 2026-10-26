@@ -34,6 +34,7 @@ import {payrollTimeRegister} from './hr_payroll_time_domain.js';
 import {payrollTimeSnapshot} from './hr_time_lock_domain.js';
 import {proposeHrTimeCorrection,decideHrTimeCorrection} from './hr_time_corrections_domain.js';
 import {adjustedTimeRegister} from './hr_adjusted_time_domain.js';
+import {payrollAuthorizationDraft,authorizePayrollProposal} from './hr_payroll_authorization_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -790,6 +791,66 @@ export const getHrAdjustedTimeRegister = callable(async request=>{
  const report=adjustedTimeRegister(lock.data(),corrections);
  return {employeeId,...report,
   note:'Read-only HR adjustment projection. Original snapshot unchanged; no wage calculation or payroll posting.'};
+});
+
+export const proposeHrPayrollAuthorization = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const proposalRef=org.collection('hrPayrollAuthorizationProposals').doc(employeeId+'_'+period);
+ return db.runTransaction(async tx=>{
+  const [employee,lock,prior,history]=await Promise.all([
+   tx.get(org.collection('employees').doc(employeeId)),
+   tx.get(org.collection('hrPayrollTimeLocks').doc(employeeId+'_'+period)),
+   tx.get(proposalRef),
+   tx.get(org.collection('hrTimeCorrections').where('employeeId','==',employeeId).limit(501))
+  ]);
+  if(!employee.exists||!lock.exists||history.size>500)
+   throw new Error('Employee, locked time or complete correction history unavailable');
+  const report=adjustedTimeRegister(lock.data(),history.docs.filter(d=>d.data().period===period)
+   .map(d=>({id:d.id,...d.data()})));
+  const proposal=payrollAuthorizationDraft(report,request.data.grossMinor,request.data.explanation);
+  if(prior.exists){
+   if(prior.data().registerDigest!==proposal.registerDigest||
+      prior.data().grossMinor!==proposal.grossMinor)throw new Error('Existing proposal differs');
+   return {proposalId:proposalRef.id,status:prior.data().status,replayed:true};
+  }
+  tx.create(proposalRef,{...proposal,employeeId,preparedBy:user,createdAt:stamp()});
+  return {proposalId:proposalRef.id,status:'pending',replayed:false};
+ });
+});
+export const decideHrPayrollAuthorization = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const ref=org.collection('hrPayrollAuthorizationProposals').doc(employeeId+'_'+period);
+ return db.runTransaction(async tx=>{
+  const [proposal,lock,history]=await Promise.all([
+   tx.get(ref),tx.get(org.collection('hrPayrollTimeLocks').doc(employeeId+'_'+period)),
+   tx.get(org.collection('hrTimeCorrections').where('employeeId','==',employeeId).limit(501))
+  ]);
+  if(!proposal.exists||!lock.exists||history.size>500)throw new Error('Proposal, lock or correction history missing');
+  const actual=adjustedTimeRegister(lock.data(),history.docs.filter(d=>d.data().period===period)
+   .map(d=>({id:d.id,...d.data()})));
+  if(actual.digest!==proposal.data().registerDigest)throw new Error('Time register changed since payroll proposal');
+  const decision=authorizePayrollProposal(proposal.data(),request.data.status,request.data.note,user);
+  tx.update(ref,{...decision,reviewedBy:user,reviewedAt:stamp()});
+  tx.create(ref.collection('audit').doc(randomUUID()),{
+   action:decision.status,reviewer:user,note:decision.reviewNote,at:stamp()});
+  return {proposalId:ref.id,status:decision.status,payrollPosted:false};
+ });
+});
+export const getHrPayrollAuthorization = callable(async request=>{
+ const {org,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const proposal=await org.collection('hrPayrollAuthorizationProposals').doc(employeeId+'_'+period).get();
+ return {exists:proposal.exists,...(proposal.exists?{
+  status:proposal.data().status,grossMinor:proposal.data().grossMinor,
+  registerDigest:proposal.data().registerDigest,payrollPosted:false}:{})};
 });
 
 export const listHrOvertime = callable(async request=>{
