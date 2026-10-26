@@ -659,7 +659,42 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:invoiceReconciliation,icon:const Icon(Icons.fact_check_outlined),label:const Text('Invoices')),TextButton.icon(onPressed:commerceSummary,icon:const Icon(Icons.receipt_long_outlined),label:const Text('Commerce')),TextButton.icon(onPressed:campaignEfficiencyReport,icon:const Icon(Icons.price_check_outlined),label:const Text('Campaign costs')),TextButton.icon(onPressed:campaignReport,icon:const Icon(Icons.campaign_outlined),label:const Text('Campaigns')),TextButton.icon(onPressed:salesCycleReport,icon:const Icon(Icons.timeline_outlined),label:const Text('Sales cycle')),TextButton.icon(onPressed:conversionReport,icon:const Icon(Icons.analytics_outlined),label:const Text('Win/loss')),TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[
+      IconButton(onPressed:dealBoard,tooltip:'Deal board',icon:const Icon(Icons.view_kanban_outlined)),
+      PopupMenuButton<String>(
+        tooltip:'CRM modules and reports',
+        onSelected:(selected){
+          switch(selected){
+            case 'pipeline':pipeline();break;
+            case 'lead':leadScores();break;
+            case 'sequences':salesSequences();break;
+            case 'team':teamPerformance();break;
+            case 'quotas':quotasAndTerritories();break;
+            case 'aging':agingReport();break;
+            case 'winloss':conversionReport();break;
+            case 'cycle':salesCycleReport();break;
+            case 'campaigns':campaignReport();break;
+            case 'costs':campaignEfficiencyReport();break;
+            case 'commerce':commerceSummary();break;
+            case 'invoices':invoiceReconciliation();break;
+          }
+        },
+        itemBuilder:(_)=>const [
+          PopupMenuItem(value:'pipeline',child:Text('Sales pipeline')),
+          PopupMenuItem(value:'lead',child:Text('Lead scoring')),
+          PopupMenuItem(value:'sequences',child:Text('Outreach sequences')),
+          PopupMenuItem(value:'team',child:Text('Sales team')),
+          PopupMenuItem(value:'quotas',child:Text('Quotas and territories')),
+          PopupMenuItem(value:'aging',child:Text('Deal aging')),
+          PopupMenuItem(value:'winloss',child:Text('Win / loss analysis')),
+          PopupMenuItem(value:'cycle',child:Text('Sales cycle')),
+          PopupMenuItem(value:'campaigns',child:Text('Campaigns')),
+          PopupMenuItem(value:'costs',child:Text('Campaign costs')),
+          PopupMenuItem(value:'commerce',child:Text('POS / Accounting summary')),
+          PopupMenuItem(value:'invoices',child:Text('Invoice reconciliation')),
+        ],
+      ),
+    ]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
