@@ -20,6 +20,13 @@ export async function verifyTransaction(secret, reference) {
   if (!r.status) throw new Error('Payment verification failed');
   return r.data;
 }
+export async function fetchPaystackRefund(secret,refundId){
+ if(!secret||!/^\\d{1,20}$/.test(String(refundId)))throw new Error('Valid refund ID and provider secret required');
+ const response=await jsonFetch(`https://api.paystack.co/refund/${encodeURIComponent(String(refundId))}`,{
+  headers:{Authorization:`Bearer ${secret}`}});
+ if(response.status!==true||!response.data)throw new Error('Paystack refund lookup unsuccessful');
+ return response.data;
+}
 export async function initiateMpesa(config, {phone, amount, reference, description = 'Tandao subscription'}) {
   if (!/^254[17]\d{8}$/.test(phone)) throw new Error('Use a Kenyan phone number starting 254');
   if (!Number.isInteger(amount) || amount <= 0) throw new Error('M-Pesa amount must be positive whole shillings');
