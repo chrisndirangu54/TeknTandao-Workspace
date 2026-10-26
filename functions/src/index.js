@@ -45,6 +45,7 @@ import {crmSalesCycleReport} from './crm_cycle_domain.js';
 import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
 import {crmCommerceSummary} from './crm_commerce_domain.js';
 import {crmInvoiceReconciliation} from './crm_invoice_reconciliation_domain.js';
+import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
 import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
 import {campaignSpend,campaignEfficiency} from './crm_campaign_spend_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
@@ -1949,19 +1950,28 @@ export const saleAutomation = onDocumentCreated({document: 'organizations/{orgId
     const runRef = org.collection('automationRuns').doc(event.params.eventId);
     const postingDate = new Date().toISOString().slice(0,10);
     const period = accountingPeriod(postingDate);
-    const [run, saleSnap, books, crm, periodLock] = await Promise.all([
+    const [run, saleSnap, books, crm, periodLock, existingInvoice, existingJournal, existingTax] = await Promise.all([
       tx.get(runRef),
       tx.get(org.collection('sales').doc(saleId)),
       tx.get(org.collection('apps').doc('accounting')),
       tx.get(org.collection('apps').doc('crm')),
-      tx.get(org.collection('accountingPeriods').doc(period))
+      tx.get(org.collection('accountingPeriods').doc(period)),
+      tx.get(org.collection('invoices').doc(saleId)),
+      tx.get(org.collection('journals').doc(`invoice_${saleId}`)),
+      tx.get(org.collection('taxOutbox').doc(saleId))
     ]);
-    if (run.exists || !saleSnap.exists) return;
-    const sale = saleSnap.data();
-    if (books.data()?.expiresAt?.toMillis() > Date.now() && periodLock.data()?.status === 'closed') {
-      tx.create(runRef, {status:'blocked_closed_period',saleId,period,blockedAt:stamp()});
+    const accountingActive=books.data()?.expiresAt?.toMillis()>Date.now();
+    const decision=saleInvoicePostingDecision({
+      runExists:run.exists,sale:saleSnap.exists?saleSnap.data():null,
+      accountingActive,periodClosed:periodLock.data()?.status==='closed',
+      invoiceExists:existingInvoice.exists,journalExists:existingJournal.exists,
+      taxOutboxExists:existingTax.exists});
+    if(decision.action==='already_processed'||decision.action==='missing_sale')return;
+    if(decision.action.startsWith('blocked_')){
+      tx.create(runRef,{status:decision.action,saleId,period,blockedAt:stamp()});
       return;
     }
+    const sale=saleSnap.data();
     if (books.data()?.expiresAt?.toMillis() > Date.now()) {
       assertOpenPeriod(period,periodLock.data());
       tx.create(org.collection('invoices').doc(saleId), {saleId, contactId: sale.contactId, total: sale.total, currency: sale.currency, paymentState: 'unpaid', status: 'draft', taxStatus: 'requires_tax_configuration', createdAt: stamp()});
