@@ -45,6 +45,7 @@ import {crmSalesCycleReport} from './crm_cycle_domain.js';
 import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
 import {crmCommerceSummary} from './crm_commerce_domain.js';
 import {crmInvoiceReconciliation} from './crm_invoice_reconciliation_domain.js';
+import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
 import {campaignSpend,campaignEfficiency} from './crm_campaign_spend_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
@@ -446,6 +447,26 @@ export const getCrmConversionReport = callable(async request=>{
  const deals=await org.collection('crmOpportunities').limit(501).get();
  if(deals.size>500)throw new Error('Conversion analysis requires pagination');
  return crmConversionReport(deals.docs.map(d=>d.data()),period);
+});
+
+export const listCrmRecordsPage = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const collections={contacts:'contacts',opportunities:'crmOpportunities',
+  activities:'crmActivities',campaigns:'crmCampaigns',followUps:'crmFollowUps'};
+ const kind=request.data?.kind;
+ if(!Object.hasOwn(collections,kind))throw new Error('Unsupported CRM record type');
+ const pageSize=validateCrmPageSize(request.data?.pageSize??50);
+ let query=org.collection(collections[kind]).orderBy(FieldPath.documentId()).limit(pageSize+1);
+ const afterId=request.data?.afterId;
+ if(afterId!==undefined&&afterId!==null){
+  const last=await org.collection(collections[kind]).doc(identifier(afterId)).get();
+  if(!last.exists)throw new Error('Pagination cursor is no longer available');
+  query=query.startAfter(last);
+ }
+ const snapshot=await query.get();
+ const docs=snapshot.docs.map(d=>({id:d.id,...d.data()}));
+ const result=crmPageResult(docs,pageSize);
+ return {kind,...result,orderedBy:'document_id'};
 });
 
 export const getCrmPipelineAging = callable(async request=>{
