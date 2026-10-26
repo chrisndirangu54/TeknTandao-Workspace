@@ -474,6 +474,67 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _payrollAuthorization() async {
+    if(selectedId==null)return;
+    final values=await recordForm(context,'Payroll authorization lookup',['Period YYYY-MM']);
+    if(values==null||values[0].trim().isEmpty)return;
+    final employeeId=selectedId!,period=values[0].trim();
+    try{
+      final result=await widget.store.call('getHrPayrollAuthorization',{
+        'employeeId':employeeId,'period':period,
+      });
+      if(!mounted)return;
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text('Payroll proposal · $period'),
+        content:Text(result['exists']==true
+          ? 'Status: ${result['status']}\nProposed gross pay: ${kes(result['grossMinor'] as num)}\nNo payroll posting has occurred through this workflow.'
+          : 'No payroll authorization proposal exists for this employee and month.'),
+        actions:[
+          if(result['exists']!=true)TextButton(onPressed:() async {
+            final input=await recordForm(dialogContext,'Prepare payroll proposal',
+              ['Gross salary (KES whole shillings)','Reason / verification notes']);
+            if(input==null)return;
+            final shillings=int.tryParse(input[0].trim());
+            if(shillings==null||shillings<1||shillings>10000000){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(content:Text('Enter a valid whole-shilling amount.')));
+              return;
+            }
+            try {
+              await widget.store.call('proposeHrPayrollAuthorization',{
+                'employeeId':employeeId,'period':period,'grossMinor':shillings*100,
+                'explanation':input[1].trim(),
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Proposal failed: $error')));
+            }
+          },child:const Text('Prepare proposal')),
+          if(result['status']=='pending')TextButton(onPressed:() async {
+            final input=await recordForm(dialogContext,'Independent payroll approval',
+              ['Decision (approved/rejected)','Review note']);
+            if(input==null)return;
+            try{
+              await widget.store.call('decideHrPayrollAuthorization',{
+                'employeeId':employeeId,'period':period,
+                'status':input[0].trim().toLowerCase(),'note':input[1].trim(),
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Approval failed: $error')));
+            }
+          },child:const Text('Review proposal')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Payroll proposal unavailable: $error')));
+    }
+  }
+
   Future<void> _adjustedTimeRegister() async {
     if(selectedId==null)return;
     final values=await recordForm(context,'Adjusted time register',['Period YYYY-MM']);
@@ -901,6 +962,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _payrollAuthorization,
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Payroll authorization'),
+                ),
                 OutlinedButton.icon(
                   onPressed: selectedId == null ? null : _adjustedTimeRegister,
                   icon: const Icon(Icons.account_tree_outlined),
