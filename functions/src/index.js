@@ -36,6 +36,7 @@ import {proposeHrTimeCorrection,decideHrTimeCorrection} from './hr_time_correcti
 import {adjustedTimeRegister} from './hr_adjusted_time_domain.js';
 import {payrollAuthorizationDraft,authorizePayrollProposal} from './hr_payroll_authorization_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
+import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} from './crm_pipeline_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -70,6 +71,63 @@ function callable(handler, secrets = []) {
     }
   });
 }
+
+export const createCrmOpportunity = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const proposed=crmOpportunity(request.data);
+ const id=identifier(request.data.opportunityId||randomUUID()),ref=org.collection('crmOpportunities').doc(id);
+ const contact=await org.collection('contacts').doc(identifier(proposed.contactId)).get();
+ if(!contact.exists)throw new Error('CRM contact not found');
+ await ref.create({...proposed,createdBy:user,createdAt:stamp(),updatedAt:stamp()});
+ return {id,stage:proposed.stage};
+});
+export const advanceCrmOpportunity = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const id=identifier(request.data.opportunityId),ref=org.collection('crmOpportunities').doc(id);
+ return db.runTransaction(async tx=>{
+  const current=await tx.get(ref);
+  if(!current.exists)throw new Error('Opportunity not found');
+  const next=crmAdvanceOpportunity(current.data(),request.data.stage,request.data.reason);
+  tx.update(ref,{...next,updatedBy:user,updatedAt:stamp()});
+  tx.create(ref.collection('history').doc(randomUUID()),{
+   from:current.data().stage,to:next.stage,actor:user,
+   reason:next.closedReason,at:stamp()});
+  return {id,stage:next.stage};
+ });
+});
+export const createCrmFollowUp = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const opportunityId=identifier(request.data.opportunityId);
+ const proposed=crmFollowUp(request.data);
+ const id=identifier(request.data.followUpId||randomUUID()),ref=org.collection('crmFollowUps').doc(id);
+ const [opportunity,member]=await Promise.all([
+  org.collection('crmOpportunities').doc(opportunityId).get(),
+  org.collection('members').doc(proposed.ownerUid).get()]);
+ if(!opportunity.exists||!member.exists)throw new Error('Opportunity or assigned workspace member not found');
+ await ref.create({...proposed,opportunityId,createdBy:user,createdAt:stamp()});
+ return {id,status:'open'};
+});
+export const completeCrmFollowUp = callable(async request=>{
+ const {org,user,member}=await authorize(request,'crm');
+ const id=identifier(request.data.followUpId),ref=org.collection('crmFollowUps').doc(id);
+ return db.runTransaction(async tx=>{
+  const item=await tx.get(ref);
+  if(!item.exists||item.data().status!=='open')throw new Error('Open follow-up required');
+  if(member.role!=='owner'&&item.data().ownerUid!==user)
+   throw new HttpsError('permission-denied','Assigned owner required');
+  tx.update(ref,{status:'completed',completedBy:user,completedAt:stamp()});
+  return {id,status:'completed'};
+ });
+});
+export const getCrmPipeline = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const [deals,tasks]=await Promise.all([
+  org.collection('crmOpportunities').limit(200).get(),
+  org.collection('crmFollowUps').limit(200).get()]);
+ const opportunities=deals.docs.map(d=>({id:d.id,...d.data()}));
+ return {opportunities,followUps:tasks.docs.map(d=>({id:d.id,...d.data()})),
+  summary:crmPipelineSummary(opportunities),truncated:deals.size===200||tasks.size===200};
+});
 
 export const getCatalog = callable(async request => {
   uid(request);
