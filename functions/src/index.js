@@ -43,6 +43,7 @@ import {crmAgingReport} from './crm_aging_domain.js';
 import {crmConversionReport} from './crm_conversion_domain.js';
 import {crmSalesCycleReport} from './crm_cycle_domain.js';
 import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
+import {campaignSpend,campaignEfficiency} from './crm_campaign_spend_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
@@ -204,6 +205,29 @@ export const getCrmCampaignAttribution = callable(async request=>{
  return {campaigns:crmAttribution(deals.docs.map(d=>d.data()),
    campaigns.docs.map(d=>({id:d.id,...d.data()}))),
   method:'Single source selected on opportunity creation; won deal value is not recognized revenue.'};
+});
+
+export const recordCrmCampaignSpend = callable(async request=>{
+ const {org,user,member}=await authorize(request,'crm');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace owner required');
+ const campaignId=identifier(request.data.campaignId);
+ const item=campaignSpend(request.data);
+ const campaign=await org.collection('crmCampaigns').doc(campaignId).get();
+ if(!campaign.exists)throw new Error('Campaign not found');
+ const id=identifier(request.data.spendId||randomUUID());
+ await org.collection('crmCampaignSpend').doc(id).create({...item,campaignId,createdBy:user,createdAt:stamp()});
+ return {spendId:id,campaignId};
+});
+export const getCrmCampaignEfficiency = callable(async request=>{
+ const {org,member}=await authorize(request,'crm');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace owner required');
+ const [campaigns,deals,spend]=await Promise.all([
+  org.collection('crmCampaigns').limit(201).get(),org.collection('crmOpportunities').limit(501).get(),
+  org.collection('crmCampaignSpend').limit(501).get()]);
+ if(campaigns.size>200||deals.size>500||spend.size>500)throw new Error('Campaign reporting requires pagination');
+ return {results:campaignEfficiency(campaigns.docs.map(d=>({id:d.id,...d.data()})),
+  deals.docs.map(d=>d.data()),spend.docs.map(d=>d.data())),
+  note:'Manual KES spend and attributed deals; not audited accounting expenditure or actual ROI.'};
 });
 
 export const createCrmOpportunity = callable(async request=>{
