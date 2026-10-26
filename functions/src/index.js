@@ -1,5 +1,5 @@
 import {initializeApp} from 'firebase-admin/app';
-import {getFirestore, Timestamp, FieldValue} from 'firebase-admin/firestore';
+import {getFirestore, Timestamp, FieldValue, FieldPath} from 'firebase-admin/firestore';
 import {getAuth} from 'firebase-admin/auth';
 import {onCall, onRequest, HttpsError} from 'firebase-functions/v2/https';
 import {onDocumentCreated} from 'firebase-functions/v2/firestore';
@@ -455,6 +455,29 @@ export const getCrmPipelineAging = callable(async request=>{
  if(deals.size>200)throw new Error('Aging report requires pagination for this workspace');
  const rows=deals.docs.map(d=>({id:d.id,...d.data()}));
  return crmAgingReport(rows,new Date().toISOString(),thresholdDays);
+});
+
+export const getCrmPipelinePage = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const requested=request.data?.pageSize??50;
+ if(!Number.isInteger(requested)||requested<1||requested>100)
+  throw new Error('Page size must be between 1 and 100');
+ const cursor=request.data?.afterId;
+ let query=org.collection('crmOpportunities')
+  .orderBy(FieldPath.documentId()).limit(requested+1);
+ if(cursor!==undefined&&cursor!==null){
+  const afterId=identifier(cursor);
+  const last=await org.collection('crmOpportunities').doc(afterId).get();
+  if(!last.exists)throw new Error('Pagination cursor no longer exists');
+  query=query.startAfter(last);
+ }
+ const snapshot=await query.get();
+ const hasMore=snapshot.size>requested;
+ const visible=snapshot.docs.slice(0,requested);
+ return {opportunities:visible.map(d=>({id:d.id,...d.data()})),
+  nextCursor:hasMore?visible[visible.length-1].id:null,hasMore,
+  pageSize:requested,orderedBy:'document_id',
+  note:'Paginated opportunities, not a complete revenue or forecasting snapshot.'};
 });
 
 export const getCrmPipeline = callable(async request=>{
