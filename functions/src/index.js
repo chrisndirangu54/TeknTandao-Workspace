@@ -41,6 +41,7 @@ import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
 import {sequencePlan,sequenceEnrollment,stopSequence} from './crm_sequences_domain.js';
 import {crmSuppression,allowedCrmContact,appendCrmSequenceStep} from './crm_suppression_domain.js';
+import {suppressActiveEnrollments,suppressionState} from './crm_sequence_suppression_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -83,11 +84,22 @@ export const suppressCrmContactChannel = callable(async request=>{
  const ref=org.collection('contacts').doc(contactId);
  const statusRef=org.collection('crmSuppression').doc(contactId+'_'+suppression.channel);
  return db.runTransaction(async tx=>{
-  const contact=await tx.get(ref);
+  const [contact,existing,active]=await Promise.all([
+   tx.get(ref),tx.get(statusRef),
+   tx.get(org.collection('crmSequenceEnrollments').where('contactId','==',contactId).limit(401))
+  ]);
   if(!contact.exists)throw new Error('Contact not found');
+  if(active.size>400)throw new Error('Too many enrollments to suppress safely');
+  const ids=suppressActiveEnrollments(active.docs.map(d=>({id:d.id,...d.data()})),suppression.channel);
   tx.set(statusRef,{...suppression,contactId,updatedBy:user,updatedAt:stamp()});
   if(suppression.channel==='all')tx.update(ref,{doNotContact:true,updatedBy:user,updatedAt:stamp()});
-  return {contactId,channel:suppression.channel,status:'suppressed'};
+  for(const id of ids){
+   tx.update(org.collection('crmSequenceEnrollments').doc(id),{
+    status:'stopped',stopReason:'Contact channel opt-out: '+suppression.reason,
+    stoppedBy:user,stoppedAt:stamp()
+   });
+  }
+  return {contactId,channel:suppression.channel,status:'suppressed',stoppedEnrollments:ids.length};
  });
 });
 export const addCrmSequenceStep = callable(async request=>{
@@ -105,7 +117,10 @@ export const getCrmContactSuppression = callable(async request=>{
  const {org}=await authorize(request,'crm');
  const contactId=identifier(request.data.contactId);
  const records=await Promise.all(['all','email','whatsapp','call'].map(c=>org.collection('crmSuppression').doc(contactId+'_'+c).get()));
- return {contactId,suppressions:records.filter(r=>r.exists).map(r=>r.data())};
+ const contact=await org.collection('contacts').doc(contactId).get();
+ if(!contact.exists)throw new Error('Contact not found');
+ const suppressions=records.filter(r=>r.exists).map(r=>r.data());
+ return {contactId,suppressions,...suppressionState(contact.data(),suppressions)};
 });
 
 export const createCrmSequence = callable(async request=>{
