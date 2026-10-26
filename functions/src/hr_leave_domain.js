@@ -15,7 +15,7 @@ export function leaveRequest({employeeId,startDate,endDate,leaveType,reason}){
   leaveType,reason:reason.trim(),calendarDays:days,status:'requested'};
 }
 export function overlappingLeave(candidate,existing){
- return existing.some(x=>['requested','approved'].includes(x.status)&&
+ return existing.some(x=>['requested','manager_approved','approved'].includes(x.status)&&
   candidate.startDate<=x.endDate&&candidate.endDate>=x.startDate);
 }
 export function leaveDecision(previous,next,decisionReason){
