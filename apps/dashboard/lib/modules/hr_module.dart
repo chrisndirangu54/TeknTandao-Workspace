@@ -474,6 +474,78 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _timeCorrections() async {
+    final employeeId=selectedId;
+    if(employeeId==null)return;
+    try {
+      final data=await widget.store.call('listHrTimeCorrections',{'employeeId':employeeId});
+      if(!mounted)return;
+      final corrections=(data['corrections'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Locked-time corrections'),
+        content:SizedBox(width:600,height:400,child:ListView(children:[
+          const Text('Approved corrections are recorded for reconciliation. They do not rewrite locked time or payroll.'),
+          if(corrections.isEmpty)const Text('No correction requests.'),
+          for(final correction in corrections)
+            ListTile(
+              title:Text('${correction['period']} · ${correction['status']}'),
+              subtitle:Text('Timesheet ${correction['timesheetId']} · Regular ${correction['regularMinutes']} min · Overtime ${correction['approvedOvertimeMinutes']} min'),
+              trailing:correction['status']=='pending'?PopupMenuButton<String>(
+                tooltip:'HR decision',
+                onSelected:(decision) async {
+                  final values=await recordForm(dialogContext,'Correction decision',['Decision note']);
+                  if(values==null||values[0].trim().isEmpty)return;
+                  try {
+                    await widget.store.call('decideHrTimeCorrection',{
+                      'correctionId':correction['id'],'status':decision,'note':values[0].trim(),
+                    });
+                    if(dialogContext.mounted)Navigator.pop(dialogContext);
+                  }catch(error){
+                    if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content:Text('Decision failed: $error')));
+                  }
+                },
+                itemBuilder:(_)=>const [
+                  PopupMenuItem(value:'approved',child:Text('Approve')),
+                  PopupMenuItem(value:'rejected',child:Text('Reject')),
+                ],
+              ):null,
+            ),
+        ])),
+        actions:[
+          TextButton(onPressed:() async {
+            final values=await recordForm(dialogContext,'Request time correction',[
+              'Period YYYY-MM','Locked timesheet / shift ID','Correct regular minutes',
+              'Correct approved overtime minutes','Explanation',
+            ]);
+            if(values==null)return;
+            final regular=int.tryParse(values[2].trim()),overtime=int.tryParse(values[3].trim());
+            if(regular==null||overtime==null){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(content:Text('Enter whole-number minutes.')));
+              return;
+            }
+            try{
+              await widget.store.call('requestHrTimeCorrection',{
+                'employeeId':employeeId,'period':values[0].trim(),
+                'timesheetId':values[1].trim(),'regularMinutes':regular,
+                'approvedOvertimeMinutes':overtime,'reason':values[4].trim(),
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Request failed: $error')));
+            }
+          },child:const Text('Request correction')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Corrections unavailable: $error')));
+    }
+  }
+
   Future<void> _payrollTimeRegister() async {
     if(selectedId==null)return;
     final values=await recordForm(context,'HR time register',['Period YYYY-MM']);
@@ -802,6 +874,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _timeCorrections,
+                  icon: const Icon(Icons.edit_calendar_outlined),
+                  label: const Text('Time corrections'),
+                ),
                 OutlinedButton.icon(
                   onPressed: selectedId == null ? null : _payrollTimeRegister,
                   icon: const Icon(Icons.lock_clock_outlined),
