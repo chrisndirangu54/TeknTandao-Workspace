@@ -21,7 +21,7 @@ export async function verifyTransaction(secret, reference) {
   return r.data;
 }
 export async function fetchPaystackRefund(secret,refundId){
- if(!secret||!/^\\d{1,20}$/.test(String(refundId)))throw new Error('Valid refund ID and provider secret required');
+ if(!secret||!/^[0-9]{1,20}$/.test(String(refundId)))throw new Error('Valid refund ID and provider secret required');
  const response=await jsonFetch(`https://api.paystack.co/refund/${encodeURIComponent(String(refundId))}`,{
   headers:{Authorization:`Bearer ${secret}`}});
  if(response.status!==true||!response.data)throw new Error('Paystack refund lookup unsuccessful');
