@@ -8,9 +8,23 @@ class InventoryAgentScreen extends StatefulWidget {
 }
 class _InventoryAgentScreenState extends State<InventoryAgentScreen>{
   final List<Map<String,dynamic>> recommendations=[];
-  String? cursor,error;
+  String? cursor,error,aiSummary;
+  final prompt=TextEditingController(text:'Which of these products should we replenish first and why?');
   bool more=true,busy=false;
   @override void initState(){super.initState();load();}
+  @override void dispose(){prompt.dispose();super.dispose();}
+  Future<void> explain() async {
+    if(busy||recommendations.isEmpty)return;
+    setState(()=>busy=true);
+    try{
+      final response=await widget.store.call('explainInventoryAgentRecommendations',{
+        'prompt':prompt.text,'items':recommendations.take(10).map((r)=>{
+          'sku':r['sku'],'warehouseId':r['warehouseId']}).toList()
+      });
+      if(mounted)setState(()=>aiSummary=response['summary']?.toString());
+    }catch(e){if(mounted)setState(()=>error=e.toString());}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
   Future<void> load() async{
     if(busy||!more)return;
     setState(()=>busy=true);
@@ -61,6 +75,12 @@ class _InventoryAgentScreenState extends State<InventoryAgentScreen>{
       const SizedBox(height:8),
       const Text('Uses configured daily demand, supplier lead times, reservations and incoming stock. Recommendations are advisory. No supplier orders are sent.'),
       const SizedBox(height:16),
+      TextField(controller:prompt,maxLength:1000,maxLines:2,
+        decoration:const InputDecoration(labelText:'Ask the Inventory Agent',border:OutlineInputBorder())),
+      FilledButton.icon(onPressed:busy||recommendations.isEmpty?null:explain,
+        icon:const Icon(Icons.auto_awesome),label:const Text('Explain recommendations with AI')),
+      if(aiSummary!=null)Card(child:Padding(padding:const EdgeInsets.all(16),
+        child:SelectableText(aiSummary!))),
       if(error!=null)Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error)),
       for(final row in recommendations)Card(child:ListTile(
         title:Text('${row['productName']} · ${row['warehouseId']}'),
