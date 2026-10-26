@@ -14,5 +14,5 @@ export function validateAgentWorkflowDraft(raw,connections){
 export function parseAgentWorkflowResponse(body){
  const text=body?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('');
  if(typeof text!=='string'||text.length>50000||!text.trim())throw new Error('AI did not return a workflow');
- return JSON.parse(text.replace(/^\\s*```(?:json)?\\s*|\\s*```\\s*$/g,''));
+ return JSON.parse(text.replace(/^[\\s]*```(?:json)?[\\s]*|[\\s]*```[\\s]*$/g,''));
 }
