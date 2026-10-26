@@ -24,6 +24,7 @@ import {leaveYear,consumeLeave,validateLeaveLedger} from './hr_leave_ledger_doma
 import {validateAccrualPolicy,accrueAnnualLeave,carryForwardLeave} from './hr_accrual_domain.js';
 import {authorizeLeaveApprover,validateLeaveManagerAssignment} from './hr_approvals_domain.js';
 import {leaveApprovalTransition} from './hr_multilevel_approval_domain.js';
+import {createReview,reviewAssessment} from './hr_performance_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -491,6 +492,63 @@ export const closePosTill = callable(async request=>{
   tx.update(till,{status:'closed',closedAt:stamp(),closedBy:user,reconciliation});
   return {tillId,...reconciliation,replayed:false};
  });
+});
+
+export const createHrPerformanceReview = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const review=createReview(request.data),id=identifier(request.data.reviewId||randomUUID());
+ const ref=org.collection('hrPerformanceReviews').doc(id);
+ const [employee,manager]=await Promise.all([
+  org.collection('employees').doc(review.employeeId).get(),
+  org.collection('members').doc(review.managerUid).get()]);
+ if(!employee.exists||!employee.data().portalUid||!manager.exists)
+  throw new Error('Linked employee identity and workspace manager required');
+ if(employee.data().portalUid===review.managerUid)throw new Error('Manager cannot review themself');
+ await ref.create({...review,createdBy:user,createdAt:stamp()});
+ return {reviewId:id,status:review.status};
+});
+export const submitHrPerformanceAssessment = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const id=identifier(request.data.reviewId),kind=request.data.kind;
+ if(!['employee','manager'].includes(kind))throw new Error('Unknown assessment role');
+ const ref=org.collection('hrPerformanceReviews').doc(id);
+ return db.runTransaction(async tx=>{
+  const previous=await tx.get(ref);
+  if(!previous.exists)throw new Error('Performance review unavailable');
+  const record=previous.data();
+  const employee=await tx.get(org.collection('employees').doc(identifier(record.employeeId)));
+  if(!employee.exists)throw new Error('Employee unavailable');
+  if(kind==='employee'&&employee.data().portalUid!==user||
+     kind==='manager'&&record.managerUid!==user)
+    throw new HttpsError('permission-denied','Assessment must be submitted by assigned participant');
+  const assessment=reviewAssessment(record,kind,request.data);
+  const status=kind==='employee'?'manager_review':'completed';
+  tx.update(ref,{[kind==='employee'?'employeeAssessment':'managerAssessment']:assessment,
+    status,updatedBy:user,updatedAt:stamp()});
+  tx.create(ref.collection('history').doc(randomUUID()),{kind,actor:user,at:stamp(),
+    from:record.status,to:status});
+  return {reviewId:id,status,weightedScore:assessment.weightedScore};
+ });
+});
+export const listMyHrPerformanceReviews = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const [mine,managed]=await Promise.all([
+  org.collection('employees').where('portalUid','==',user).limit(2).get(),
+  org.collection('hrPerformanceReviews').where('managerUid','==',user).limit(101).get()]);
+ if(mine.size>1||managed.size>100)throw new Error('Review list exceeds safe bounds');
+ const employeeId=mine.empty?null:mine.docs[0].id;
+ const employeeReviews=employeeId?
+  await org.collection('hrPerformanceReviews').where('employeeId','==',employeeId).limit(101).get():null;
+ if(employeeReviews&&employeeReviews.size>100)throw new Error('Review list exceeds safe bounds');
+ const map=new Map();
+ for(const doc of [...managed.docs,...(employeeReviews?.docs||[])])
+  map.set(doc.id,{id:doc.id,employeeId:doc.data().employeeId,startDate:doc.data().startDate,
+    endDate:doc.data().endDate,status:doc.data().status,goals:doc.data().goals,
+    employeeAssessment:doc.data().employeeAssessment??null,
+    managerAssessment:doc.data().managerAssessment??null,
+    myRole:doc.data().managerUid===user?'manager':'employee'});
+ return {reviews:[...map.values()]};
 });
 
 export const requestHrLeave = callable(async request=>{
