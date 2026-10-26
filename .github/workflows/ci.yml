@@ -26,6 +26,8 @@ jobs:
       # keeps its own deterministic npm ci step below.
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm --prefix functions ci
+      - name: Check JavaScript source and test syntax
+        run: find functions/src functions/test -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
       - run: npm test
       - run: npm run test:rules
 
