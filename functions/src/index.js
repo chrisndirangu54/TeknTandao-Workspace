@@ -143,17 +143,24 @@ export const enrollCrmSequence = callable(async request=>{
  const {org,user}=await authorize(request,'crm');
  const contactId=identifier(request.data.contactId),sequenceId=identifier(request.data.sequenceId);
  const id=identifier(request.data.enrollmentId||randomUUID()),ref=org.collection('crmSequenceEnrollments').doc(id);
- const [template,contact]=await Promise.all([
-  org.collection('crmSequences').doc(sequenceId).get(),org.collection('contacts').doc(contactId).get()]);
- if(!template.exists||!contact.exists)throw new Error('Sequence or contact unavailable');
- const suppressionRecords=await Promise.all(['all',request.data.channel].map(channel=>
-  org.collection('crmSuppression').doc(contactId+'_'+channel).get()));
- if(!allowedCrmContact(contact.data(),suppressionRecords.filter(x=>x.exists).map(x=>x.data()),request.data.channel))
-  throw new Error('Contact suppressed for this channel');
- const enrollment=sequenceEnrollment(template.data(),contact.data(),
-  request.data.channel,request.data.consent,new Date().toISOString());
- await ref.create({...enrollment,contactId,sequenceId,createdBy:user,createdAt:stamp()});
- return {enrollmentId:id,status:'active',automaticSending:false};
+ return db.runTransaction(async tx=>{
+  const [template,contact,globalOptOut,channelOptOut,prior]=await Promise.all([
+   tx.get(org.collection('crmSequences').doc(sequenceId)),
+   tx.get(org.collection('contacts').doc(contactId)),
+   tx.get(org.collection('crmSuppression').doc(contactId+'_all')),
+   tx.get(org.collection('crmSuppression').doc(contactId+'_'+request.data.channel)),
+   tx.get(ref)
+  ]);
+  if(!template.exists||!contact.exists)throw new Error('Sequence or contact unavailable');
+  if(prior.exists)throw new Error('Enrollment ID already exists');
+  const suppressionRecords=[globalOptOut,channelOptOut].filter(x=>x.exists).map(x=>x.data());
+  if(!allowedCrmContact(contact.data(),suppressionRecords,request.data.channel))
+   throw new Error('Contact suppressed for this channel');
+  const enrollment=sequenceEnrollment(template.data(),contact.data(),
+   request.data.channel,request.data.consent,new Date().toISOString());
+  tx.create(ref,{...enrollment,contactId,sequenceId,createdBy:user,createdAt:stamp()});
+  return {enrollmentId:id,status:'active',automaticSending:false};
+ });
 });
 export const stopCrmSequenceEnrollment = callable(async request=>{
  const {org,user}=await authorize(request,'crm');
