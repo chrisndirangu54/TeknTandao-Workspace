@@ -29,6 +29,7 @@ import {candidateApplication,advanceCandidate,onboardingTask} from './hr_recruit
 import {validateShift,shiftConflicts,changeShiftStatus} from './hr_shifts_domain.js';
 import {reconcileShiftPunches} from './hr_shift_reconciliation_domain.js';
 import {draftTimesheet,decideTimesheet} from './hr_timesheets_domain.js';
+import {proposeOvertime,decideOvertime} from './hr_overtime_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -609,6 +610,53 @@ export const decideHrTimesheet = callable(async request=>{
   return {timesheetId:id,status:decision.status,payrollPosted:false};
  });
 });
+export const requestHrOvertime = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const timesheetId=identifier(request.data.timesheetId);
+ const sheetRef=org.collection('hrTimesheets').doc(timesheetId);
+ const shiftRef=org.collection('hrShifts').doc(timesheetId);
+ const overtimeRef=org.collection('hrOvertimeRequests').doc(timesheetId);
+ return db.runTransaction(async tx=>{
+  const [sheet,shift,prior]=await Promise.all([
+   tx.get(sheetRef),tx.get(shiftRef),tx.get(overtimeRef)]);
+  if(!sheet.exists||!shift.exists)throw new Error('Timesheet or shift missing');
+  const employee=await tx.get(org.collection('employees').doc(identifier(sheet.data().employeeId)));
+  if(!employee.exists||employee.data().portalUid!==user)
+   throw new HttpsError('permission-denied','Only employee may request overtime');
+  if(prior.exists)throw new Error('Overtime request already exists for shift');
+  const proposal=proposeOvertime(sheet.data(),{id:timesheetId,...shift.data()},
+   request.data.minutes,request.data.reason);
+  tx.create(overtimeRef,{...proposal,submittedBy:user,submittedAt:stamp()});
+  return {overtimeId:timesheetId,status:'pending',minutes:proposal.minutes};
+ });
+});
+export const decideHrOvertime = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner approval required');
+ const id=identifier(request.data.overtimeId),ref=org.collection('hrOvertimeRequests').doc(id);
+ return db.runTransaction(async tx=>{
+  const previous=await tx.get(ref);
+  if(!previous.exists)throw new Error('Overtime request unavailable');
+  if(previous.data().submittedBy===user)
+   throw new HttpsError('permission-denied','Self-approval prohibited');
+  const decision=decideOvertime(previous.data(),request.data.status,request.data.note);
+  tx.update(ref,{...decision,decidedBy:user,decidedAt:stamp()});
+  tx.create(ref.collection('audit').doc(randomUUID()),{
+   from:'pending',to:decision.status,actor:user,note:decision.decisionNote,at:stamp()});
+  return {overtimeId:id,status:decision.status,payrollPosted:false};
+ });
+});
+export const listHrOvertime = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId);
+ const employee=await org.collection('employees').doc(employeeId).get();
+ if(!employee.exists||member.role!=='owner'&&employee.data().portalUid!==user)
+  throw new HttpsError('permission-denied','Overtime records restricted');
+ const rows=await org.collection('hrOvertimeRequests').where('employeeId','==',employeeId).limit(100).get();
+ return {requests:rows.docs.map(d=>({id:d.id,status:d.data().status,minutes:d.data().minutes,
+  reason:d.data().reason,payrollPosted:false})),payrollIntegrated:false};
+});
+
 export const listHrTimesheets = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
  const employeeId=identifier(request.data.employeeId);
