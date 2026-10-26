@@ -243,6 +243,33 @@ export const previewCustomerAllocationReversal = callable(async request=>{
   {id:allocationSnap.id,...allocation});
 });
 
+export const requestCustomerAllocationReversalReview = callable(async request=>{
+ const {org,user,member}=await authorize(request,'accounting');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace finance owner required');
+ const allocationId=identifier(request.data.allocationId);
+ const allocationRef=org.collection('customerAllocations').doc(allocationId);
+ const reviewRef=org.collection('customerReversalReviews').doc(allocationId);
+ return db.runTransaction(async tx=>{
+  const allocation=await tx.get(allocationRef);
+  if(!allocation.exists)throw new HttpsError('not-found','Allocation not found');
+  const invoiceRef=org.collection('invoices').doc(identifier(allocation.data().invoiceId));
+  const settlementRef=org.collection('customerSettlements').doc(identifier(allocation.data().settlementId));
+  const [invoice,settlement,priorReview]=await Promise.all([
+   tx.get(invoiceRef),tx.get(settlementRef),tx.get(reviewRef)]);
+  if(!invoice.exists||!settlement.exists)throw new Error('Linked financial records missing');
+  if(priorReview.exists)return {reviewId:allocationId,status:priorReview.data().status};
+  const decision=planCustomerAllocationReversal(
+   {id:invoice.id,...invoice.data()},{id:settlement.id,...settlement.data()},
+   {id:allocation.id,...allocation.data()});
+  if(decision.status!=='review_required')throw new Error('Allocation already reversed or pending');
+  tx.create(reviewRef,{allocationId,invoiceId:invoice.id,settlementId:settlement.id,
+   amountMinor:decision.reversalMinor,status:'pending_provider_evidence',
+   createdBy:user,createdAt:stamp(),originalAllocationJournalId:`customer_payment_${allocationId}`,
+   note:'A review request is not a refund and cannot authorize financial reversal.'});
+  return {reviewId:allocationId,status:'pending_provider_evidence'};
+ });
+});
+
 export const freezeDisputedCustomerSettlement = callable(async request=>{
  const {org,user,member}=await authorize(request,'accounting');
  if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace finance owner required');
