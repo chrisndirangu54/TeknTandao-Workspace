@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
+import 'crm_deal_board.dart';
 
 class CrmModuleScreen extends StatefulWidget {
   final SuiteStore store;
@@ -542,74 +543,8 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
   }
 
   Future<void> dealBoard() async {
-    try {
-      final data=await widget.store.call('getCrmPipeline',{});
-      if(!mounted)return;
-      final deals=(data['opportunities'] as List?)??[];
-      final board=(data['board'] as Map?)??{};
-      final columns=(board['columns'] as List?)??[];
-      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
-        title:const Text('Visual deal board'),
-        content:SizedBox(width:920,height:520,child:Column(children:[
-          Wrap(spacing:12,children:[
-            Chip(label:Text('Open: ${board['openDeals']??0}')),
-            Chip(label:Text('Won: ${board['wonDeals']??0}')),
-            Chip(label:Text('Closed win rate: ${board['winRateClosedPercent']??'N/A'}%')),
-            Chip(label:Text('Overdue follow-ups: ${board['overdueFollowUps']??0}')),
-          ]),
-          if(data['truncated']==true)const Text('Partial data: only the first 200 deals are displayed.'),
-          const SizedBox(height:12),
-          Expanded(child:ListView(scrollDirection:Axis.horizontal,children:[
-            for(final column in columns)SizedBox(width:230,child:Card(child:Padding(
-              padding:const EdgeInsets.all(8),child:Column(children:[
-                Text('${column['stage']} (${column['count']})',style:const TextStyle(fontWeight:FontWeight.bold)),
-                Text('Value: ${column['amountMinor']} minor units',style:const TextStyle(fontSize:11)),
-                const Divider(),
-                Expanded(child:ListView(children:[
-                  for(final deal in deals)
-                    if(deal['stage']==column['stage'])Card(child:ListTile(
-                      dense:true,title:Text(deal['title']?.toString()??'Deal'),
-                      onTap:() async {
-                        final input=await recordForm(dialogContext,'Assign sales owner',['Member user ID','Reason for assignment']);
-                        if(input==null)return;
-                        try {
-                          await widget.store.call('assignCrmDealOwner',{'opportunityId':deal['id'],'ownerUid':input[0].trim(),'reason':input[1].trim()});
-                          if(dialogContext.mounted)Navigator.pop(dialogContext);
-                        }catch(error){
-                          if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Assignment failed: $error')));
-                        }
-                      },
-                      subtitle:Text('Probability: ${deal['probability']}%'),
-                      trailing:PopupMenuButton<String>(tooltip:'Move deal',
-                        onSelected:(stage) async {
-                          String reason='';
-                          if(stage=='lost'){
-                            final input=await recordForm(dialogContext,'Loss explanation',['Reason']);
-                            if(input==null||input[0].trim().isEmpty)return;
-                            reason=input[0].trim();
-                          }
-                          try{
-                            await widget.store.call('advanceCrmOpportunity',{
-                              'opportunityId':deal['id'],'stage':stage,'reason':reason});
-                            if(dialogContext.mounted)Navigator.pop(dialogContext);
-                          }catch(error){
-                            if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
-                              SnackBar(content:Text('Move blocked: $error')));
-                          }
-                        },itemBuilder:(_)=>['discovery','proposal','negotiation','won','lost']
-                            .map((v)=>PopupMenuItem(value:v,child:Text(v))).toList()),
-                    )),
-                ])),
-              ]),
-            ))),
-          ])),
-        ])),
-        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
-      ));
-    }catch(error){
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content:Text('Deal board unavailable: $error')));
-    }
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder:(_)=>CrmDealBoardScreen(store:widget.store)));
   }
 
   Future<void> pipeline() async {
