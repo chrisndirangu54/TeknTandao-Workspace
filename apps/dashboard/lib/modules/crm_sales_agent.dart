@@ -13,7 +13,23 @@ class _CrmSalesAgentScreenState extends State<CrmSalesAgentScreen> {
   String? cursor;
   bool busy=false,more=true;
   String? error,summary;
-  @override void initState(){super.initState();load();}
+  bool? scheduled;
+  @override void initState(){super.initState();load();loadSchedule();}
+  Future<void> loadSchedule() async {
+    try {
+      final result=await widget.store.call('getCrmSalesAgentSchedule',{});
+      if(mounted)setState(()=>scheduled=result['enabled']==true);
+    } catch (_) { /* Scheduling is optional and owner-only. */ }
+  }
+  Future<void> changeSchedule(bool value) async {
+    if(busy)return;
+    setState(()=>busy=true);
+    try {
+      await widget.store.call('configureCrmSalesAgentSchedule',{'enabled':value});
+      if(mounted)setState(()=>scheduled=value);
+    }catch(e){if(mounted)setState(()=>error=e.toString());}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
   @override void dispose(){prompt.dispose();super.dispose();}
   Future<void> load() async {
     if(busy||!more)return;
@@ -86,6 +102,11 @@ class _CrmSalesAgentScreenState extends State<CrmSalesAgentScreen> {
       const Text('Review-only AI sales assistant',style:TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
       const SizedBox(height:6),
       const Text('Pipeline signals are computed from CRM records. AI explanations are advisory. Customer outreach is never automatic.'),
+      if(scheduled!=null)SwitchListTile.adaptive(
+        title:const Text('Daily sales analysis'),
+        subtitle:const Text('8:00 AM Nairobi time · read-only · no customer outreach'),
+        value:scheduled!,onChanged:busy?null:changeSchedule,
+      ),
       const SizedBox(height:16),
       TextField(controller:prompt,maxLines:2,maxLength:1000,
         decoration:const InputDecoration(labelText:'Ask about the selected deals',border:OutlineInputBorder())),
