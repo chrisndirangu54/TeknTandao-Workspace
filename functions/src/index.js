@@ -40,6 +40,7 @@ import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} fro
 import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {crmBoardMetrics} from './crm_board_domain.js';
 import {crmAgingReport} from './crm_aging_domain.js';
+import {crmConversionReport} from './crm_conversion_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
@@ -335,6 +336,15 @@ export const getCrmLeadScores = callable(async request=>{
  const scores=rankCrmLeads(contacts.docs.map(d=>({id:d.id,...d.data()})),
   deals.docs.map(d=>({id:d.id,...d.data()})),tasks.docs.map(d=>({id:d.id,...d.data()})),new Date().toISOString());
  return {scores,model:'Rules-based signals from CRM data; not a prediction of purchase intent.'};
+});
+
+export const getCrmConversionReport = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const deals=await org.collection('crmOpportunities').limit(501).get();
+ if(deals.size>500)throw new Error('Conversion analysis requires pagination');
+ return crmConversionReport(deals.docs.map(d=>d.data()),period);
 });
 
 export const getCrmPipelineAging = callable(async request=>{
