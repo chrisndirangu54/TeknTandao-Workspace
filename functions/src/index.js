@@ -39,6 +39,7 @@ import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_g
 import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} from './crm_pipeline_domain.js';
 import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
+import {sequencePlan,sequenceEnrollment,stopSequence} from './crm_sequences_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -73,6 +74,55 @@ function callable(handler, secrets = []) {
     }
   });
 }
+
+export const createCrmSequence = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const plan=sequencePlan(request.data),id=identifier(request.data.sequenceId||randomUUID());
+ await org.collection('crmSequences').doc(id).create({...plan,createdBy:user,createdAt:stamp()});
+ return {sequenceId:id,status:'draft'};
+});
+export const activateCrmSequence = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const id=identifier(request.data.sequenceId),ref=org.collection('crmSequences').doc(id);
+ return db.runTransaction(async tx=>{
+  const snap=await tx.get(ref);
+  if(!snap.exists||snap.data().status!=='draft')throw new Error('Draft sequence required');
+  tx.update(ref,{status:'active',activatedBy:user,activatedAt:stamp()});
+  return {sequenceId:id,status:'active',automaticSending:false};
+ });
+});
+export const enrollCrmSequence = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const contactId=identifier(request.data.contactId),sequenceId=identifier(request.data.sequenceId);
+ const id=identifier(request.data.enrollmentId||randomUUID()),ref=org.collection('crmSequenceEnrollments').doc(id);
+ const [template,contact]=await Promise.all([
+  org.collection('crmSequences').doc(sequenceId).get(),org.collection('contacts').doc(contactId).get()]);
+ if(!template.exists||!contact.exists)throw new Error('Sequence or contact unavailable');
+ const enrollment=sequenceEnrollment(template.data(),contact.data(),
+  request.data.channel,request.data.consent,new Date().toISOString());
+ await ref.create({...enrollment,contactId,sequenceId,createdBy:user,createdAt:stamp()});
+ return {enrollmentId:id,status:'active',automaticSending:false};
+});
+export const stopCrmSequenceEnrollment = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const id=identifier(request.data.enrollmentId),ref=org.collection('crmSequenceEnrollments').doc(id);
+ return db.runTransaction(async tx=>{
+  const current=await tx.get(ref);
+  if(!current.exists)throw new Error('Enrollment not found');
+  const result=stopSequence(current.data(),request.data.reason);
+  tx.update(ref,{...result,stoppedBy:user,stoppedAt:stamp()});
+  return {enrollmentId:id,status:'stopped'};
+ });
+});
+export const listCrmSequences = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const [templates,enrollments]=await Promise.all([
+  org.collection('crmSequences').limit(100).get(),
+  org.collection('crmSequenceEnrollments').limit(100).get()]);
+ return {templates:templates.docs.map(d=>({id:d.id,...d.data()})),
+  enrollments:enrollments.docs.map(d=>({id:d.id,...d.data()})),
+  automaticSending:false};
+});
 
 export const createCrmOpportunity = callable(async request=>{
  const {org,user}=await authorize(request,'crm');
