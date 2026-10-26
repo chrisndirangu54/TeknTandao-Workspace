@@ -474,6 +474,33 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _adjustedTimeRegister() async {
+    if(selectedId==null)return;
+    final values=await recordForm(context,'Adjusted time register',['Period YYYY-MM']);
+    if(values==null||values[0].trim().isEmpty)return;
+    try {
+      final report=await widget.store.call('getHrAdjustedTimeRegister',{
+        'employeeId':selectedId,'period':values[0].trim(),
+      });
+      if(!mounted)return;
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text('Adjusted time · ${report['period']}'),
+        content:SizedBox(width:500,height:320,child:ListView(children:[
+          Text('Version: ${report['version']}'),
+          Text('Net time: ${report['totalNetMinutes']} minutes'),
+          Text('Approved overtime: ${report['approvedOvertimeMinutes']} minutes'),
+          Text('Applied corrections: ${(report['applied'] as List?)?.length??0}'),
+          const Divider(),
+          const Text('Read-only projection. The original locked register remains unchanged. No payroll has been posted.'),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Adjusted register unavailable: $error')));
+    }
+  }
+
   Future<void> _timeCorrections() async {
     final employeeId=selectedId;
     if(employeeId==null)return;
@@ -874,6 +901,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _adjustedTimeRegister,
+                  icon: const Icon(Icons.account_tree_outlined),
+                  label: const Text('Adjusted time register'),
+                ),
                 OutlinedButton.icon(
                   onPressed: selectedId == null ? null : _timeCorrections,
                   icon: const Icon(Icons.edit_calendar_outlined),
