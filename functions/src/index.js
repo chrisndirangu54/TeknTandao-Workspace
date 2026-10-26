@@ -43,6 +43,7 @@ import {crmAgingReport} from './crm_aging_domain.js';
 import {crmConversionReport} from './crm_conversion_domain.js';
 import {crmSalesCycleReport} from './crm_cycle_domain.js';
 import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
+import {crmCommerceSummary} from './crm_commerce_domain.js';
 import {campaignSpend,campaignEfficiency} from './crm_campaign_spend_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
@@ -189,6 +190,25 @@ export const listCrmSequences = callable(async request=>{
  return {templates:templates.docs.map(d=>({id:d.id,...d.data()})),
   enrollments:enrollments.docs.map(d=>({id:d.id,...d.data()})),
   automaticSending:false};
+});
+
+export const getCrmCommerceSummary = callable(async request=>{
+ const {org,member}=await authorize(request,'crm');
+ const [posApp,accountingApp]=await Promise.all([
+  org.collection('apps').doc('pos').get(),org.collection('apps').doc('accounting').get()]);
+ if(!canAccess(member,'pos',posApp.data())||!canAccess(member,'accounting',accountingApp.data()))
+  throw new HttpsError('permission-denied','CRM, POS and Accounting permissions required');
+ const [contacts,deals,sales,invoices]=await Promise.all([
+  org.collection('contacts').limit(501).get(),
+  org.collection('crmOpportunities').limit(501).get(),
+  org.collection('sales').limit(501).get(),
+  org.collection('invoices').limit(501).get()]);
+ if([contacts,deals,sales,invoices].some(x=>x.size>500))
+  throw new Error('Commerce summary requires pagination for large workspaces');
+ return {customers:crmCommerceSummary(
+  contacts.docs.map(d=>({id:d.id,...d.data()})),
+  deals.docs.map(d=>d.data()),sales.docs.map(d=>d.data()),invoices.docs.map(d=>d.data())),
+  note:'Snapshot only: sale and invoice records can refer to one transaction. Amounts are not additive. Paid status is not independently verified cash received.'};
 });
 
 export const createCrmCampaign = callable(async request=>{
