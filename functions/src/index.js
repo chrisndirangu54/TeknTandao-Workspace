@@ -1,3 +1,4 @@
+import {crmSalesRecommendations} from './crm_sales_agent_domain.js';
 import {initializeApp} from 'firebase-admin/app';
 import {getFirestore, Timestamp, FieldValue, FieldPath} from 'firebase-admin/firestore';
 import {getAuth} from 'firebase-admin/auth';
@@ -718,6 +719,28 @@ export const getCrmPipelineAging = callable(async request=>{
  if(deals.size>200)throw new Error('Aging report requires pagination for this workspace');
  const rows=deals.docs.map(d=>({id:d.id,...d.data()}));
  return crmAgingReport(rows,new Date().toISOString(),thresholdDays);
+});
+
+export const getCrmSalesAgentRecommendations = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const prompt=textValue(request.data?.prompt||'Review overdue follow-ups and stalled opportunities',1000);
+ const limit=request.data?.limit??25;
+ if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid recommendation limit');
+ const [opportunities,followUps]=await Promise.all([
+  org.collection('crmOpportunities').limit(501).get(),
+  org.collection('crmFollowUps').limit(501).get()]);
+ if(opportunities.size>500||followUps.size>500)
+  throw new Error('CRM Sales Agent requires paginated analysis for this workspace');
+ const result=crmSalesRecommendations(
+  opportunities.docs.map(d=>({id:d.id,...d.data()})),
+  followUps.docs.map(d=>({id:d.id,...d.data()})),new Date().toISOString(),limit);
+ const runId=randomUUID();
+ await org.collection('crmSalesAgentRuns').doc(runId).create({
+  requestedBy:user,prompt,analyzedOpportunities:result.analyzedOpportunities,
+  analyzedFollowUps:result.analyzedFollowUps,flagged:result.totalFlagged,
+  recommendationIds:result.recommendations.map(x=>x.opportunityId),
+  status:'completed',mode:'read_only',createdAt:stamp()});
+ return {...result,runId,prompt};
 });
 
 export const getCrmPipelinePage = callable(async request=>{
