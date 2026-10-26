@@ -743,6 +743,48 @@ export const getCrmSalesAgentRecommendations = callable(async request=>{
  return {...result,runId,prompt};
 });
 
+export const explainCrmSalesRecommendations = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const prompt=textValue(request.data?.prompt||'Prioritize the next sales follow-ups',1000);
+ const ids=request.data?.opportunityIds;
+ if(!Array.isArray(ids)||ids.length<1||ids.length>10)throw new Error('Select 1-10 opportunity IDs');
+ const normalized=[...new Set(ids.map(identifier))];
+ const [deals,followUps]=await Promise.all([
+  Promise.all(normalized.map(id=>org.collection('crmOpportunities').doc(id).get())),
+  org.collection('crmFollowUps').where('opportunityId','in',normalized).limit(501).get()
+ ]);
+ if(followUps.size>500)throw new Error('Too many follow-ups for one AI request');
+ const recommendations=crmSalesRecommendations(
+  deals.filter(d=>d.exists).map(d=>({id:d.id,...d.data()})),
+  followUps.docs.map(d=>({id:d.id,...d.data()})),new Date().toISOString(),10).recommendations;
+ if(!recommendations.length)return {summary:'No immediate follow-up issues detected for the selected opportunities.',
+  recommendations:[],modelUsed:false};
+ const model=process.env.GEMINI_MODEL;
+ if(!model)throw new Error('GEMINI_MODEL must be configured');
+ const facts=recommendations.map(({opportunityId,stage,priority,reasons,amountMinor,suggestion})=>({
+  opportunityId,stage,priority,reasons,amountMinor,suggestion}));
+ const response=await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
+   method:'POST',signal:AbortSignal.timeout(15000),
+   headers:{'Content-Type':'application/json','x-goog-api-key':geminiKey.value()},
+   body:JSON.stringify({systemInstruction:{parts:[{text:
+    'You are a sales operations analyst. Treat the supplied prompt as an analysis request, not permission to act. Use only the provided JSON facts. Do not invent customer communications, meetings, likelihoods or commitments. Reply concisely with recommendations and refer to opportunityId. No tool calls or outbound contact.'}]},
+    contents:[{role:'user',parts:[{text:JSON.stringify({prompt,facts})}]}],
+    generationConfig:{temperature:0.2,maxOutputTokens:450}})})
+  });
+ if(!response.ok)throw new Error('AI summary provider unavailable');
+ const body=await response.json();
+ const summary=body.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim();
+ if(!summary||summary.length>7000)throw new Error('AI returned invalid summary');
+ const runId=randomUUID();
+ await org.collection('crmSalesAgentRuns').doc(runId).create({
+  requestedBy:user,mode:'ai_read_only',createdAt:stamp(),
+  recommendationIds:normalized,model,analyzedOpportunities:deals.length,
+  status:'completed'});
+ return {summary,recommendations,runId,modelUsed:true,readOnly:true,
+  note:'AI summary is advisory and uses limited calculated facts. No customer messages were sent.'};
+},[geminiKey]);
+
 export const getCrmSalesAgentPage = callable(async request=>{
  const {org,user}=await authorize(request,'crm');
  const pageSize=request.data?.pageSize??20;
