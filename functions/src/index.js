@@ -10,7 +10,7 @@ import {transitionEncounter,transitionAssessment,assessmentScore} from './vertic
 import {requireVerticalPermission,requireRecordScope} from './vertical_permissions_domain.js';
 import {validateAppointment,validateAttendance} from './vertical_operations_domain.js';
 import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expandRequiredApps, sanitizeRecord} from './domain.js';
-import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
+import {initializePaystack, verifyPaystack, verifyTransaction, fetchPaystackRefund, initiateMpesa, queryMpesa} from './providers.js';
 import {invoiceJournal,paymentJournal} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
@@ -50,6 +50,7 @@ import {settlementDisputeDecision} from './customer_settlement_disputes_domain.j
 import {planCustomerAllocationReversal} from './customer_allocation_reversal_domain.js';
 import {customerReversalReviewState} from './customer_reversal_review_domain.js';
 import {planPostedCustomerReversal} from './customer_reversal_execution_domain.js';
+import {verifiedPaystackRefundEvidence} from './customer_paystack_refund_domain.js';
 import {verifiedCustomerPaystackSettlement} from './customer_paystack_settlement_domain.js';
 import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
 import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
@@ -244,6 +245,44 @@ export const previewCustomerAllocationReversal = callable(async request=>{
   {id:invoice.id,...invoice.data()},{id:settlement.id,...settlement.data()},
   {id:allocationSnap.id,...allocation});
 });
+
+export const verifyCustomerPaystackRefund = callable(async request=>{
+ const {org,member}=await authorize(request,'accounting');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Finance owner required');
+ const allocationId=identifier(request.data.allocationId);
+ const refundId=String(request.data.refundId??'');
+ if(!/^[0-9]{1,20}$/.test(refundId))throw new Error('Invalid refund ID');
+ const allocationRef=org.collection('customerAllocations').doc(allocationId);
+ const allocationSnap=await allocationRef.get();
+ if(!allocationSnap.exists)throw new Error('Allocation not found');
+ const settlementId=identifier(allocationSnap.data().settlementId);
+ const settlementSnap=await org.collection('customerSettlements').doc(settlementId).get();
+ if(!settlementSnap.exists)throw new Error('Settlement not found');
+ const providerResult=await fetchPaystackRefund(paystackSecret.value(),refundId);
+ const evidence=verifiedPaystackRefundEvidence(providerResult,
+  settlementSnap.data(),{id:allocationId,...allocationSnap.data()},refundId);
+ const evidenceRef=org.collection('customerProviderReversalEvidence').doc(allocationId);
+ const uniqueRef=org.collection('customerRefundVerificationIndex').doc(`paystack_${refundId}`);
+ const reviewRef=org.collection('customerReversalReviews').doc(allocationId);
+ return db.runTransaction(async tx=>{
+  const [allocation,settlement,review,existing,unique]=await Promise.all([
+   tx.get(allocationRef),tx.get(org.collection('customerSettlements').doc(settlementId)),
+   tx.get(reviewRef),tx.get(evidenceRef),tx.get(uniqueRef)]);
+  if(!allocation.exists||!settlement.exists||review.data()?.status!=='pending_provider_evidence')
+   throw new Error('Refund review is not pending');
+  verifiedPaystackRefundEvidence(providerResult,settlement.data(),
+   {id:allocationId,...allocation.data()},refundId);
+  if(unique.exists&&unique.data().allocationId!==allocationId)
+   throw new Error('Refund already linked to a different allocation');
+  if(existing.exists){
+   if(existing.data().providerRefundId!==refundId)throw new Error('Conflicting refund evidence');
+   return {status:'already_verified',allocationId};
+  }
+  tx.create(uniqueRef,{allocationId,settlementId,refundId,createdAt:stamp()});
+  tx.create(evidenceRef,{...evidence,verifiedAt:stamp()});
+  return {status:'verified',allocationId};
+ });
+},[paystackSecret]);
 
 export const postProviderVerifiedCustomerReversal = callable(async request=>{
  const {org,member}=await authorize(request,'accounting');
