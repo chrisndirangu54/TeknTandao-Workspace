@@ -28,6 +28,7 @@ import {createReview,reviewAssessment} from './hr_performance_domain.js';
 import {candidateApplication,advanceCandidate,onboardingTask} from './hr_recruitment_domain.js';
 import {validateShift,shiftConflicts,changeShiftStatus} from './hr_shifts_domain.js';
 import {reconcileShiftPunches} from './hr_shift_reconciliation_domain.js';
+import {draftTimesheet,decideTimesheet} from './hr_timesheets_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -567,6 +568,57 @@ export const getHrShiftAttendanceReconciliation = callable(async request=>{
  return {employeeId,results,
   payrollReady:false,
   note:'Observations rely on self-recorded attendance punches; not payroll-authorized hours or approved overtime.'};
+});
+
+export const submitHrTimesheet = callable(async request=>{
+ const {org,user}=await authorize(request,'hr');
+ const shiftId=identifier(request.data.shiftId),ref=org.collection('hrShifts').doc(shiftId);
+ const sheetRef=org.collection('hrTimesheets').doc(shiftId);
+ return db.runTransaction(async tx=>{
+  const shift=await tx.get(ref);
+  if(!shift.exists)throw new Error('Shift not found');
+  const employee=await tx.get(org.collection('employees').doc(identifier(shift.data().employeeId)));
+  if(!employee.exists||employee.data().portalUid!==user)
+   throw new HttpsError('permission-denied','Only the scheduled employee may submit');
+  const date=shift.data().startAt.slice(0,10);
+  const nextDate=new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+  const punches=await Promise.all([date,nextDate].map(day=>tx.get(
+   org.collection('attendancePunches').doc(user+'_'+day))));
+  const evidence=reconcileShiftPunches(shift.data(),
+   punches.filter(d=>d.exists&&d.data().employeeUid===user).map(d=>({id:d.id,...d.data()})));
+  const proposed=draftTimesheet({id:shiftId,...shift.data()},evidence,
+   request.data.unpaidBreakMinutes,request.data.reason);
+  if((await tx.get(sheetRef)).exists)throw new Error('Timesheet already submitted');
+  tx.create(sheetRef,{...proposed,submittedBy:user,submittedAt:stamp()});
+  return {timesheetId:shiftId,status:'pending',netMinutes:proposed.netMinutes};
+ });
+});
+export const decideHrTimesheet = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner review required');
+ const id=identifier(request.data.timesheetId),ref=org.collection('hrTimesheets').doc(id);
+ return db.runTransaction(async tx=>{
+  const sheet=await tx.get(ref);
+  if(!sheet.exists)throw new Error('Timesheet not found');
+  const decision=decideTimesheet(sheet.data(),request.data.status,request.data.note);
+  if(sheet.data().submittedBy===user)
+   throw new HttpsError('permission-denied','Cannot approve or reject own timesheet');
+  tx.update(ref,{...decision,decidedBy:user,decidedAt:stamp()});
+  tx.create(ref.collection('history').doc(randomUUID()),{
+   from:'pending',to:decision.status,actor:user,note:decision.decisionNote,at:stamp()});
+  return {timesheetId:id,status:decision.status,payrollPosted:false};
+ });
+});
+export const listHrTimesheets = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId);
+ const employee=await org.collection('employees').doc(employeeId).get();
+ if(!employee.exists||member.role!=='owner'&&employee.data().portalUid!==user)
+  throw new HttpsError('permission-denied','Timesheet not accessible');
+ const sheets=await org.collection('hrTimesheets').where('employeeId','==',employeeId).limit(100).get();
+ return {timesheets:sheets.docs.map(d=>({id:d.id,status:d.data().status,
+  netMinutes:d.data().netMinutes,unpaidBreakMinutes:d.data().unpaidBreakMinutes,
+  payrollPosted:false})),payrollIntegrated:false};
 });
 
 export const createHrCandidate = callable(async request=>{
