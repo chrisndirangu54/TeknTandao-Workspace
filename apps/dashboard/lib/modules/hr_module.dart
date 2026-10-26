@@ -474,6 +474,70 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _shiftPlanner() async {
+    final employeeId = selectedId;
+    if (employeeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select an employee to view shifts.')));
+      return;
+    }
+    try {
+      final data = await widget.store.call('listMyHrShifts', {'employeeId': employeeId});
+      if (!mounted) return;
+      final shifts = (data['shifts'] as List?) ?? [];
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+        title: const Text('Workforce schedule'),
+        content: SizedBox(width: 560,height: 360,child: ListView(children: [
+          const Text('Schedules are not verified attendance or payable overtime.'),
+          if (shifts.isEmpty) const Text('No shifts assigned.'),
+          for (final shift in shifts)
+            ListTile(
+              title: Text(shift['title']?.toString() ?? 'Shift'),
+              subtitle: Text('${shift['startAt']} – ${shift['endAt']} · ${shift['status']}'),
+              trailing: shift['status']=='scheduled' ? IconButton(
+                tooltip: 'Cancel shift (HR owner)',
+                icon: const Icon(Icons.event_busy_outlined),
+                onPressed: () async {
+                  try {
+                    await widget.store.call('cancelHrShift', {'shiftId': shift['id']});
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Shift cancelled. Reopen to refresh.')));
+                  } catch (error) {
+                    if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Cancellation failed: $error')));
+                  }
+                },
+              ) : null,
+            ),
+        ])),
+        actions: [
+          TextButton(onPressed: () async {
+            final values=await recordForm(dialogContext,'Assign shift',
+              ['Shift title','Start UTC YYYY-MM-DDTHH:MM:SSZ','End UTC YYYY-MM-DDTHH:MM:SSZ']);
+            if(values==null)return;
+            try {
+              await widget.store.call('scheduleHrShift',{
+                'employeeId':employeeId,'title':values[0].trim(),
+                'startAt':values[1].trim(),'endAt':values[2].trim(),
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+              if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Shift scheduled. Reopen to refresh.')));
+            } catch(error) {
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content: Text('Shift scheduling failed: $error')));
+            }
+          },child:const Text('Assign shift')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    } catch(error) {
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Schedule unavailable: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
@@ -519,6 +583,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _shiftPlanner,
+                  icon: const Icon(Icons.schedule_outlined),
+                  label: const Text('Workforce schedule'),
+                ),
                 OutlinedButton.icon(
                   onPressed: _recruitmentDashboard,
                   icon: const Icon(Icons.work_outline),
