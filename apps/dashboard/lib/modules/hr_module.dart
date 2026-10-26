@@ -474,6 +474,45 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _payrollTimeRegister() async {
+    if(selectedId==null)return;
+    final values=await recordForm(context,'HR time register',['Period YYYY-MM']);
+    if(values==null||values[0].trim().isEmpty)return;
+    final period=values[0].trim(),employeeId=selectedId!;
+    try{
+      final report=await widget.store.call('getHrPayrollTimeRegister',{'employeeId':employeeId,'period':period});
+      final lock=await widget.store.call('getHrPayrollTimeLock',{'employeeId':employeeId,'period':period});
+      if(!mounted)return;
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text('Time register · $period'),
+        content:SizedBox(width:480,height:260,child:ListView(children:[
+          Text('Net: ${report['totalNetMinutes']} minutes'),
+          Text('Approved overtime: ${report['approvedOvertimeMinutes']} minutes'),
+          Text('Locked snapshot: ${lock['locked']==true?'Yes':'No'}'),
+          const SizedBox(height:8),
+          const Text('This is an HR time record only, not payroll posting or wage authorization.'),
+        ])),
+        actions:[
+          if(lock['locked']!=true)TextButton(onPressed:() async {
+            try{
+              await widget.store.call('lockHrPayrollTimeRegister',{'employeeId':employeeId,'period':period});
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+              if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content:Text('HR time snapshot saved. Future changes must be reconciled separately.')));
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Time lock failed: $error')));
+            }
+          },child:const Text('Lock snapshot')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Register unavailable: $error')));
+    }
+  }
+
   Future<void> _overtimePanel() async {
     final employeeId = selectedId;
     if (employeeId == null) return;
@@ -763,6 +802,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _payrollTimeRegister,
+                  icon: const Icon(Icons.lock_clock_outlined),
+                  label: const Text('Payroll time register'),
+                ),
                 OutlinedButton.icon(
                   onPressed: selectedId == null ? null : _overtimePanel,
                   icon: const Icon(Icons.more_time_outlined),
