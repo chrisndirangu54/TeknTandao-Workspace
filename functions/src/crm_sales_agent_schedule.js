@@ -16,6 +16,12 @@ async function owner(request){
  if(member?.role!=='owner')throw new HttpsError('permission-denied','Workspace owner required');
  return {org,user:request.auth.uid};
 }
+export const getCrmSalesAgentSchedule=onCall({region},async request=>{
+ const {org}=await owner(request);
+ const settings=(await org.collection('crmAgentSettings').doc('daily').get()).data();
+ return {enabled:settings?.enabled===true,mode:'read_only',timeZone:'Africa/Nairobi',
+  cadence:'daily_08_00'};
+});
 export const configureCrmSalesAgentSchedule=onCall({region},async request=>{
  const {org,user}=await owner(request);
  const enabled=request.data?.enabled;
