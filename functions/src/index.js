@@ -11,7 +11,7 @@ import {requireVerticalPermission,requireRecordScope} from './vertical_permissio
 import {validateAppointment,validateAttendance} from './vertical_operations_domain.js';
 import {catalog, identifier, textValue, money, quote, canAccess, saleTotal, expandRequiredApps, sanitizeRecord} from './domain.js';
 import {initializePaystack, verifyPaystack, verifyTransaction, initiateMpesa, queryMpesa} from './providers.js';
-import {invoiceJournal} from './ledger_domain.js';
+import {invoiceJournal,paymentJournal} from './ledger_domain.js';
 import {accountingPeriod, assertOpenPeriod} from './accounting_period_domain.js';
 import {preparePosting} from './posting_policy_domain.js';
 import {buildPosSaleSnapshot,posReceipt} from './pos_receipts_domain.js';
@@ -270,12 +270,17 @@ export const allocateVerifiedCustomerSettlement = callable(async request=>{
   settlementId=identifier(request.data.settlementId),
   allocationId=identifier(request.data.allocationId);
  const amountMinor=request.data.amountMinor;
+ const postingDate=new Date().toISOString().slice(0,10);
+ const period=accountingPeriod(postingDate);
+ const journalRef=org.collection('journals').doc(`customer_payment_${allocationId}`);
+ const periodRef=org.collection('accountingPeriods').doc(period);
  const invoiceRef=org.collection('invoices').doc(invoiceId);
  const settlementRef=org.collection('customerSettlements').doc(settlementId);
  const allocationRef=org.collection('customerAllocations').doc(allocationId);
  return db.runTransaction(async tx=>{
-  const [invoice,settlement,allocation]=await Promise.all([
-   tx.get(invoiceRef),tx.get(settlementRef),tx.get(allocationRef)]);
+  const [invoice,settlement,allocation,journalExisting,periodLock]=await Promise.all([
+   tx.get(invoiceRef),tx.get(settlementRef),tx.get(allocationRef),
+   tx.get(journalRef),tx.get(periodRef)]);
   if(allocation.exists){
    const recorded=allocation.data();
    if(recorded.invoiceId!==invoiceId||recorded.settlementId!==settlementId||
@@ -283,7 +288,12 @@ export const allocateVerifiedCustomerSettlement = callable(async request=>{
    return {allocationId,status:'already_applied'};
   }
   if(!invoice.exists||!settlement.exists)throw new Error('Invoice or verified settlement not found');
+  if(journalExisting.exists)throw new Error('Allocation journal already exists without matching receipt');
   const result=customerSettlementAllocation(invoice.data(),settlement.data(),amountMinor);
+  const posting=preparePosting({postingDate,periodState:periodLock.data(),
+   sourceType:'customer_allocation',sourceId:allocationId,
+   journal:paymentJournal(amountMinor,settlement.data().provider)});
+  tx.create(journalRef,{...posting.journal,createdAt:stamp()});
   tx.create(allocationRef,{invoiceId,settlementId,amountMinor,
    verificationSource:settlement.data().verificationSource,createdBy:user,createdAt:stamp()});
   tx.update(invoiceRef,{allocatedMinor:result.invoiceAllocatedMinor,
