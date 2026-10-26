@@ -40,6 +40,7 @@ import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} fro
 import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
 import {sequencePlan,sequenceEnrollment,stopSequence} from './crm_sequences_domain.js';
+import {crmSuppression,allowedCrmContact,appendCrmSequenceStep} from './crm_suppression_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -75,6 +76,38 @@ function callable(handler, secrets = []) {
   });
 }
 
+export const suppressCrmContactChannel = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const contactId=identifier(request.data.contactId);
+ const suppression=crmSuppression(request.data);
+ const ref=org.collection('contacts').doc(contactId);
+ const statusRef=org.collection('crmSuppression').doc(contactId+'_'+suppression.channel);
+ return db.runTransaction(async tx=>{
+  const contact=await tx.get(ref);
+  if(!contact.exists)throw new Error('Contact not found');
+  tx.set(statusRef,{...suppression,contactId,updatedBy:user,updatedAt:stamp()});
+  if(suppression.channel==='all')tx.update(ref,{doNotContact:true,updatedBy:user,updatedAt:stamp()});
+  return {contactId,channel:suppression.channel,status:'suppressed'};
+ });
+});
+export const addCrmSequenceStep = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const sequenceId=identifier(request.data.sequenceId),ref=org.collection('crmSequences').doc(sequenceId);
+ return db.runTransaction(async tx=>{
+  const template=await tx.get(ref);
+  if(!template.exists)throw new Error('Sequence not found');
+  const update=appendCrmSequenceStep(template.data(),request.data.step);
+  tx.update(ref,update);
+  return {sequenceId,steps:update.steps.length,status:'draft'};
+ });
+});
+export const getCrmContactSuppression = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const contactId=identifier(request.data.contactId);
+ const records=await Promise.all(['all','email','whatsapp','call'].map(c=>org.collection('crmSuppression').doc(contactId+'_'+c).get()));
+ return {contactId,suppressions:records.filter(r=>r.exists).map(r=>r.data())};
+});
+
 export const createCrmSequence = callable(async request=>{
  const {org,user}=await authorize(request,'crm');
  const plan=sequencePlan(request.data),id=identifier(request.data.sequenceId||randomUUID());
@@ -98,6 +131,10 @@ export const enrollCrmSequence = callable(async request=>{
  const [template,contact]=await Promise.all([
   org.collection('crmSequences').doc(sequenceId).get(),org.collection('contacts').doc(contactId).get()]);
  if(!template.exists||!contact.exists)throw new Error('Sequence or contact unavailable');
+ const suppressionRecords=await Promise.all(['all',request.data.channel].map(channel=>
+  org.collection('crmSuppression').doc(contactId+'_'+channel).get()));
+ if(!allowedCrmContact(contact.data(),suppressionRecords.filter(x=>x.exists).map(x=>x.data()),request.data.channel))
+  throw new Error('Contact suppressed for this channel');
  const enrollment=sequenceEnrollment(template.data(),contact.data(),
   request.data.channel,request.data.consent,new Date().toISOString());
  await ref.create({...enrollment,contactId,sequenceId,createdBy:user,createdAt:stamp()});
