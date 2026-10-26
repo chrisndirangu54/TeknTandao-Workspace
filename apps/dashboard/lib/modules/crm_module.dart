@@ -237,6 +237,31 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> teamPerformance() async {
+    try{
+      final result=await widget.store.call('getCrmTeamPerformance',{});
+      if(!mounted)return;
+      final team=(result['team'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Sales team performance'),
+        content:SizedBox(width:620,height:420,child:ListView(children:[
+          const Text('Current opportunity snapshot; won deal value is not recognized revenue.'),
+          if(team.isEmpty)const Text('No assigned opportunities found.'),
+          for(final member in team)
+            ListTile(
+              title:Text('Sales owner ${member['ownerUid']}'),
+              subtitle:Text('Open ${member['open']} · Won ${member['won']} · Lost ${member['lost']}\nOpen value: ${member['openValueMinor']} · Won value: ${member['wonValueMinor']} (minor currency units)'),
+              trailing:Text('Win rate ${member['winRatePercent']??'N/A'}%'),
+            ),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Sales team report unavailable: $error')));
+    }
+  }
+
   Future<void> dealBoard() async {
     try {
       final data=await widget.store.call('getCrmPipeline',{});
@@ -265,6 +290,16 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
                   for(final deal in deals)
                     if(deal['stage']==column['stage'])Card(child:ListTile(
                       dense:true,title:Text(deal['title']?.toString()??'Deal'),
+                      onTap:() async {
+                        final input=await recordForm(dialogContext,'Assign sales owner',['Member user ID','Reason for assignment']);
+                        if(input==null)return;
+                        try {
+                          await widget.store.call('assignCrmDealOwner',{'opportunityId':deal['id'],'ownerUid':input[0].trim(),'reason':input[1].trim()});
+                          if(dialogContext.mounted)Navigator.pop(dialogContext);
+                        }catch(error){
+                          if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content:Text('Assignment failed: $error')));
+                        }
+                      },
                       subtitle:Text('Probability: ${deal['probability']}%'),
                       trailing:PopupMenuButton<String>(tooltip:'Move deal',
                         onSelected:(stage) async {
@@ -409,7 +444,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
