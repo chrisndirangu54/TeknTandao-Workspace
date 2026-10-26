@@ -553,7 +553,7 @@ export const postHrMonthlyAccrual = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
  if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
  const employeeId=identifier(request.data.employeeId),period=request.data.period;
- if(typeof period!=='string'||!/^\\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid accrual period');
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid accrual period');
  const year=period.slice(0,4),balanceRef=org.collection('hrLeaveBalances').doc(employeeId+'_'+year);
  const eventRef=org.collection('hrLeaveLedgerEvents').doc(employeeId+'_'+period+'_accrual');
  return db.runTransaction(async tx=>{
@@ -572,7 +572,7 @@ export const carryForwardHrAnnualLeave = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
  if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
  const employeeId=identifier(request.data.employeeId),year=String(request.data.year);
- if(!/^\\d{4}$/.test(year)||+year<2001)throw new Error('Invalid carryover year');
+ if(!/^\d{4}$/.test(year)||+year<2001)throw new Error('Invalid carryover year');
  const priorRef=org.collection('hrLeaveBalances').doc(employeeId+'_'+(+year-1));
  const nextRef=org.collection('hrLeaveBalances').doc(employeeId+'_'+year);
  const eventRef=org.collection('hrLeaveLedgerEvents').doc(employeeId+'_'+year+'_carryover');
