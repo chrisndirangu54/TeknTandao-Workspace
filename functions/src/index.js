@@ -743,6 +743,38 @@ export const getCrmSalesAgentRecommendations = callable(async request=>{
  return {...result,runId,prompt};
 });
 
+export const getCrmSalesAgentPage = callable(async request=>{
+ const {org,user}=await authorize(request,'crm');
+ const pageSize=request.data?.pageSize??20;
+ if(!Number.isInteger(pageSize)||pageSize<1||pageSize>30)throw new Error('Page size must be 1-30');
+ let query=org.collection('crmOpportunities').orderBy(FieldPath.documentId()).limit(pageSize+1);
+ if(request.data?.afterId){
+  const cursor=await org.collection('crmOpportunities').doc(identifier(request.data.afterId)).get();
+  if(!cursor.exists)throw new Error('Opportunity cursor is invalid');
+  query=query.startAfter(cursor);
+ }
+ const snapshot=await query.get(),page=snapshot.docs.slice(0,pageSize);
+ const followUps=[];
+ for(let i=0;i<page.length;i+=10){
+  const ids=page.slice(i,i+10).map(d=>d.id);
+  if(!ids.length)continue;
+  const tasks=await org.collection('crmFollowUps').where('opportunityId','in',ids).limit(501).get();
+  if(tasks.size>500)throw new Error('Follow-up page exceeds safe analysis limit');
+  followUps.push(...tasks.docs.map(d=>({id:d.id,...d.data()})));
+ }
+ const result=crmSalesRecommendations(page.map(d=>({id:d.id,...d.data()})),
+  followUps,new Date().toISOString(),request.data?.limit??25);
+ const nextCursor=snapshot.size>pageSize?page[page.length-1].id:null;
+ const runId=randomUUID();
+ await org.collection('crmSalesAgentRuns').doc(runId).create({
+  requestedBy:user,mode:'read_only_page',createdAt:stamp(),
+  analyzedOpportunities:result.analyzedOpportunities,analyzedFollowUps:result.analyzedFollowUps,
+  afterId:request.data?.afterId||null,nextCursor,recommendationIds:result.recommendations.map(x=>x.opportunityId)
+ });
+ return {...result,runId,nextCursor,hasMore:nextCursor!==null,
+  scope:'Single opportunity page. Accumulate pages before computing complete pipeline totals.'};
+});
+
 export const getCrmPipelinePage = callable(async request=>{
  const {org}=await authorize(request,'crm');
  const requested=request.data?.pageSize??50;
