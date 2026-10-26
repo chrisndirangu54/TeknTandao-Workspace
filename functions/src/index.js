@@ -40,6 +40,7 @@ import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} fro
 import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {crmBoardMetrics} from './crm_board_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
+import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
 import {sequencePlan,sequenceEnrollment,stopSequence} from './crm_sequences_domain.js';
 import {crmSuppression,allowedCrmContact,appendCrmSequenceStep} from './crm_suppression_domain.js';
@@ -203,7 +204,7 @@ export const advanceCrmOpportunity = callable(async request=>{
   if(member.role!=='owner'&&(current.data().ownerUid||current.data().createdBy)!==user)
    throw new HttpsError('permission-denied','Deal owner or sales administrator required');
   const next=crmAdvanceOpportunity(current.data(),request.data.stage,request.data.reason);
-  tx.update(ref,{...next,updatedBy:user,updatedAt:stamp()});
+  tx.update(ref,{...next,...(next.stage==='won'||next.stage==='lost'?{closedAt:new Date().toISOString()}:{}),updatedBy:user,updatedAt:stamp()});
   tx.create(ref.collection('history').doc(randomUUID()),{
    from:current.data().stage,to:next.stage,actor:user,
    reason:next.closedReason,at:stamp()});
@@ -233,6 +234,39 @@ export const getCrmTeamPerformance = callable(async request=>{
  if(deals.size>500)throw new Error('Sales reporting requires pagination');
  return {team:crmTeamPerformance(deals.docs.map(d=>d.data())),
   scope:'Current stored opportunity snapshot, not realized revenue.'};
+});
+
+export const setCrmSalesQuota = callable(async request=>{
+ const {org,user,member}=await authorize(request,'crm');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Sales administrator required');
+ const quota=salesQuota(request.data);
+ const assignee=await org.collection('members').doc(quota.ownerUid).get();
+ if(!assignee.exists)throw new Error('Sales member not found');
+ await org.collection('crmSalesQuotas').doc(quota.ownerUid+'_'+quota.period).set({...quota,updatedBy:user,updatedAt:stamp()});
+ return {ownerUid:quota.ownerUid,period:quota.period};
+});
+export const setCrmSalesTerritory = callable(async request=>{
+ const {org,user,member}=await authorize(request,'crm');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Sales administrator required');
+ const territory=salesTerritory(request.data),id=identifier(request.data.territoryId||randomUUID());
+ const assignee=await org.collection('members').doc(territory.ownerUid).get();
+ if(!assignee.exists)throw new Error('Sales member not found');
+ await org.collection('crmSalesTerritories').doc(id).set({...territory,updatedBy:user,updatedAt:stamp()});
+ return {territoryId:id};
+});
+export const getCrmQuotaDashboard = callable(async request=>{
+ const {org,member}=await authorize(request,'crm');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Sales administrator required');
+ const period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const [quotas,deals,territories]=await Promise.all([
+  org.collection('crmSalesQuotas').limit(301).get(),
+  org.collection('crmOpportunities').limit(501).get(),
+  org.collection('crmSalesTerritories').limit(301).get()]);
+ if(quotas.size>300||deals.size>500||territories.size>300)throw new Error('Report requires pagination');
+ return {period,attainment:quotaAttainment(quotas.docs.map(d=>d.data()),deals.docs.map(d=>d.data()),period),
+  territories:territories.docs.map(d=>({id:d.id,...d.data()})),
+  note:'Won-opportunity value with recorded close date; not recognized accounting revenue.'};
 });
 
 export const createCrmFollowUp = callable(async request=>{
