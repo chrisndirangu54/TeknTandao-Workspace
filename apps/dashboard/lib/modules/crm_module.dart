@@ -237,6 +237,31 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }
   }
 
+  Future<void> conversionReport() async {
+    final input=await recordForm(context,'Win / loss report',['Period YYYY-MM']);
+    if(input==null)return;
+    try{
+      final data=await widget.store.call('getCrmConversionReport',{'period':input[0].trim()});
+      if(!mounted)return;
+      final reasons=(data['lossReasons'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text('Win / loss · ${data['period']}'),
+        content:SizedBox(width:510,height:330,child:ListView(children:[
+          Text('Won: ${data['won']} · Lost: ${data['lost']}'),
+          Text('Closed-deal win rate: ${data['closedWinRatePercent']??'N/A'}%'),
+          Text('Won opportunity value (minor units): ${data['wonValueMinor']}'),
+          const SizedBox(height:10),
+          const Text('Recorded loss reasons',style:TextStyle(fontWeight:FontWeight.bold)),
+          for(final reason in reasons)ListTile(title:Text(reason['reason'].toString()),trailing:Text('${reason['count']}')),
+          const Text('This is a closed-deal snapshot, not a stage-to-stage historical conversion funnel.'),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Win/loss report unavailable: $error')));
+    }
+  }
+
   Future<void> agingReport() async {
     try {
       final report=await widget.store.call('getCrmPipelineAging',{'thresholdDays':14});
@@ -531,7 +556,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:conversionReport,icon:const Icon(Icons.analytics_outlined),label:const Text('Win/loss')),TextButton.icon(onPressed:agingReport,icon:const Icon(Icons.hourglass_bottom_outlined),label:const Text('Aging')),TextButton.icon(onPressed:quotasAndTerritories,icon:const Icon(Icons.flag_outlined),label:const Text('Quotas')),TextButton.icon(onPressed:teamPerformance,icon:const Icon(Icons.groups_outlined),label:const Text('Team')),TextButton.icon(onPressed:dealBoard,icon:const Icon(Icons.view_kanban_outlined),label:const Text('Deal board')),TextButton.icon(onPressed:salesSequences,icon:const Icon(Icons.auto_awesome_motion_outlined),label:const Text('Sequences')),TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
