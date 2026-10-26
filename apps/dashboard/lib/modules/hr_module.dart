@@ -145,6 +145,74 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _approvalInbox() async {
+    try {
+      final data = await widget.store.call('listHrLeaveApprovalInbox', {});
+      if (!mounted) return;
+      final requests = (data['requests'] as List?) ?? [];
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Pending leave approvals'),
+          content: SizedBox(
+            width: 650,
+            height: 430,
+            child: requests.isEmpty
+              ? const Center(child: Text('No leave requests currently assigned to you.'))
+              : ListView.builder(
+                  itemCount: requests.length,
+                  itemBuilder: (context, index) {
+                    final item = requests[index] as Map;
+                    return ListTile(
+                      title: Text('${item['employeeName']} · ${item['leaveType']}'),
+                      subtitle: Text('${item['department']} · ${item['startDate']} – ${item['endDate']}'),
+                      trailing: Wrap(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
+                        TextButton(
+                          onPressed: () async {
+                            try {
+                              await widget.store.call('decideHrLeave', {
+                                'requestId': item['id'], 'status': 'approved',
+                              });
+                              if (dialogContext.mounted) Navigator.pop(dialogContext);
+                              if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(content: Text('Leave approved. Balance checks were applied.')));
+                            } catch (error) {
+                              if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(content: Text('Approval failed: $error')));
+                            }
+                          }, child: const Text('Approve'),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            final details = await recordForm(dialogContext, 'Reject leave request', ['Reason']);
+                            if (details == null || details[0].trim().isEmpty) return;
+                            try {
+                              await widget.store.call('decideHrLeave', {
+                                'requestId': item['id'], 'status': 'rejected', 'reason': details[0].trim(),
+                              });
+                              if (dialogContext.mounted) Navigator.pop(dialogContext);
+                              if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(content: Text('Leave rejected with reason recorded.')));
+                            } catch (error) {
+                              if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(content: Text('Rejection failed: $error')));
+                            }
+                          }, child: const Text('Reject'),
+                        ),
+                      ]),
+                    );
+                  },
+                ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+        ),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Approval inbox unavailable: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
@@ -190,6 +258,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: _approvalInbox,
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('Approval inbox'),
+                ),
                 OutlinedButton.icon(
                   onPressed: selectedId == null ? null : _requestLeave,
                   icon: const Icon(Icons.event_available_outlined),
