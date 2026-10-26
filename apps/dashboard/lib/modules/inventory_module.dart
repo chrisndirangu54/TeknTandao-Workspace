@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
+import 'inventory_agent.dart';
 
 class InventoryModuleScreen extends StatefulWidget {
   final SuiteStore store;
@@ -358,7 +359,10 @@ class _InventoryModuleScreenState extends State<InventoryModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.inventory_2_rounded,color:Color(0xFFF59E0B)),SizedBox(width:10),Text('Inventory & Warehouses')])),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.inventory_2_rounded,color:Color(0xFFF59E0B)),SizedBox(width:10),Text('Inventory & Warehouses')]),actions:[
+      IconButton(tooltip:'Inventory Agent',icon:const Icon(Icons.auto_awesome),onPressed:()=>Navigator.of(context).push(
+        MaterialPageRoute<void>(builder:(_)=>InventoryAgentScreen(store:widget.store))))
+    ]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addProduct,icon:const Icon(Icons.add_box_rounded),label:Text(saving?'Saving…':'Add SKU')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('products'),
