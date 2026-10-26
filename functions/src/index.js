@@ -27,6 +27,7 @@ import {leaveApprovalTransition} from './hr_multilevel_approval_domain.js';
 import {createReview,reviewAssessment} from './hr_performance_domain.js';
 import {candidateApplication,advanceCandidate,onboardingTask} from './hr_recruitment_domain.js';
 import {validateShift,shiftConflicts,changeShiftStatus} from './hr_shifts_domain.js';
+import {reconcileShiftPunches} from './hr_shift_reconciliation_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -539,6 +540,33 @@ export const listMyHrShifts = callable(async request=>{
  const result=await org.collection('hrShifts').where('employeeId','==',employeeId).limit(100).get();
  return {shifts:result.docs.map(d=>({id:d.id,...d.data()})),
   note:'Scheduled shifts are not verified attendance or payable overtime.'};
+});
+
+export const getHrShiftAttendanceReconciliation = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId);
+ const employee=await org.collection('employees').doc(employeeId).get();
+ if(!employee.exists||member.role!=='owner'&&employee.data().portalUid!==user)
+  throw new HttpsError('permission-denied','Employee attendance is restricted');
+ const portalUid=employee.data().portalUid;
+ if(typeof portalUid!=='string'||!portalUid)throw new Error('Employee attendance identity not linked');
+ const shifts=await org.collection('hrShifts').where('employeeId','==',employeeId).limit(101).get();
+ if(shifts.size>100)throw new Error('Too many shifts for bounded reconciliation');
+ const results=[];
+ for(const doc of shifts.docs){
+  const shift=doc.data();
+  if(shift.status!=='scheduled')continue;
+  const date=shift.startAt.slice(0,10);
+  const nextDate=new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+  const punchIds=[portalUid+'_'+date,portalUid+'_'+nextDate];
+  const punches=await Promise.all(punchIds.map(id=>org.collection('attendancePunches').doc(id).get()));
+  results.push({shiftId:doc.id,startAt:shift.startAt,endAt:shift.endAt,
+   ...reconcileShiftPunches(shift,punches.filter(x=>x.exists&&x.data().employeeUid===portalUid)
+    .map(x=>({id:x.id,...x.data()})),{graceMinutes:5})});
+ }
+ return {employeeId,results,
+  payrollReady:false,
+  note:'Observations rely on self-recorded attendance punches; not payroll-authorized hours or approved overtime.'};
 });
 
 export const createHrCandidate = callable(async request=>{
