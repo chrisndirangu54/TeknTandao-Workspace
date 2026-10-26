@@ -213,6 +213,91 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _reviewGrowth(Map review) async {
+    final reviewId = review['id'];
+    final isManager = review['myRole'] == 'manager';
+    try {
+      final data = await widget.store.call('listHrReviewGrowth', {'reviewId': reviewId});
+      if (!mounted) return;
+      final feedback = (data['feedback'] as List?) ?? [];
+      final plans = (data['plans'] as List?) ?? [];
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+        title: const Text('Feedback & development'),
+        content: SizedBox(width: 560, height: 430, child: ListView(children: [
+          const Text('CONTINUOUS FEEDBACK', style: TextStyle(fontWeight: FontWeight.bold)),
+          if (feedback.isEmpty) const Text('No feedback recorded yet.'),
+          for (final entry in feedback)
+            ListTile(title: Text((entry as Map)['category'].toString()),
+              subtitle: Text(entry['message'].toString())),
+          const Divider(),
+          const Text('DEVELOPMENT PLANS', style: TextStyle(fontWeight: FontWeight.bold)),
+          if (plans.isEmpty) const Text('No development plans created yet.'),
+          for (final plan in plans)
+            ListTile(title: Text((plan as Map)['title'].toString()),
+              subtitle: Text('${plan['description']} · Due ${plan['dueDate']} · ${plan['status']}'),
+              trailing: isManager ? PopupMenuButton<String>(
+                tooltip: 'Update development progress',
+                onSelected: (status) async {
+                  try {
+                    await widget.store.call('advanceHrDevelopmentPlan', {
+                      'reviewId': reviewId, 'planId': plan['id'], 'status': status,
+                    });
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Development plan updated. Reopen to refresh.')));
+                  } catch (error) {
+                    if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Update failed: $error')));
+                  }
+                },
+                itemBuilder: (_) => ['in_progress', 'blocked', 'completed', 'cancelled']
+                  .map((status) => PopupMenuItem(value: status, child: Text(status))).toList(),
+              ) : null),
+        ])),
+        actions: [
+          TextButton(onPressed: () async {
+            final values = await recordForm(dialogContext, 'Continuous feedback',
+              ['Category (recognition/coaching/check_in)', 'Feedback']);
+            if (values == null) return;
+            try {
+              await widget.store.call('addHrContinuousFeedback', {
+                'reviewId': reviewId, 'category': values[0].trim().toLowerCase(),
+                'message': values[1].trim(),
+              });
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Feedback saved. Reopen to refresh.')));
+            } catch (error) {
+              if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content: Text('Feedback failed: $error')));
+            }
+          }, child: const Text('Add feedback')),
+          if (isManager) TextButton(onPressed: () async {
+            final values = await recordForm(dialogContext, 'New development plan',
+              ['Title', 'Description', 'Due date YYYY-MM-DD']);
+            if (values == null) return;
+            try {
+              await widget.store.call('createHrDevelopmentPlan', {
+                'reviewId': reviewId, 'title': values[0].trim(),
+                'description': values[1].trim(), 'dueDate': values[2].trim(),
+              });
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Development plan created. Reopen to refresh.')));
+            } catch (error) {
+              if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content: Text('Plan creation failed: $error')));
+            }
+          }, child: const Text('Add plan')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+        ],
+      ));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Growth records unavailable: $error')));
+    }
+  }
+
   Future<void> _performanceReviews() async {
     try {
       final result = await widget.store.call('listMyHrPerformanceReviews', {});
@@ -239,6 +324,13 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
                       Text('Role: $role · Status: $status'),
                       for (final goal in goals)
                         Text('• ${(goal as Map)['title']} (${goal['weight']}%)'),
+                      Align(alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () => _reviewGrowth(review),
+                          icon: const Icon(Icons.trending_up_outlined),
+                          label: const Text('Feedback & development'),
+                        ),
+                      ),
                       if (canSubmit) Align(alignment: Alignment.centerRight,
                         child: FilledButton(onPressed: () async {
                           final labels = <String>[
