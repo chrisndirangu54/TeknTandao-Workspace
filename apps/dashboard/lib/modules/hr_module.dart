@@ -474,6 +474,86 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _timesheetPanel() async {
+    final employeeId=selectedId;
+    if(employeeId==null)return;
+    try {
+      final results=await Future.wait([
+        widget.store.call('listHrTimesheets',{'employeeId':employeeId}),
+        widget.store.call('listMyHrShifts',{'employeeId':employeeId}),
+      ]);
+      if(!mounted)return;
+      final sheets=(results[0]['timesheets'] as List?)??[];
+      final shifts=(results[1]['shifts'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Timesheets & approvals'),
+        content:SizedBox(width:600,height:440,child:ListView(children:[
+          const Text('Clock records require supervisor review. No automatic payroll posting.'),
+          const Divider(),
+          const Text('TIMESHEETS',style:TextStyle(fontWeight:FontWeight.bold)),
+          if(sheets.isEmpty)const Text('No submitted timesheets.'),
+          for(final sheet in sheets)
+            ListTile(title:Text('${sheet['status']} · ${sheet['netMinutes']} net minutes'),
+              subtitle:Text('Unpaid break: ${sheet['unpaidBreakMinutes']} minutes'),
+              trailing:sheet['status']=='pending'?Wrap(mainAxisSize:MainAxisSize.min,children:[
+                TextButton(onPressed:() async {
+                  final values=await recordForm(dialogContext,'Approve timesheet',['Decision note']);
+                  if(values==null||values[0].trim().isEmpty)return;
+                  try{
+                    await widget.store.call('decideHrTimesheet',{
+                      'timesheetId':sheet['id'],'status':'approved','note':values[0].trim()});
+                    if(dialogContext.mounted)Navigator.pop(dialogContext);
+                  }catch(error){
+                    if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content:Text('Approval unavailable: $error')));
+                  }
+                },child:const Text('Approve')),
+                TextButton(onPressed:() async {
+                  final values=await recordForm(dialogContext,'Reject timesheet',['Decision note']);
+                  if(values==null||values[0].trim().isEmpty)return;
+                  try{
+                    await widget.store.call('decideHrTimesheet',{
+                      'timesheetId':sheet['id'],'status':'rejected','note':values[0].trim()});
+                    if(dialogContext.mounted)Navigator.pop(dialogContext);
+                  }catch(error){
+                    if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content:Text('Rejection unavailable: $error')));
+                  }
+                },child:const Text('Reject')),
+              ]):null,
+            ),
+          const Divider(),
+          const Text('SCHEDULED SHIFTS',style:TextStyle(fontWeight:FontWeight.bold)),
+          for(final shift in shifts)
+            if(shift['status']=='scheduled')
+              ListTile(title:Text(shift['title']?.toString()??'Shift'),
+                subtitle:Text('${shift['startAt']} – ${shift['endAt']}'),
+                trailing:TextButton(onPressed:() async {
+                  final values=await recordForm(dialogContext,'Submit timesheet',
+                    ['Unpaid break minutes','Explanation of clock records']);
+                  if(values==null)return;
+                  try{
+                    await widget.store.call('submitHrTimesheet',{
+                      'shiftId':shift['id'],
+                      'unpaidBreakMinutes':int.parse(values[0].trim()),
+                      'reason':values[1].trim(),
+                    });
+                    if(dialogContext.mounted)Navigator.pop(dialogContext);
+                  }catch(error){
+                    if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content:Text('Submission failed: $error')));
+                  }
+                },child:const Text('Submit')),
+              ),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Timesheets unavailable: $error')));
+    }
+  }
+
   Future<void> _attendanceReconciliation() async {
     final employeeId=selectedId;
     if(employeeId==null)return;
@@ -609,6 +689,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _timesheetPanel,
+                  icon: const Icon(Icons.assignment_turned_in_outlined),
+                  label: const Text('Timesheets'),
+                ),
                 OutlinedButton.icon(
                   onPressed: selectedId == null ? null : _attendanceReconciliation,
                   icon: const Icon(Icons.rule_outlined),
