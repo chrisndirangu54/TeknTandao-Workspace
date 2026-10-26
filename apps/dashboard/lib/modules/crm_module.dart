@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
 import 'crm_deal_board.dart';
+import 'crm_sales_agent.dart';
 
 class CrmModuleScreen extends StatefulWidget {
   final SuiteStore store;
@@ -666,6 +667,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
         onSelected:(selected){
           switch(selected){
             case 'pipeline':pipeline();break;
+            case 'sales_agent':Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>CrmSalesAgentScreen(store:widget.store)));break;
             case 'lead':leadScores();break;
             case 'sequences':salesSequences();break;
             case 'team':teamPerformance();break;
@@ -681,6 +683,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
         },
         itemBuilder:(_)=>const [
           PopupMenuItem(value:'pipeline',child:Text('Sales pipeline')),
+          PopupMenuItem(value:'sales_agent',child:Text('AI Sales Agent')),
           PopupMenuItem(value:'lead',child:Text('Lead scoring')),
           PopupMenuItem(value:'sequences',child:Text('Outreach sequences')),
           PopupMenuItem(value:'team',child:Text('Sales team')),
