@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,6 +31,8 @@ jobs:
         run: find functions/src functions/test -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
       - run: npm test
       - run: npm run test:rules
+      - name: Verify concurrent financial transactions in Firestore emulator
+        run: npx firebase emulators:exec --project demo-tandao --only firestore "node --test functions/test/customer_settlement_emulator.test.js"
 
   flutter:
     runs-on: ubuntu-latest
