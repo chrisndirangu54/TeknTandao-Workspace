@@ -26,6 +26,7 @@ import {authorizeLeaveApprover,validateLeaveManagerAssignment} from './hr_approv
 import {leaveApprovalTransition} from './hr_multilevel_approval_domain.js';
 import {createReview,reviewAssessment} from './hr_performance_domain.js';
 import {candidateApplication,advanceCandidate,onboardingTask} from './hr_recruitment_domain.js';
+import {validateShift,shiftConflicts,changeShiftStatus} from './hr_shifts_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -494,6 +495,50 @@ export const closePosTill = callable(async request=>{
   tx.update(till,{status:'closed',closedAt:stamp(),closedBy:user,reconciliation});
   return {tillId,...reconciliation,replayed:false};
  });
+});
+
+export const scheduleHrShift = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const shift=validateShift(request.data),id=identifier(request.data.shiftId||randomUUID());
+ const employeeRef=org.collection('employees').doc(shift.employeeId);
+ const ref=org.collection('hrShifts').doc(id);
+ return db.runTransaction(async tx=>{
+  const [employee,existing,shifts,leaves]=await Promise.all([
+   tx.get(employeeRef),tx.get(ref),
+   tx.get(org.collection('hrShifts').where('employeeId','==',shift.employeeId).limit(501)),
+   tx.get(org.collection('hrLeaveRequests').where('employeeId','==',shift.employeeId).limit(501))
+  ]);
+  if(!employee.exists)throw new Error('Employee not found');
+  if(existing.exists)throw new Error('Shift ID already exists');
+  if(shifts.size>500||leaves.size>500)throw new Error('Employee schedule history exceeds safe conflict scan');
+  shiftConflicts(shift,shifts.docs.map(d=>d.data()),leaves.docs.map(d=>d.data()));
+  tx.update(employeeRef,{shiftRevision:FieldValue.increment(1)});
+  tx.create(ref,{...shift,createdBy:user,createdAt:stamp()});
+  return {shiftId:id,status:'scheduled'};
+ });
+});
+export const cancelHrShift = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const id=identifier(request.data.shiftId),ref=org.collection('hrShifts').doc(id);
+ return db.runTransaction(async tx=>{
+  const shift=await tx.get(ref);
+  if(!shift.exists)throw new Error('Shift unavailable');
+  const updated=changeShiftStatus(shift.data(),'cancelled');
+  tx.update(ref,{...updated,cancelledBy:user,cancelledAt:stamp()});
+  return {shiftId:id,status:'cancelled'};
+ });
+});
+export const listMyHrShifts = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId);
+ const employee=await org.collection('employees').doc(employeeId).get();
+ if(!employee.exists||member.role!=='owner'&&employee.data().portalUid!==user)
+  throw new HttpsError('permission-denied','Employee schedule not available');
+ const result=await org.collection('hrShifts').where('employeeId','==',employeeId).limit(100).get();
+ return {shifts:result.docs.map(d=>({id:d.id,...d.data()})),
+  note:'Scheduled shifts are not verified attendance or payable overtime.'};
 });
 
 export const createHrCandidate = callable(async request=>{
