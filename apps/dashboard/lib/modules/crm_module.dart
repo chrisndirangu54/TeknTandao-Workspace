@@ -27,9 +27,118 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> pipeline() async {
+    try {
+      final report=await widget.store.call('getCrmPipeline',{});
+      if(!mounted)return;
+      final deals=(report['opportunities'] as List?)??[];
+      final tasks=(report['followUps'] as List?)??[];
+      final summary=(report['summary'] as Map?)??{};
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Sales pipeline & follow-ups'),
+        content:SizedBox(width:700,height:520,child:ListView(children:[
+          const Text('Forecast values are estimates, not confirmed sales.'),
+          if(report['truncated']==true)const Text('Only the first 200 opportunities and 200 follow-ups are shown.'),
+          Wrap(spacing:10,children:[
+            for(final entry in summary.entries)
+              Chip(label:Text('${entry.key}: ${entry.value['count']} deals')),
+          ]),
+          const Divider(),
+          const Text('OPPORTUNITIES',style:TextStyle(fontWeight:FontWeight.bold)),
+          if(deals.isEmpty)const Text('No opportunities recorded.'),
+          for(final deal in deals)ListTile(
+            title:Text(deal['title']?.toString()??'Opportunity'),
+            subtitle:Text('Stage: ${deal['stage']} · Amount (minor units): ${deal['amountMinor']} · Probability: ${deal['probability']}%'),
+            trailing:PopupMenuButton<String>(
+              tooltip:'Advance deal',
+              onSelected:(stage) async {
+                String reason='';
+                if(stage=='lost'){
+                  final input=await recordForm(dialogContext,'Lost opportunity',['Loss reason']);
+                  if(input==null||input[0].trim().isEmpty)return;
+                  reason=input[0].trim();
+                }
+                try {
+                  await widget.store.call('advanceCrmOpportunity',{
+                    'opportunityId':deal['id'],'stage':stage,'reason':reason,
+                  });
+                  if(dialogContext.mounted)Navigator.pop(dialogContext);
+                }catch(error){
+                  if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content:Text('Stage update failed: $error')));
+                }
+              },
+              itemBuilder:(_)=>['discovery','proposal','negotiation','won','lost']
+                .map((v)=>PopupMenuItem(value:v,child:Text(v))).toList(),
+            ),
+          ),
+          const Divider(),
+          const Text('FOLLOW-UPS',style:TextStyle(fontWeight:FontWeight.bold)),
+          if(tasks.isEmpty)const Text('No follow-ups scheduled.'),
+          for(final task in tasks)ListTile(
+            title:Text(task['title']?.toString()??'Follow-up'),
+            subtitle:Text('Due: ${task['dueAt']} · ${task['status']}'),
+            trailing:task['status']=='open'?TextButton(onPressed:() async {
+              try {
+                await widget.store.call('completeCrmFollowUp',{'followUpId':task['id']});
+                if(dialogContext.mounted)Navigator.pop(dialogContext);
+              }catch(error){
+                if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  SnackBar(content:Text('Completion failed: $error')));
+              }
+            },child:const Text('Complete')):null,
+          ),
+        ])),
+        actions:[
+          TextButton(onPressed:() async {
+            final input=await recordForm(dialogContext,'New opportunity',
+              ['Title','Contact record ID','Amount in KES','Expected close YYYY-MM-DD','Probability 0–100']);
+            if(input==null)return;
+            final amount=double.tryParse(input[2].trim()),probability=int.tryParse(input[4].trim());
+            if(amount==null||!amount.isFinite||probability==null){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(content:Text('Enter a valid amount and probability.')));
+              return;
+            }
+            try{
+              await widget.store.call('createCrmOpportunity',{
+                'title':input[0].trim(),'contactId':input[1].trim(),
+                'amountMinor':(amount*100).round(),
+                'expectedCloseDate':input[3].trim(),'probability':probability,
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Opportunity creation failed: $error')));
+            }
+          },child:const Text('Add opportunity')),
+          TextButton(onPressed:() async {
+            final input=await recordForm(dialogContext,'Schedule follow-up',
+              ['Opportunity ID','Follow-up title','Assigned user ID','Due at UTC YYYY-MM-DDTHH:MM:SSZ']);
+            if(input==null)return;
+            try{
+              await widget.store.call('createCrmFollowUp',{
+                'opportunityId':input[0].trim(),'title':input[1].trim(),
+                'ownerUid':input[2].trim(),'dueAt':input[3].trim(),
+              });
+              if(dialogContext.mounted)Navigator.pop(dialogContext);
+            }catch(error){
+              if(dialogContext.mounted)ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content:Text('Follow-up creation failed: $error')));
+            }
+          },child:const Text('Add follow-up')),
+          TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close')),
+        ],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Sales pipeline unavailable: $error')));
+    }
+  }
+
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')])),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
