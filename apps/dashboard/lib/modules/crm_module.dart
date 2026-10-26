@@ -27,6 +27,34 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
     }finally{if(mounted)setState(()=>saving=false);}
   }
 
+  Future<void> leadScores() async {
+    try {
+      final result=await widget.store.call('getCrmLeadScores',{});
+      if(!mounted)return;
+      final scores=(result['scores'] as List?)??[];
+      await showDialog<void>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:const Text('Lead prioritization'),
+        content:SizedBox(width:560,height:460,child:ListView(children:[
+          const Text('Explainable rule-based signals, not purchase predictions.'),
+          if(scores.isEmpty)const Text('No CRM contacts found.'),
+          for(final lead in scores)ExpansionTile(
+            title:Text('Contact ${lead['contactId']} · ${lead['score']}/100'),
+            subtitle:Text('Priority: ${lead['band']}'),
+            children:[
+              for(final reason in (lead['reasons'] as List? ?? []))
+                ListTile(dense:true,title:Text(reason['reason'].toString()),
+                  trailing:Text('${reason['points']} pts')),
+            ],
+          ),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Close'))],
+      ));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Lead scoring unavailable: $error')));
+    }
+  }
+
   Future<void> pipeline() async {
     try {
       final report=await widget.store.call('getCrmPipeline',{});
@@ -138,7 +166,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
 
   @override Widget build(BuildContext context)=>Scaffold(
     backgroundColor:const Color(0xFFF5F7FB),
-    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
+    appBar:AppBar(title:const Row(children:[Icon(Icons.people_alt_rounded,color:Color(0xFF2563EB)),SizedBox(width:10),Text('Sales & CRM')]),actions:[TextButton.icon(onPressed:leadScores,icon:const Icon(Icons.insights_outlined),label:const Text('Lead scores')),TextButton.icon(onPressed:pipeline,icon:const Icon(Icons.account_tree_outlined),label:const Text('Pipeline'))]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
