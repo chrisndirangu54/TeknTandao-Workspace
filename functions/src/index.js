@@ -785,6 +785,25 @@ export const explainCrmSalesRecommendations = callable(async request=>{
   note:'AI summary is advisory and uses limited calculated facts. No customer messages were sent.'};
 },[geminiKey]);
 
+export const getCrmSalesAgentFollowUpsPage = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const opportunityId=identifier(request.data?.opportunityId);
+ const size=request.data?.pageSize??50;
+ if(!Number.isInteger(size)||size<1||size>100)throw new Error('Invalid page size');
+ const ref=org.collection('crmOpportunities').doc(opportunityId);
+ if(!(await ref.get()).exists)throw new HttpsError('not-found','Opportunity not found');
+ let query=org.collection('crmFollowUps').where('opportunityId','==',opportunityId)
+  .orderBy(FieldPath.documentId()).limit(size+1);
+ if(request.data?.afterId){
+  const after=await org.collection('crmFollowUps').doc(identifier(request.data.afterId)).get();
+  if(!after.exists||after.data().opportunityId!==opportunityId)throw new Error('Invalid follow-up cursor');
+  query=query.startAfter(after);
+ }
+ const snapshot=await query.get(),docs=snapshot.docs.slice(0,size);
+ return {opportunityId,followUps:docs.map(d=>({id:d.id,...d.data()})),
+  hasMore:snapshot.size>size,nextCursor:snapshot.size>size?docs[docs.length-1].id:null};
+});
+
 export const getCrmSalesAgentPage = callable(async request=>{
  const {org,user}=await authorize(request,'crm');
  const pageSize=request.data?.pageSize??20;
