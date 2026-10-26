@@ -50,6 +50,7 @@ import {settlementDisputeDecision} from './customer_settlement_disputes_domain.j
 import {planCustomerAllocationReversal} from './customer_allocation_reversal_domain.js';
 import {customerReversalReviewState} from './customer_reversal_review_domain.js';
 import {planPostedCustomerReversal} from './customer_reversal_execution_domain.js';
+import {auditCustomerFinancialConsistency} from './customer_financial_audit_domain.js';
 import {verifiedPaystackRefundEvidence} from './customer_paystack_refund_domain.js';
 import {verifiedCustomerPaystackSettlement} from './customer_paystack_settlement_domain.js';
 import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
@@ -421,6 +422,18 @@ export const allocateVerifiedCustomerSettlement = callable(async request=>{
   return {allocationId,status:'applied',invoiceOutstandingMinor:result.invoiceOutstandingMinor,
    settlementAvailableMinor:result.settlementAvailableMinor};
  });
+});
+
+export const auditCustomerFinancialIntegrity = callable(async request=>{
+ const {org,member}=await authorize(request,'accounting');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace finance owner required');
+ const names=['invoices','customerSettlements','customerAllocations','journals'];
+ const snapshots=await Promise.all(names.map(n=>org.collection(n).limit(501).get()));
+ if(snapshots.some(x=>x.size>500))
+  throw new Error('Financial integrity audit requires pagination beyond 500 records');
+ const rows=snapshots.map(x=>x.docs.map(d=>({id:d.id,...d.data()})));
+ return auditCustomerFinancialConsistency({
+  invoices:rows[0],settlements:rows[1],allocations:rows[2],journals:rows[3]});
 });
 
 export const getCrmInvoiceReconciliation = callable(async request=>{
