@@ -33,6 +33,7 @@ import {proposeOvertime,decideOvertime} from './hr_overtime_domain.js';
 import {payrollTimeRegister} from './hr_payroll_time_domain.js';
 import {payrollTimeSnapshot} from './hr_time_lock_domain.js';
 import {proposeHrTimeCorrection,decideHrTimeCorrection} from './hr_time_corrections_domain.js';
+import {adjustedTimeRegister} from './hr_adjusted_time_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
@@ -770,6 +771,25 @@ export const listHrTimeCorrections = callable(async request=>{
    timesheetId:d.data().timesheetId,status:d.data().status,
    regularMinutes:d.data().regularMinutes,approvedOvertimeMinutes:d.data().approvedOvertimeMinutes,
    reason:d.data().reason})),appliedToPayroll:false};
+});
+
+export const getHrAdjustedTimeRegister = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ const employeeId=identifier(request.data.employeeId),period=request.data.period;
+ if(typeof period!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw new Error('Invalid period');
+ const employee=await org.collection('employees').doc(employeeId).get();
+ if(!employee.exists||member.role!=='owner'&&employee.data().portalUid!==user)
+  throw new HttpsError('permission-denied','HR time register restricted');
+ const [lock,history]=await Promise.all([
+  org.collection('hrPayrollTimeLocks').doc(employeeId+'_'+period).get(),
+  org.collection('hrTimeCorrections').where('employeeId','==',employeeId).limit(501).get()]);
+ if(!lock.exists)throw new Error('Original time period must be locked');
+ if(history.size>500)throw new Error('Correction history exceeds safe reporting bounds');
+ const corrections=history.docs.filter(doc=>doc.data().period===period)
+  .map(doc=>({id:doc.id,...doc.data()}));
+ const report=adjustedTimeRegister(lock.data(),corrections);
+ return {employeeId,...report,
+  note:'Read-only HR adjustment projection. Original snapshot unchanged; no wage calculation or payroll posting.'};
 });
 
 export const listHrOvertime = callable(async request=>{
