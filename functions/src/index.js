@@ -46,6 +46,7 @@ import {crmCampaign,crmAttribution} from './crm_campaign_domain.js';
 import {crmCommerceSummary} from './crm_commerce_domain.js';
 import {crmInvoiceReconciliation} from './crm_invoice_reconciliation_domain.js';
 import {customerSettlementAllocation} from './customer_settlement_transaction_domain.js';
+import {verifiedCustomerPaystackSettlement} from './customer_paystack_settlement_domain.js';
 import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
 import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
 import {campaignSpend,campaignEfficiency} from './crm_campaign_spend_domain.js';
@@ -195,6 +196,34 @@ export const listCrmSequences = callable(async request=>{
   enrollments:enrollments.docs.map(d=>({id:d.id,...d.data()})),
   automaticSending:false};
 });
+
+export const startCustomerInvoicePaystackPayment = callable(async request=>{
+ const {org,member}=await authorize(request,'accounting');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace finance owner required');
+ const invoiceId=identifier(request.data.invoiceId);
+ const email=textValue(request.data.customerEmail,254);
+ const invoiceSnap=await org.collection('invoices').doc(invoiceId).get();
+ if(!invoiceSnap.exists)throw new HttpsError('not-found','Invoice missing');
+ const invoice=invoiceSnap.data();
+ const amountMinor=request.data.amountMinor;
+ const outstanding=invoice.total-(invoice.allocatedMinor??0);
+ if(invoice.currency!=='KES'||!Number.isSafeInteger(outstanding)||outstanding<=0||
+ !Number.isSafeInteger(amountMinor)||amountMinor<=0||amountMinor>outstanding)
+ throw new Error('Invalid invoice amount');
+ const reference=randomUUID();
+ const paymentRef=org.collection('customerPaymentIntents').doc(reference);
+ await paymentRef.create({invoiceId,contactId:invoice.contactId,provider:'paystack',
+  currency:'KES',amountMinor,state:'initializing',createdAt:stamp()});
+ await db.doc(`customerInvoicePaymentReferences/${reference}`).create({orgId:org.id});
+ try{
+  const initialized=await initializePaystack({secret:paystackSecret.value(),email,amount:amountMinor,reference});
+  await paymentRef.update({state:'pending',authorizationUrl:initialized.authorization_url});
+  return {reference,url:initialized.authorization_url};
+ }catch(error){
+  await paymentRef.update({state:'initialization_failed'});
+  throw error;
+ }
+},[paystackSecret]);
 
 export const allocateVerifiedCustomerSettlement = callable(async request=>{
  const {org,user,member}=await authorize(request,'accounting');
@@ -2084,6 +2113,22 @@ export const paystackWebhook = onRequest({region, secrets: [paystackSecret]}, as
     const reference = identifier(req.body.data.reference);
     const mapping = (await db.doc(`paymentReferences/${reference}`).get()).data();
     if (!mapping) {
+      const customerMapping=(await db.doc(`customerInvoicePaymentReferences/${reference}`).get()).data();
+      if(customerMapping){
+       const verified=await verifyTransaction(paystackSecret.value(),reference);
+       const org=root(customerMapping.orgId),intentRef=org.collection('customerPaymentIntents').doc(reference);
+       const settlementRef=org.collection('customerSettlements').doc(reference);
+       await db.runTransaction(async tx=>{
+        const [intent,settlement]=await Promise.all([tx.get(intentRef),tx.get(settlementRef)]);
+        if(settlement.exists)return;
+        if(!intent.exists)throw new Error('Payment intent missing');
+        const evidence=verifiedCustomerPaystackSettlement(intent.data(),verified,reference);
+        tx.create(settlementRef,{...evidence,allocatedMinor:0,availableMinor:evidence.amountMinor,
+         verifiedAt:stamp()});
+        tx.update(intentRef,{state:'verified',verifiedAt:stamp()});
+       });
+       res.sendStatus(200);return;
+      }
       if ((await db.doc(`resellerPaymentReferences/${reference}`).get()).exists) {
         const {settleResellerPayment} = await import('./reseller.js');
         await settleResellerPayment(reference, await verifyTransaction(paystackSecret.value(), reference));
