@@ -21,6 +21,7 @@ import {maintenanceTicket,transitionMaintenance} from './property_maintenance_do
 import {leaveRequest,overlappingLeave,leaveDecision} from './hr_leave_domain.js';
 import {validateLeavePolicy,chargeableLeaveDays,availableAnnualLeave} from './hr_leave_policy_domain.js';
 import {leaveYear,consumeLeave,validateLeaveLedger} from './hr_leave_ledger_domain.js';
+import {authorizeLeaveApprover,validateLeaveManagerAssignment} from './hr_approvals_domain.js';
 import {validateLease,leaseOverlaps,rentCharge,renewLease,terminateLease} from './property_leases_domain.js';
 import {propertyTenantStatement} from './property_statements_domain.js';
 import {availableRentAllocation} from './property_payments_domain.js';
@@ -551,13 +552,26 @@ export const getHrAnnualLeaveBalance = callable(async request=>{
  return {employeeId,year,configured:true,grantedDays:balance.data().grantedDays,
   usedDays:balance.data().usedDays,remainingDays:validateLeaveLedger(balance.data())};
 });
+export const assignHrLeaveManager = callable(async request=>{
+ const {org,user,member}=await authorize(request,'hr');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','HR owner required');
+ const config=validateLeaveManagerAssignment(request.data);
+ const target=await org.collection('members').doc(config.managerUid).get();
+ if(!target.exists)throw new Error('Manager must be an organization member');
+ await org.collection('hrLeaveManagers').doc(config.managerUid).set({...config,assignedBy:user,updatedAt:stamp()});
+ return {managerUid:config.managerUid,active:config.active,departments:config.departments};
+});
 export const decideHrLeave = callable(async request=>{
  const {org,user,member}=await authorize(request,'hr');
- if(member.role!=='owner')throw new HttpsError('permission-denied','HR approval requires owner');
  const id=identifier(request.data.requestId),ref=org.collection('hrLeaveRequests').doc(id);
  return db.runTransaction(async tx=>{
   const previous=await tx.get(ref);
   if(!previous.exists)throw new Error('Leave request unavailable');
+  const employeeRef=org.collection('employees').doc(identifier(previous.data().employeeId));
+  const [employee,assignment]=await Promise.all([tx.get(employeeRef),tx.get(org.collection('hrLeaveManagers').doc(user))]);
+  if(!employee.exists)throw new Error('Employee unavailable');
+  try{authorizeLeaveApprover({member,assignment:assignment.data(),employee:employee.data(),approverUid:user});}
+  catch{throw new HttpsError('permission-denied','Not authorized to approve this employee leave');}
   const decision=leaveDecision(previous.data(),request.data.status,request.data.reason);
   let policyDays=null;
   if(decision.status==='approved'&&previous.data().leaveType==='annual'){
