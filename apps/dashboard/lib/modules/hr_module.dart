@@ -474,6 +474,80 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
     }
   }
 
+  Future<void> _overtimePanel() async {
+    final employeeId = selectedId;
+    if (employeeId == null) return;
+    try {
+      final result = await widget.store.call('listHrOvertime', {'employeeId': employeeId});
+      if (!mounted) return;
+      final requests = (result['requests'] as List?) ?? [];
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+        title: const Text('Overtime requests'),
+        content: SizedBox(width: 570, height: 370, child: ListView(children: [
+          const Text('Approved overtime is not automatically payable or posted to payroll.'),
+          if (requests.isEmpty) const Text('No overtime requests yet.'),
+          for (final request in requests)
+            ListTile(
+              title: Text('${request['minutes']} minutes · ${request['status']}'),
+              subtitle: Text(request['reason']?.toString() ?? ''),
+              trailing: request['status'] == 'pending'
+                ? PopupMenuButton<String>(
+                    tooltip: 'HR overtime decision',
+                    onSelected: (status) async {
+                      final note = await recordForm(dialogContext, 'Overtime decision', ['Decision note']);
+                      if (note == null || note[0].trim().isEmpty) return;
+                      try {
+                        await widget.store.call('decideHrOvertime', {
+                          'overtimeId': request['id'], 'status': status, 'note': note[0].trim(),
+                        });
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Decision recorded. Reopen to refresh.')));
+                      } catch (error) {
+                        if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          SnackBar(content: Text('Decision failed: $error')));
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'approved', child: Text('Approve')),
+                      PopupMenuItem(value: 'rejected', child: Text('Reject')),
+                    ],
+                  )
+                : null,
+            ),
+        ])),
+        actions: [
+          TextButton(onPressed: () async {
+            final values = await recordForm(dialogContext, 'Request overtime',
+              ['Approved timesheet / shift ID', 'Overtime minutes', 'Reason']);
+            if (values == null) return;
+            final minutes = int.tryParse(values[1].trim());
+            if (minutes == null) {
+              if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(content: Text('Overtime minutes must be a whole number.')));
+              return;
+            }
+            try {
+              await widget.store.call('requestHrOvertime', {
+                'timesheetId': values[0].trim(), 'minutes': minutes, 'reason': values[2].trim(),
+              });
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Overtime request submitted.')));
+            } catch (error) {
+              if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content: Text('Overtime request failed: $error')));
+            }
+          }, child: const Text('Request overtime')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+        ],
+      ));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Overtime unavailable: $error')));
+    }
+  }
+
   Future<void> _timesheetPanel() async {
     final employeeId=selectedId;
     if(employeeId==null)return;
@@ -689,6 +763,11 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: selectedId == null ? null : _overtimePanel,
+                  icon: const Icon(Icons.more_time_outlined),
+                  label: const Text('Overtime'),
+                ),
                 OutlinedButton.icon(
                   onPressed: selectedId == null ? null : _timesheetPanel,
                   icon: const Icon(Icons.assignment_turned_in_outlined),
