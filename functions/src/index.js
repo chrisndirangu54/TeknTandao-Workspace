@@ -49,6 +49,7 @@ import {customerSettlementAllocation} from './customer_settlement_transaction_do
 import {settlementDisputeDecision} from './customer_settlement_disputes_domain.js';
 import {planCustomerAllocationReversal} from './customer_allocation_reversal_domain.js';
 import {customerReversalReviewState} from './customer_reversal_review_domain.js';
+import {planPostedCustomerReversal} from './customer_reversal_execution_domain.js';
 import {verifiedCustomerPaystackSettlement} from './customer_paystack_settlement_domain.js';
 import {saleInvoicePostingDecision} from './sale_invoice_posting_decision.js';
 import {crmPageResult,validateCrmPageSize} from './crm_pagination_domain.js';
@@ -242,6 +243,54 @@ export const previewCustomerAllocationReversal = callable(async request=>{
  return planCustomerAllocationReversal(
   {id:invoice.id,...invoice.data()},{id:settlement.id,...settlement.data()},
   {id:allocationSnap.id,...allocation});
+});
+
+export const postProviderVerifiedCustomerReversal = callable(async request=>{
+ const {org,member}=await authorize(request,'accounting');
+ if(member.role!=='owner')throw new HttpsError('permission-denied','Workspace finance owner required');
+ const allocationId=identifier(request.data.allocationId);
+ const allocationRef=org.collection('customerAllocations').doc(allocationId);
+ const reviewRef=org.collection('customerReversalReviews').doc(allocationId);
+ const evidenceRef=org.collection('customerProviderReversalEvidence').doc(allocationId);
+ const journalRef=org.collection('journals').doc(`customer_reversal_${allocationId}`);
+ const postingDate=new Date().toISOString().slice(0,10),period=accountingPeriod(postingDate);
+ return db.runTransaction(async tx=>{
+  const [allocation,review,evidence,existingJournal,periodLock]=await Promise.all([
+   tx.get(allocationRef),tx.get(reviewRef),tx.get(evidenceRef),tx.get(journalRef),
+   tx.get(org.collection('accountingPeriods').doc(period))]);
+  if(allocation.exists&&allocation.data().reversalStatus==='reversed'){
+   if(!existingJournal.exists)throw new Error('Reversal receipt exists without journal');
+   return {status:'already_reversed',allocationId};
+  }
+  if(!allocation.exists||!review.exists||!evidence.exists)
+   throw new Error('Allocation, review and trusted provider evidence required');
+  if(existingJournal.exists)throw new Error('Reversal journal conflicts with pending review');
+  const invoiceRef=org.collection('invoices').doc(identifier(allocation.data().invoiceId));
+  const settlementRef=org.collection('customerSettlements').doc(identifier(allocation.data().settlementId));
+  const originalJournalRef=org.collection('journals').doc(`customer_payment_${allocationId}`);
+  const [invoice,settlement,originalJournal]=await Promise.all([
+   tx.get(invoiceRef),tx.get(settlementRef),tx.get(originalJournalRef)]);
+  if(!invoice.exists||!settlement.exists||!originalJournal.exists)
+   throw new Error('Related invoice, settlement or original journal missing');
+  const decision=planPostedCustomerReversal({
+   invoice:{id:invoice.id,...invoice.data()},
+   settlement:{id:settlement.id,...settlement.data()},
+   allocation:{id:allocation.id,...allocation.data()},
+   review:review.data(),evidence:evidence.data()});
+  const posting=preparePosting({postingDate,periodState:periodLock.data(),
+   sourceType:'customer_reversal',sourceId:allocationId,journal:decision.journal});
+  tx.create(journalRef,{...posting.journal,originalJournalId:originalJournal.id,
+   evidenceId:evidence.id,createdAt:stamp()});
+  tx.update(allocationRef,{reversalStatus:'reversed',reversedAt:stamp(),
+   reversalJournalId:journalRef.id});
+  tx.update(invoiceRef,{allocatedMinor:decision.invoiceAllocatedMinor,
+   outstandingMinor:decision.projectedInvoiceOutstandingMinor,
+   paymentState:decision.invoiceAllocatedMinor===0?'unpaid':'partial',updatedAt:stamp()});
+  tx.update(settlementRef,{allocatedMinor:decision.settlementAllocatedMinor,
+   availableMinor:0,disputeState:'reversed',updatedAt:stamp()});
+  tx.update(reviewRef,{status:'posted',postedAt:stamp(),journalId:journalRef.id});
+  return {status:'posted',allocationId,journalId:journalRef.id};
+ });
 });
 
 export const requestCustomerAllocationReversalReview = callable(async request=>{
