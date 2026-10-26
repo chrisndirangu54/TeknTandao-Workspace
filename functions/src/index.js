@@ -39,6 +39,7 @@ import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_g
 import {crmOpportunity,crmAdvanceOpportunity,crmFollowUp,crmPipelineSummary} from './crm_pipeline_domain.js';
 import {rankCrmLeads} from './crm_lead_scoring_domain.js';
 import {crmBoardMetrics} from './crm_board_domain.js';
+import {crmAgingReport} from './crm_aging_domain.js';
 import {assignDealOwner,crmTeamPerformance} from './crm_team_domain.js';
 import {salesQuota,salesTerritory,quotaAttainment} from './crm_quota_domain.js';
 import {crmActivity,crmActivityTimeline} from './crm_activity_domain.js';
@@ -192,7 +193,7 @@ export const createCrmOpportunity = callable(async request=>{
  const id=identifier(request.data.opportunityId||randomUUID()),ref=org.collection('crmOpportunities').doc(id);
  const contact=await org.collection('contacts').doc(identifier(proposed.contactId)).get();
  if(!contact.exists)throw new Error('CRM contact not found');
- await ref.create({...proposed,ownerUid:user,createdBy:user,createdAt:stamp(),updatedAt:stamp()});
+ await ref.create({...proposed,ownerUid:user,createdBy:user,createdAt:stamp(),stageEnteredAt:new Date().toISOString(),updatedAt:stamp()});
  return {id,stage:proposed.stage};
 });
 export const advanceCrmOpportunity = callable(async request=>{
@@ -204,7 +205,7 @@ export const advanceCrmOpportunity = callable(async request=>{
   if(member.role!=='owner'&&(current.data().ownerUid||current.data().createdBy)!==user)
    throw new HttpsError('permission-denied','Deal owner or sales administrator required');
   const next=crmAdvanceOpportunity(current.data(),request.data.stage,request.data.reason);
-  tx.update(ref,{...next,...(next.stage==='won'||next.stage==='lost'?{closedAt:new Date().toISOString()}:{}),updatedBy:user,updatedAt:stamp()});
+  tx.update(ref,{...next,stageEnteredAt:new Date().toISOString(),...(next.stage==='won'||next.stage==='lost'?{closedAt:new Date().toISOString()}:{}),updatedBy:user,updatedAt:stamp()});
   tx.create(ref.collection('history').doc(randomUUID()),{
    from:current.data().stage,to:next.stage,actor:user,
    reason:next.closedReason,at:stamp()});
@@ -334,6 +335,15 @@ export const getCrmLeadScores = callable(async request=>{
  const scores=rankCrmLeads(contacts.docs.map(d=>({id:d.id,...d.data()})),
   deals.docs.map(d=>({id:d.id,...d.data()})),tasks.docs.map(d=>({id:d.id,...d.data()})),new Date().toISOString());
  return {scores,model:'Rules-based signals from CRM data; not a prediction of purchase intent.'};
+});
+
+export const getCrmPipelineAging = callable(async request=>{
+ const {org}=await authorize(request,'crm');
+ const thresholdDays=request.data.thresholdDays??14;
+ const deals=await org.collection('crmOpportunities').limit(201).get();
+ if(deals.size>200)throw new Error('Aging report requires pagination for this workspace');
+ const rows=deals.docs.map(d=>({id:d.id,...d.data()}));
+ return crmAgingReport(rows,new Date().toISOString(),thresholdDays);
 });
 
 export const getCrmPipeline = callable(async request=>{
