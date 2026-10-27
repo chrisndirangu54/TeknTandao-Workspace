@@ -18,7 +18,7 @@ class _FinanceAgentScreenState extends State<FinanceAgentScreen>{
   setState(()=>busy=true);
   try{
    final result=await widget.store.call('getFinanceAgentSummary',{});
-   if(mounted)setState(()=>{report=Map<String,dynamic>.from(result),summary=null,error=null});
+   if(mounted)setState((){report=Map<String,dynamic>.from(result);summary=null;error=null;});
   }catch(e){if(mounted)setState(()=>error=e.toString());}
   finally{if(mounted)setState(()=>busy=false);}
  }
@@ -27,7 +27,7 @@ class _FinanceAgentScreenState extends State<FinanceAgentScreen>{
   setState(()=>busy=true);
   try{
    final result=await widget.store.call('explainFinanceAgentSummary',{'prompt':prompt.text.trim()});
-   if(mounted)setState(()=>{summary=result['summary']?.toString(),error=null});
+   if(mounted)setState((){summary=result['summary']?.toString();error=null;});
   }catch(e){if(mounted)setState(()=>error=e.toString());}
   finally{if(mounted)setState(()=>busy=false);}
  }
