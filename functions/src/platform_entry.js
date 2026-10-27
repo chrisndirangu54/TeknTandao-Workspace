@@ -67,3 +67,5 @@ export * from './funzi_school_integration.js';
 export * from './crm_sales_agent_schedule.js';
 
 export * from './inventory_agent.js';
+
+export * from './finance_agent.js';
