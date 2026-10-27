@@ -69,3 +69,5 @@ export * from './crm_sales_agent_schedule.js';
 export * from './inventory_agent.js';
 
 export * from './finance_agent.js';
+
+export * from './hr_operations_agent.js';
