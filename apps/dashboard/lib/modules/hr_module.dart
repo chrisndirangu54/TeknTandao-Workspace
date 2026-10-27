@@ -931,6 +931,9 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
             Text('People & Attendance System'),
           ],
         ),
+        actions:[IconButton(tooltip:'HR Operations Agent',icon:const Icon(Icons.auto_awesome),
+          onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(
+            builder:(_)=>HrOperationsAgentScreen(store:widget.store))))],
         bottom: const TabBar(
           tabs: [
             Tab(icon: Icon(Icons.groups_rounded), text: 'People'),
