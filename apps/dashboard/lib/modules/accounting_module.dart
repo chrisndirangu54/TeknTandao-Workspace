@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
+import 'finance_agent.dart';
 
 class AccountingModuleScreen extends StatefulWidget {
   final SuiteStore store;
@@ -32,6 +33,9 @@ class _AccountingModuleScreenState extends State<AccountingModuleScreen> {
           SizedBox(width: 10),
           Text('Books & Accounting Ledger'),
         ]),
+        actions: [IconButton(tooltip:'Finance Agent',icon:const Icon(Icons.auto_awesome),
+          onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(
+            builder:(_)=>FinanceAgentScreen(store:widget.store))))],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
