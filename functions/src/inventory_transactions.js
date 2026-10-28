@@ -367,7 +367,7 @@ export const postMatchedSupplierBill = callable(async request => {
       sourceType:'supplier_bill',sourceId:id,journal:supplierBillJournal(bill.totalMinor)});
     tx.create(journalRef,{...posting.journal,createdBy:uid,createdAt:stamp()});
     tx.update(invoiceRef,{accountingState:'posted',postedBy:uid,postedAt:stamp(),updatedAt:stamp()});
-    return {id,status:'posted',replayed:false,totalMinor:entry.total};
+    return {id,status:'posted',replayed:false,totalMinor:posting.journal.total};
   });
 });
 
