@@ -2,7 +2,7 @@ import {getFirestore,FieldValue,FieldPath} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {identifier,canAccess} from './domain.js';
 import {isSuperAdminToken} from './super_admin_domain.js';
-import {ispStoragePath,ispModeNames,ispRecordKinds} from './isp_product_modes_domain.js';
+import {ispStoragePath,ispModeNames,ispRecordKinds,canUseIspMode} from './isp_product_modes_domain.js';
 const db=getFirestore(),region='europe-west1';
 const modes=ispModeNames;
 const collections=Object.freeze(Object.fromEntries(ispRecordKinds.map(k=>[k,k])));
@@ -14,7 +14,7 @@ async function context(req,write=false){
  if(!req.auth)throw new HttpsError('unauthenticated','Sign in first');
  const mode=parseMode(req.data?.mode),uid=req.auth.uid,superAdmin=isSuperAdminToken(req.auth.token||{});
  if(mode==='operator'){
-  if(!superAdmin)throw new HttpsError('permission-denied','TeknTandao ISP operations are platform-admin only');
+  if(!canUseIspMode({mode,superAdmin}))throw new HttpsError('permission-denied','TeknTandao ISP operations are platform-admin only');
   return {root:db.doc(ispStoragePath(mode)),mode,uid};
  }
  const orgId=identifier(req.data?.orgId);
@@ -22,10 +22,8 @@ async function context(req,write=false){
  const [member,app]=await Promise.all([
   org.collection('members').doc(uid).get(),org.collection('apps').doc('isp').get()
  ]);
- if(!member.exists||!canAccess(member.data(),'isp',app.data()))
+ if(!canUseIspMode({mode,superAdmin,member:member.exists?member.data():null,hasAppAccess:member.exists&&canAccess(member.data(),'isp',app.data()),write}))
   throw new HttpsError('permission-denied','Third-party ISP workspace access required');
- if(write&&!['owner','admin'].includes(member.data()?.role))
-  throw new HttpsError('permission-denied','ISP manager permissions required');
  return {root:db.doc(ispStoragePath(mode,orgId)),mode,uid};
 }
 const publicRecord=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()??null});
