@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'platform_security_panel.dart';
 import 'isp_admin_panel.dart';
 import 'isp_suite_console.dart';
+import 'isp_product_console.dart';
 
 class SuperAdminGate {
   static Future<Map<String, dynamic>> context() async {
@@ -378,8 +379,12 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                             icon: const Icon(Icons.router_rounded), label: const Text('ISP operations'),
                           ),
                           FilledButton.icon(
+                            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IspProductConsole())),
+                            icon: const Icon(Icons.account_tree_outlined), label: const Text('ISP products: Third-party / TeknTandao'),
+                          ),
+                          FilledButton.icon(
                             onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IspSuiteConsole())),
-                            icon: const Icon(Icons.hub_outlined), label: const Text('Full ISP suite'),
+                            icon: const Icon(Icons.hub_outlined), label: const Text('Legacy ISP suite'),
                           ),
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
