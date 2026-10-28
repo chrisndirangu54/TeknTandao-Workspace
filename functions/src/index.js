@@ -33,7 +33,7 @@ import {draftTimesheet,decideTimesheet} from './hr_timesheets_domain.js';
 import {proposeOvertime,decideOvertime} from './hr_overtime_domain.js';
 import {payrollTimeRegister} from './hr_payroll_time_domain.js';
 import {payrollTimeSnapshot} from './hr_time_lock_domain.js';
-import {proposeHrTimeCorrection,decideHrTimeCorrection} from './hr_time_corrections_domain.js';
+import {proposeHrTimeCorrection,decideHrTimeCorrection as evaluateHrTimeCorrection} from './hr_time_corrections_domain.js';
 import {adjustedTimeRegister} from './hr_adjusted_time_domain.js';
 import {payrollAuthorizationDraft,authorizePayrollProposal} from './hr_payroll_authorization_domain.js';
 import {performanceFeedback,developmentPlan,advanceDevelopmentPlan} from './hr_growth_domain.js';
@@ -1552,7 +1552,7 @@ export const decideHrTimeCorrection = callable(async request=>{
   const lock=await tx.get(org.collection('hrPayrollTimeLocks').doc(current.data().employeeId+'_'+current.data().period));
   if(!lock.exists||lock.data().digest!==current.data().originalDigest)
    throw new Error('Original locked register changed');
-  const decision=decideHrTimeCorrection(current.data(),request.data.status,request.data.note);
+  const decision=evaluateHrTimeCorrection(current.data(),request.data.status,request.data.note);
   tx.update(ref,{...decision,decidedBy:user,decidedAt:stamp()});
   tx.create(ref.collection('history').doc(randomUUID()),{
    from:'pending',to:decision.status,actor:user,note:decision.decisionNote,at:stamp()});
