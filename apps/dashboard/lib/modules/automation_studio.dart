@@ -143,7 +143,7 @@ class _AutomationStudioState extends State<AutomationStudio> {
               }
               if (dialogContext.mounted) Navigator.pop(dialogContext);
             },
-            child: Text('Continue to $name'),
+            child: Text(provider == 'google' ? 'Continue to Google' : 'Continue to $name'),
           ),
         ],
       ),
