@@ -379,28 +379,57 @@ class _DashboardState extends State<Dashboard> {
               ],
             ),
             actions: [
-              IconButton(
+              if (!compact) IconButton(
                 tooltip: 'Workspace WhatsApp Business settings',
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                   builder: (_) => WhatsAppWorkspaceSettings(workspaceId: store.orgId),
                 )),
                 icon: const Icon(Icons.chat_bubble_outline_rounded),
               ),
-              IconButton(
+              if (!compact) IconButton(
                 tooltip: 'ISP service enquiries',
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IspCustomerPortal())),
                 icon: const Icon(Icons.wifi_tethering_outlined),
               ),
-              IconButton(
+              if (!compact) IconButton(
                 tooltip: 'Smart Intake · photo, document, text & IoT',
                 onPressed: _openSmartIntake,
                 icon: const Icon(Icons.document_scanner_outlined),
               ),
-              IconButton(
+              if (!compact) IconButton(
                 tooltip: 'Automation & custom features',
                 onPressed: _openAutomationStudio,
                 icon: const Icon(Icons.hub_outlined),
               ),
+              if (compact)
+                PopupMenuButton<String>(
+                  tooltip: 'More workspace tools',
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (choice) {
+                    switch (choice) {
+                      case 'whatsapp':
+                        Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => WhatsAppWorkspaceSettings(workspaceId: store.orgId)));
+                        break;
+                      case 'isp':
+                        Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => const IspCustomerPortal()));
+                        break;
+                      case 'intake':
+                        _openSmartIntake();
+                        break;
+                      case 'automation':
+                        _openAutomationStudio();
+                        break;
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value:'whatsapp',child:Text('WhatsApp settings')),
+                    PopupMenuItem(value:'isp',child:Text('ISP service enquiries')),
+                    PopupMenuItem(value:'intake',child:Text('Smart Intake')),
+                    PopupMenuItem(value:'automation',child:Text('Automation Studio')),
+                  ],
+                ),
               if (widget.onSwitchWorkspace != null)
                 IconButton(
                   tooltip: 'Switch workspace',
