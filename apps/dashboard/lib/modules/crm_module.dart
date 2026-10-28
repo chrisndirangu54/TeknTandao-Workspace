@@ -114,7 +114,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
           for(final template in templates)ListTile(
             title:Text(template['name']?.toString()??'Sequence'),
             subtitle:Text('Status: ${template['status']} · Steps: ${(template['steps'] as List?)?.length??0}'),
-            trailing:template['status']=='draft'?Wrap(mainAxisSize:MainAxisSize.min,children:[
+            trailing:template['status']=='draft'?Wrap(spacing:4,children:[
               TextButton(onPressed:() async {
                 final v=await recordForm(dialogContext,'Add sequence step',['Channel email / whatsapp / call','Delay days','Subject','Message']);
                 if(v==null)return;
