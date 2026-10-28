@@ -106,6 +106,7 @@ class SuiteModule {
 }
 
 const List<SuiteModule> modules = [
+  SuiteModule(id:'isp',name:'Third-party ISP Management',description:'Manage your ISP subscribers, sites, devices and service plans in your workspace.',icon:Icons.router_rounded,color:Color(0xFF2563EB),category:'Connectivity & ISP',monthlyPriceKes:120000),
   // 1. Sales & Marketing
   SuiteModule(
     id: 'crm',
