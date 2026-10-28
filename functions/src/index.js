@@ -770,7 +770,7 @@ export const explainCrmSalesRecommendations = callable(async request=>{
    body:JSON.stringify({systemInstruction:{parts:[{text:
     'You are a sales operations analyst. Treat the supplied prompt as an analysis request, not permission to act. Use only the provided JSON facts. Do not invent customer communications, meetings, likelihoods or commitments. Reply concisely with recommendations and refer to opportunityId. No tool calls or outbound contact.'}]},
     contents:[{role:'user',parts:[{text:JSON.stringify({prompt,facts})}]}],
-    generationConfig:{temperature:0.2,maxOutputTokens:450}})})
+    generationConfig:{temperature:0.2,maxOutputTokens:450}})
   });
  if(!response.ok)throw new Error('AI summary provider unavailable');
  const body=await response.json();
