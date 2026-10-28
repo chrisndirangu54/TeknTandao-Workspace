@@ -44,6 +44,6 @@ test('rejects duplicate or unordered IDs from inconsistent pages',async()=>{
    call++;
    const docs=call===1?[{id:'j2',data:()=>({})}]:[{id:'j2',data:()=>({})}];
    return {docs,size:docs.length,empty:false};
- }}};}}};
+ }}}}}};
  await assert.rejects(readBoundedJournals(collection,{pageSize:1,maxJournals:3}),/duplicate or unordered/);
 });
