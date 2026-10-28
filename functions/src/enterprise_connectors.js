@@ -39,6 +39,8 @@ export const enterpriseBuiltinTools = Object.freeze({
   ],
   microsoft365:[
     tool('m365_drive_files','List files in the connected OneDrive root',{limit:number}),
+    tool('m365_user_profile','Read the connected Microsoft 365 user profile',{}),
+    tool('m365_drive_metadata','Read connected OneDrive storage metadata',{}),
   ],
   powerbi:[
     tool('powerbi_workspaces','List Power BI workspaces',{limit:number}),
@@ -132,6 +134,8 @@ const schemas = {
     accountName:z.string().max(160).optional(),
   }).strict(),
   m365_drive_files:z.object({limit:commonLimit}).strict(),
+  m365_user_profile:z.object({}).strict(),
+  m365_drive_metadata:z.object({}).strict(),
   powerbi_workspaces:z.object({limit:commonLimit}).strict(),
   powerbi_datasets:z.object({groupId:z.string().uuid().optional()}).strict(),
   powerbi_refresh_history:z.object({groupId:z.string().uuid().optional(),datasetId:z.string().uuid(),top:z.number().int().min(1).max(60).default(20)}).strict(),
@@ -226,6 +230,8 @@ async function microsoft365(credential,name,args){
   if(name==='m365_drive_files'){
     return http(`https://graph.microsoft.com/v1.0/me/drive/root/children?$top=${args.limit}&$select=id,name,size,webUrl,lastModifiedDateTime,file,folder`,{headers});
   }
+  if(name==='m365_user_profile') return http('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName',{headers});
+  if(name==='m365_drive_metadata') return http('https://graph.microsoft.com/v1.0/me/drive?$select=id,name,driveType,webUrl,quota',{headers});
   throw new Error('Unknown Microsoft 365 tool');
 }
 
