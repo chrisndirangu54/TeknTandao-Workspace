@@ -2,9 +2,10 @@ import {getFirestore,FieldValue,FieldPath} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {identifier,canAccess} from './domain.js';
 import {isSuperAdminToken} from './super_admin_domain.js';
+import {ispStoragePath,ispModeNames,ispRecordKinds} from './isp_product_modes_domain.js';
 const db=getFirestore(),region='europe-west1';
-const modes=Object.freeze({managed:'third_party_isp_management',operator:'tekntandao_isp'});
-const collections=Object.freeze({devices:'devices',subscribers:'subscribers',incidents:'incidents',plans:'plans',sites:'sites'});
+const modes=ispModeNames;
+const collections=Object.freeze(Object.fromEntries(ispRecordKinds.map(k=>[k,k])));
 const parseMode=value=>{
  if(!Object.hasOwn(modes,value))throw new HttpsError('invalid-argument','Specify managed or operator ISP mode');
  return value;
@@ -14,7 +15,7 @@ async function context(req,write=false){
  const mode=parseMode(req.data?.mode),uid=req.auth.uid,superAdmin=isSuperAdminToken(req.auth.token||{});
  if(mode==='operator'){
   if(!superAdmin)throw new HttpsError('permission-denied','TeknTandao ISP operations are platform-admin only');
-  return {root:db.collection('tekntandaoIsp').doc('operations'),mode,uid};
+  return {root:db.doc(ispStoragePath(mode)),mode,uid};
  }
  const orgId=identifier(req.data?.orgId);
  const org=db.collection('organizations').doc(orgId);
@@ -25,7 +26,7 @@ async function context(req,write=false){
   throw new HttpsError('permission-denied','Third-party ISP workspace access required');
  if(write&&!['owner','admin'].includes(member.data()?.role))
   throw new HttpsError('permission-denied','ISP manager permissions required');
- return {root:org.collection('ispManagement').doc('workspace'),mode,uid};
+ return {root:db.doc(ispStoragePath(mode,orgId)),mode,uid};
 }
 const publicRecord=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()??null});
 export const getIspProductModes=onCall({region},async req=>{
