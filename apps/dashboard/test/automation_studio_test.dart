@@ -81,7 +81,10 @@ void main() {
     expect(find.text('Connect Google'), findsOneWidget);
     expect(find.text('Connect Notion'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Add MCP server'), 300,
-      scrollable: find.byType(Scrollable).first);
+      scrollable: find.descendant(
+        of: find.byType(ListView).first,
+        matching: find.byType(Scrollable),
+      ).first);
     await tester.pumpAndSettle();
     expect(find.text('Add MCP server'), findsOneWidget);
     expect(tester.takeException(), isNull);
