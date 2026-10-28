@@ -15,6 +15,8 @@ class _IspProductConsoleState extends State<IspProductConsole>{
  String? error;
  Map<String,dynamic>? overview;
  List<Map<String,dynamic>> records=[];
+ String? nextCursor;
+ bool hasMore=false;
  @override void initState(){super.initState();orgId=TextEditingController(text:widget.workspaceId??'');mode=widget.initialMode??(widget.workspaceId!=null?'managed':'operator');}
  FirebaseFunctions get functions=>FirebaseFunctions.instanceFor(region:'europe-west1');
  Future<void> refresh()async{
@@ -26,12 +28,50 @@ class _IspProductConsoleState extends State<IspProductConsole>{
    final second=await functions.httpsCallable('listIspWorkspaceRecords').call({...base,'kind':kind,'pageSize':50});
    if(mounted)setState((){
     overview=Map<String,dynamic>.from(first.data as Map);
+    nextCursor=second.data['nextCursor']?.toString();
+    hasMore=second.data['hasMore']==true;
     records=(second.data['records'] as List? ?? const []).whereType<Map>()
      .map((x)=>Map<String,dynamic>.from(x)).toList();
     error=null;
    });
   }catch(e){if(mounted)setState(()=>error=e.toString());}
   finally{if(mounted)setState(()=>loading=false);}
+ }
+ Future<void> loadMore()async{
+  if(loading||!hasMore||nextCursor==null)return;
+  setState(()=>loading=true);
+  try{
+   final response=await functions.httpsCallable('listIspWorkspaceRecords').call({
+    'mode':mode,if(mode=='managed')'orgId':orgId.text.trim(),
+    'kind':kind,'pageSize':50,'afterId':nextCursor});
+   if(!mounted)return;
+   setState((){
+    records.addAll((response.data['records'] as List? ?? const []).whereType<Map>()
+      .map((x)=>Map<String,dynamic>.from(x)));
+    nextCursor=response.data['nextCursor']?.toString();
+    hasMore=response.data['hasMore']==true;
+   });
+  }catch(e){if(mounted)setState(()=>error=e.toString());}
+  finally{if(mounted)setState(()=>loading=false);}
+ }
+ Future<void> addRecord()async{
+  final label=TextEditingController(),notes=TextEditingController();
+  try{
+   final approved=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+    title:Text('New $kind record'),content:Column(mainAxisSize:MainAxisSize.min,children:[
+     TextField(controller:label,maxLength:120,decoration:const InputDecoration(labelText:'Label')),
+     TextField(controller:notes,maxLength:1000,decoration:const InputDecoration(labelText:'Notes')),
+    ]),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),
+     FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Create'))]));
+   if(approved!=true||!mounted)return;
+   if(label.text.trim().isEmpty)throw StateError('A label is required');
+   setState(()=>loading=true);
+   await functions.httpsCallable('saveIspWorkspaceRecord').call({
+    'mode':mode,if(mode=='managed')'orgId':orgId.text.trim(),'kind':kind,
+    'id':'isp_${DateTime.now().microsecondsSinceEpoch}',
+    'record':{'label':label.text.trim(),'status':'planned','notes':notes.text.trim()}});
+  }catch(e){if(mounted)setState(()=>error=e.toString());}
+  finally{label.dispose();notes.dispose();if(mounted){setState(()=>loading=false);await refresh();}}
  }
  @override void dispose(){orgId.dispose();super.dispose();}
  @override Widget build(BuildContext context)=>Scaffold(
@@ -61,6 +101,8 @@ class _IspProductConsoleState extends State<IspProductConsole>{
    FilledButton.icon(onPressed:loading?null:refresh,icon:const Icon(Icons.refresh),
     label:const Text('Open selected ISP')),
    if(loading)const LinearProgressIndicator(),
+   if(overview!=null)OutlinedButton.icon(onPressed:loading?null:addRecord,
+    icon:const Icon(Icons.add),label:Text('Add $kind record')),
    if(error!=null)Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error)),
    if(overview!=null)...[
     Text('Product: ${overview!['product']}'),
@@ -71,6 +113,7 @@ class _IspProductConsoleState extends State<IspProductConsole>{
     for(final record in records)
      ListTile(title:Text(record['label']?.toString()??record['id']?.toString()??'Record'),
       subtitle:Text('${record['status']??'Unknown'}')),
+    if(hasMore)TextButton(onPressed:loading?null:loadMore,child:const Text('Load more records')),
    ],
   ])
  );
