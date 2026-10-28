@@ -1,3 +1,4 @@
+import 'hr_operations_agent.dart';
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
@@ -166,7 +167,7 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
                     return ListTile(
                       title: Text('${item['employeeName']} · ${item['leaveType']}'),
                       subtitle: Text('${item['department']} · ${item['startDate']} – ${item['endDate']} · ${item['status']}'),
-                      trailing: Wrap(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
+                      trailing: Wrap(spacing: 6, children: [
                         TextButton(
                           onPressed: () async {
                             try {
@@ -768,7 +769,7 @@ class _HrModuleScreenState extends State<HrModuleScreen> {
           for(final sheet in sheets)
             ListTile(title:Text('${sheet['status']} · ${sheet['netMinutes']} net minutes'),
               subtitle:Text('Unpaid break: ${sheet['unpaidBreakMinutes']} minutes'),
-              trailing:sheet['status']=='pending'?Wrap(mainAxisSize:MainAxisSize.min,children:[
+              trailing:sheet['status']=='pending'?Wrap(spacing:4,children:[
                 TextButton(onPressed:() async {
                   final values=await recordForm(dialogContext,'Approve timesheet',['Decision note']);
                   if(values==null||values[0].trim().isEmpty)return;
