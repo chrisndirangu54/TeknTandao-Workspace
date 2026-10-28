@@ -474,3 +474,27 @@ test('clients cannot mutate server-owned builder, AI, platform, payment or contr
     'publishedWebsiteSites/forged','publishedWebsiteDomains/forged','websitePublicSiteOwners/forged','websitePlugins/forged','websiteFormRateLimits/forged'
   ]) await assertFails(setDoc(doc(db, path), {state:'forged'}));
 });
+
+
+test('ISP product records deny direct client access across tenants and operator root', async () => {
+  const tenantPath = 'organizations/a/ispManagement/workspace/subscribers/subscriber_one';
+  const otherTenantPath = 'organizations/b/ispManagement/workspace/subscribers/subscriber_one';
+  const platformPath = 'tekntandaoIsp/operations/subscribers/subscriber_one';
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db, tenantPath), {label:'Tenant A subscriber',status:'active'});
+    await setDoc(doc(db, otherTenantPath), {label:'Tenant B subscriber',status:'active'});
+    await setDoc(doc(db, platformPath), {label:'TeknTandao subscriber',status:'active'});
+  });
+  for (const uid of ['a','b','clerk','attacker']) {
+    const db = env.authenticatedContext(uid, {superAdmin:uid==='a'}).firestore();
+    for (const path of [tenantPath,otherTenantPath,platformPath]) {
+      await assertFails(getDoc(doc(db,path)));
+      await assertFails(setDoc(doc(db,path),{label:'Tampered',status:'active'}));
+      await assertFails(updateDoc(doc(db,path),{status:'retired'}));
+    }
+  }
+  const anon = env.unauthenticatedContext().firestore();
+  await assertFails(getDoc(doc(anon,tenantPath)));
+  await assertFails(getDoc(doc(anon,platformPath)));
+});
