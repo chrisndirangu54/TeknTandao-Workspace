@@ -1,6 +1,7 @@
 import {buildMasterCatalog} from './master_catalog.js';
 
 const coreCatalog = Object.freeze({
+  isp: {name: 'Third-party ISP Management', price: 120000, shares: []},
   crm: {name: 'CRM', price: 150000, shares: ['contacts', 'tasks']},
   marketing: {name: 'Marketing Automation', price: 130000, shares: []},
   bookings: {name: 'Bookings & Scheduling', price: 110000, shares: []},
