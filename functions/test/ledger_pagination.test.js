@@ -29,7 +29,7 @@ test('reads every journal across several pages in ID order',async()=>{
  assert.equal(result[522].amount,522);
 });
 test('fails safely instead of silently truncating ledgers',async()=>{
- const docs=Array.from({length:12},(_,i)=>({id:'j'+i,data:{amount:i}}));
+ const docs=Array.from({length:12},(_,i)=>({id:'j'+String(i).padStart(2,'0'),data:{amount:i}}));
  await assert.rejects(readBoundedJournals(fakeCollection(docs),{pageSize:5,maxJournals:10}),/exceeds bounded/);
 });
 
