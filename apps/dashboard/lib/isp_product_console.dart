@@ -3,16 +3,19 @@ import 'package:flutter/material.dart';
 
 /// Separate operating contexts; switching modes does not copy or merge records.
 class IspProductConsole extends StatefulWidget{
- const IspProductConsole({super.key});
+ const IspProductConsole({super.key,this.workspaceId,this.initialMode});
+ final String? workspaceId;
+ final String? initialMode;
  @override State<IspProductConsole> createState()=>_IspProductConsoleState();
 }
 class _IspProductConsoleState extends State<IspProductConsole>{
- final orgId=TextEditingController();
+ late final TextEditingController orgId;
  String mode='operator',kind='subscribers';
  bool loading=false;
  String? error;
  Map<String,dynamic>? overview;
  List<Map<String,dynamic>> records=[];
+ @override void initState(){super.initState();orgId=TextEditingController(text:widget.workspaceId??'');mode=widget.initialMode??(widget.workspaceId!=null?'managed':'operator');}
  FirebaseFunctions get functions=>FirebaseFunctions.instanceFor(region:'europe-west1');
  Future<void> refresh()async{
   if(loading)return;
@@ -39,13 +42,13 @@ class _IspProductConsoleState extends State<IspProductConsole>{
    SegmentedButton<String>(segments:const [
     ButtonSegment(value:'managed',label:Text('Third-party ISP Management'),icon:Icon(Icons.apartment)),
     ButtonSegment(value:'operator',label:Text('TeknTandao ISP'),icon:Icon(Icons.router))
-   ],selected:{mode},onSelectionChanged:(v)=>setState((){
+   ],selected:{mode},onSelectionChanged:widget.workspaceId!=null?null:(v)=>setState((){
     mode=v.first;overview=null;records.clear();
    })),
    const SizedBox(height:12),
    Text(mode=='managed'?'Manage an ISP customer organization. Every workspace is isolated from other ISPs.':
     'Operate TeknTandao-owned subscribers and infrastructure. Platform administrators only.'),
-   if(mode=='managed')TextField(controller:orgId,decoration:const InputDecoration(
+   if(mode=='managed'&&widget.workspaceId==null)TextField(controller:orgId,decoration:const InputDecoration(
     labelText:'Third-party ISP organization ID',border:OutlineInputBorder())),
    const SizedBox(height:12),
    DropdownButton<String>(value:kind,items:const [
