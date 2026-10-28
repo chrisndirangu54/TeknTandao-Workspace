@@ -8,7 +8,7 @@ const enabled=Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 test('ISP callable functions isolate tenants, enforce roles, and separate platform operations',
   {skip:!enabled},async()=>{
     if(!getApps().length)initializeApp({projectId:process.env.GCLOUD_PROJECT||'demo-tandao'});
-    const {getIspWorkspaceOverview,listIspWorkspaceRecords,saveIspWorkspaceRecord}=await import('../src/isp_product_modes.js');
+    const {getIspWorkspaceOverview,listIspWorkspaceRecords,saveIspWorkspaceRecord,createIspConfigurationRecord,requestIspServiceActivation,approveIspServiceActivation}=await import('../src/isp_product_modes.js');
     const db=getFirestore(), suffix=randomUUID().replaceAll('-','').slice(0,16);
     const orgA='ispA_'+suffix,orgB='ispB_'+suffix,ownerA='ownerA_'+suffix,ownerB='ownerB_'+suffix;
     const outsider='intruder_'+suffix,viewer='viewer_'+suffix;
@@ -44,6 +44,23 @@ test('ISP callable functions isolate tenants, enforce roles, and separate platfo
       assert.equal(p.records[0].mode,'operator');
       const readOnly=await listIspWorkspaceRecords.run(payload(viewer,'managed',orgA,{kind:'subscribers'}));
       assert.equal(readOnly.records.length,1);
+      const configured=(kind,id,record)=>createIspConfigurationRecord.run(payload(ownerA,'managed',orgA,{kind,id,record}));
+      await configured('sites','main',{label:'Main Hub',siteCode:'main',area:'Nairobi'});
+      await configured('plans','fibre20',{label:'Fiber 20M',downloadKbps:20000,uploadKbps:10000,priceMinorKes:250000,activationMode:'pppoe',vlanId:100});
+      await configured('devices','router_1',{label:'Router One',vendor:'mikrotik',model:'CCR',siteId:'main',driver:'routeros_rest'});
+      await configured('subscribers','cust_1',{label:'Customer One',accountCode:'cust_1',planId:'fibre20',siteId:'main',deviceId:'router_1',accessMode:'fiber'});
+      await assert.rejects(createIspConfigurationRecord.run(payload(ownerB,'managed',orgB,{kind:'subscribers',id:'cust_2',
+         record:{label:'Intruder',accountCode:'cust_2',planId:'fibre20',siteId:'main',accessMode:'fiber'}})),/within this ISP/);
+      const activation=await requestIspServiceActivation.run(payload(ownerA,'managed',orgA,{request:{
+        subscriberId:'cust_1',operation:'activate',reason:'Signed installation order',idempotencyKey:'install_one'}}));
+      assert.equal(activation.executed,false);
+      await assert.rejects(approveIspServiceActivation.run(payload(ownerA,'managed',orgA,{requestId:'install_one'})),/independent approver/i);
+      await db.doc('organizations/'+orgA+'/members/approver_'+suffix).set({role:'admin',apps:['isp']});
+      const approval=await approveIspServiceActivation.run(payload('approver_'+suffix,'managed',orgA,{requestId:'install_one'}));
+      assert.equal(approval.approved,true);
+      assert.equal(approval.executed,false);
+      assert.equal((await db.doc('organizations/'+orgA+'/ispManagement/workspace/activationRequests/install_one').get()).data().state,'approved_not_executed');
+      await assert.rejects(approveIspServiceActivation.run(payload(ownerB,'managed',orgB,{requestId:'install_one'})),/not found/i);
       await assert.rejects(getIspWorkspaceOverview.run(payload(outsider,'managed',orgA)),/access required/);
       await assert.rejects(listIspWorkspaceRecords.run(payload(ownerA,'managed',orgB,{kind:'subscribers'})),/access required/);
       await assert.rejects(listIspWorkspaceRecords.run(payload(ownerA,'operator',undefined,{kind:'subscribers'})),/platform-admin only/);
