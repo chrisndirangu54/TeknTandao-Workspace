@@ -19,5 +19,5 @@ test('a KES 100,000 salary matches the February 2026 statutory worked example an
   assert.equal(openBooks.rows.find(row => row.account === '1100').balance, 9_500_000);
   const balance = trialBalance([invoiceJournal(10_000_000), creditJournal(500_000), paymentJournal(9_500_000, 'mpesa'), payrollJournal({...slip, period: '2026-09'})]);
   assert.equal(balance.rows.reduce((sum, row) => sum + row.balance, 0), 0);
-  assert.throws(() => trialBalance([{currency: 'KES', lines: [{account: '1100', name: 'AR', debit: 2, credit: 0}, {account: '4000', name: 'Revenue', debit: 0, credit: 1}]}]), /out of balance/);
+  assert.throws(() => trialBalance([{currency: 'KES', lines: [{account: '1100', name: 'AR', debit: 2, credit: 0}, {account: '4000', name: 'Revenue', debit: 0, credit: 1}]}]), /Journal entry must balance/);
 });
