@@ -16,7 +16,7 @@ jobs:
           node-version: 22
       - name: Repair compatible vulnerable packages
         run: |
-          npm --prefix functions install 'firebase-admin@^14.5.0' --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm --prefix functions install 'firebase-functions@^7.3.0' 'firebase-admin@^14.5.0' --package-lock-only --ignore-scripts --no-audit --no-fund
           # audit fix may exit nonzero while reporting vulnerabilities that it cannot
           # resolve automatically; the later explicit audit remains a hard gate.
           npm --prefix functions audit fix --package-lock-only --ignore-scripts --no-fund || true
