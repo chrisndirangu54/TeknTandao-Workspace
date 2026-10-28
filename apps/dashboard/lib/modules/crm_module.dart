@@ -697,7 +697,7 @@ class _CrmModuleScreenState extends State<CrmModuleScreen>{
           PopupMenuItem(value:'invoices',child:Text('Invoice reconciliation')),
         ],
       ),
-    ],
+    ]),
     floatingActionButton:FloatingActionButton.extended(onPressed:saving?null:addContact,icon:const Icon(Icons.person_add_alt_1_rounded),label:Text(saving?'Saving…':'Add customer')),
     body:StreamBuilder<List<Map<String,dynamic>>>(
       stream:widget.store.watch('contacts'),
