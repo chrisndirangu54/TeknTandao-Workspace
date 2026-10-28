@@ -1,0 +1,36 @@
+name: One-time Functions dependency security repair
+on:
+  push:
+    branches: [fix/functions-dependency-security]
+    paths: ['.github/workflows/security-lock-refresh.yml']
+permissions:
+  contents: write
+jobs:
+  update-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Repair compatible vulnerable packages
+        run: |
+          npm --prefix functions audit fix --package-lock-only --ignore-scripts --no-fund
+          npm --prefix functions install 'firebase-admin@^14.5.0' --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm --prefix functions audit fix --package-lock-only --ignore-scripts --no-fund
+      - name: Verify lockfile, Node tests and audit
+        run: |
+          npm --prefix functions ci --ignore-scripts
+          npm --prefix functions test
+          npm --prefix functions audit --audit-level=high
+      - name: Commit successful lockfile repair on isolated branch
+        run: |
+          test "$(git branch --show-current)" = "fix/functions-dependency-security"
+          rm .github/workflows/security-lock-refresh.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/package.json functions/package-lock.json .github/workflows/security-lock-refresh.yml
+          git diff --cached --quiet && exit 1
+          git commit -m "security(functions): repair audited dependencies and refresh lockfile"
+          git push origin HEAD:fix/functions-dependency-security
