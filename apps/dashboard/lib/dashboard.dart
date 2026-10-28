@@ -35,6 +35,7 @@ import 'modules/reseller_studio.dart';
 import 'modules/smart_intake.dart';
 import 'modules/executive_intelligence.dart';
 import 'isp_suite_console.dart';
+import 'isp_product_console.dart';
 import 'whatsapp_workspace_settings.dart';
 
 class Dashboard extends StatefulWidget {
@@ -153,6 +154,9 @@ class _DashboardState extends State<Dashboard> {
   void _navigateToModule(SuiteModule module) {
     Widget targetScreen;
     switch (module.id) {
+      case 'isp':
+        targetScreen = IspProductConsole(workspaceId: store.orgId,initialMode: 'managed');
+        break;
       case 'pos':
         targetScreen = PosModuleScreen(store: store);
         break;
