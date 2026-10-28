@@ -13,3 +13,12 @@ export function ispRecordPath(mode,orgId,kind,id){
   throw new Error('Invalid record ID');
  return `${ispStoragePath(mode,orgId)}/${kind}/${id}`;
 }
+
+// Authorization decisions are enforced server-side; UI mode restrictions are not trusted.
+export function canUseIspMode({mode,superAdmin,member,app,hasAppAccess,write=false}) {
+ if(!Object.hasOwn(ispModeNames,mode))return false;
+ if(mode==='operator')return superAdmin===true;
+ if(!member||hasAppAccess!==true)return false;
+ if(write&&!['owner','admin'].includes(member.role))return false;
+ return true;
+}
