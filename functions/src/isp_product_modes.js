@@ -1,3 +1,4 @@
+import {normalizeIspConfig,ispConfigKinds,validateIspActivation,approveIspActivation} from './isp_typed_config_domain.js';
 import {getFirestore,FieldValue,FieldPath} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {identifier,canAccess} from './domain.js';
@@ -85,4 +86,62 @@ export const saveIspWorkspaceRecord=onCall({region},async req=>{
   tx.create(ref,{...data,label:data.label.trim(),mode,createdBy:uid,createdAt:FieldValue.serverTimestamp()});
  });
  return {id,kind,mode,status:'created'};
+});
+
+const asValidationError=error=>new HttpsError('invalid-argument',error.message||'Invalid ISP operation');
+export const createIspConfigurationRecord=onCall({region},async req=>{
+ const {root,uid,mode}=await context(req,true);
+ const kind=req.data?.kind;
+ if(!ispConfigKinds.includes(kind))throw new HttpsError('invalid-argument','Unsupported typed ISP kind');
+ const id=identifier(req.data?.id);
+ let configuration;
+ try{configuration=normalizeIspConfig(kind,req.data?.record);}catch(error){throw asValidationError(error);}
+ if(kind==='subscribers'&&configuration.accountCode!==id)
+   throw new HttpsError('invalid-argument','Subscriber account code must match record ID');
+ const dependencies=kind==='subscribers'?[
+   root.collection('plans').doc(configuration.planId),
+   root.collection('sites').doc(configuration.siteId),
+   ...(configuration.deviceId?[root.collection('devices').doc(configuration.deviceId)]:[])
+ ]:kind==='devices'?[root.collection('sites').doc(configuration.siteId)]:[];
+ const record=root.collection(kind).doc(id);
+ await db.runTransaction(async tx=>{
+   const [existing,...refs]=await Promise.all([tx.get(record),...dependencies.map(ref=>tx.get(ref))]);
+   if(existing.exists)throw new HttpsError('already-exists','ISP configuration already exists');
+   if(refs.some(ref=>!ref.exists))throw new HttpsError('failed-precondition','Referenced plan, site or device must exist within this ISP');
+   tx.create(record,{...configuration,mode,recordType:'typed_configuration',createdAt:FieldValue.serverTimestamp(),createdBy:uid});
+ });
+ return {id,kind,mode,created:true,liveNetwork:false};
+});
+
+export const requestIspServiceActivation=onCall({region},async req=>{
+ const {root,uid,mode}=await context(req,true);
+ let input;
+ try{input=validateIspActivation(req.data?.request);}catch(error){throw asValidationError(error);}
+ const subscriber=root.collection('subscribers').doc(input.subscriberId);
+ const activation=root.collection('activationRequests').doc(input.idempotencyKey);
+ await db.runTransaction(async tx=>{
+   const [sub,existing]=await Promise.all([tx.get(subscriber),tx.get(activation)]);
+   if(!sub.exists||sub.data()?.recordType!=='typed_configuration')
+     throw new HttpsError('failed-precondition','Typed subscriber configuration required');
+   if(existing.exists)throw new HttpsError('already-exists','Activation request already exists');
+   tx.create(activation,{...input,mode,state:'awaiting_approval',executionState:'not_connected',
+     requestedBy:uid,createdAt:FieldValue.serverTimestamp()});
+ });
+ return {requestId:activation.id,state:'awaiting_approval',executed:false};
+});
+
+export const approveIspServiceActivation=onCall({region},async req=>{
+ const {root,uid}=await context(req,true);
+ const id=identifier(req.data?.requestId);
+ const activation=root.collection('activationRequests').doc(id);
+ await db.runTransaction(async tx=>{
+   const previous=await tx.get(activation);
+   if(!previous.exists)throw new HttpsError('not-found','Activation request not found');
+   let decision;
+   try{decision=approveIspActivation(previous.data(),uid);}
+   catch(error){throw new HttpsError('failed-precondition',error.message);}
+   tx.update(activation,{...decision,approvedAt:FieldValue.serverTimestamp()});
+ });
+ return {requestId:id,approved:true,executed:false,
+   message:'Approved for a separately authenticated network controller; no command was sent.'};
 });
