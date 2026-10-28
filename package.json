@@ -1,5 +1,6 @@
 {
   "name": "tandao-suite-workspace",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "test": "npm --prefix functions test",
