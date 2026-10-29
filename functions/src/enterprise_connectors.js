@@ -33,6 +33,7 @@ export const enterpriseBuiltinTools = Object.freeze({
   zoho:[
     tool('zoho_contacts','List Zoho CRM contacts',{page:number,perPage:number}),
     tool('zoho_deals','List Zoho CRM deals',{page:number,perPage:number}),
+    tool('zoho_accounts','List Zoho CRM accounts',{page:number,perPage:number}),
     tool('zoho_upsert_contact','Upsert a Zoho CRM contact by email',{
       email:string,firstName:string,lastName:string,phone:string,accountName:string
     },['email']),
@@ -59,6 +60,7 @@ export const enterpriseBuiltinTools = Object.freeze({
     tool('odoo_contacts','List Odoo contacts',{limit:number}),
     tool('odoo_sale_orders','List Odoo sale orders',{limit:number}),
     tool('odoo_products','List Odoo products',{limit:number}),
+    tool('odoo_invoices','List Odoo customer invoices',{limit:number}),
     tool('odoo_create_contact','Create an Odoo contact',{
       name:string,email:string,phone:string,companyType:string
     },['name']),
@@ -131,6 +133,7 @@ const schemas = {
   }).strict(),
   jira_projects:z.object({}).strict(),
   zoho_contacts:z.object({page:z.number().int().min(1).max(1000).default(1),perPage:z.number().int().min(1).max(200).default(50)}).strict(),
+  zoho_accounts:z.object({page:z.number().int().min(1).max(1000).default(1),perPage:z.number().int().min(1).max(200).default(50)}).strict(),
   zoho_deals:z.object({page:z.number().int().min(1).max(1000).default(1),perPage:z.number().int().min(1).max(200).default(50)}).strict(),
   zoho_upsert_contact:z.object({
     email:z.string().email().max(254),
@@ -159,6 +162,7 @@ const schemas = {
   odoo_contacts:z.object({limit:commonLimit}).strict(),
   odoo_sale_orders:z.object({limit:commonLimit}).strict(),
   odoo_products:z.object({limit:commonLimit}).strict(),
+  odoo_invoices:z.object({limit:commonLimit}).strict(),
   odoo_create_contact:z.object({
     name:z.string().min(1).max(200),
     email:z.string().email().max(254).optional(),
@@ -227,6 +231,7 @@ async function zoho(credential,name,args){
   const base=enterpriseBaseUrl(credential.api_domain||'https://www.zohoapis.com');
   const headers={Authorization:`Zoho-oauthtoken ${credential.access_token}`,'Content-Type':'application/json'};
   if(name==='zoho_contacts') return http(`${base}/crm/v8/Contacts?page=${args.page}&per_page=${args.perPage}`,{headers});
+  if(name==='zoho_accounts') return http(`${base}/crm/v8/Accounts?page=${args.page}&per_page=${args.perPage}`,{headers});
   if(name==='zoho_deals') return http(`${base}/crm/v8/Deals?page=${args.page}&per_page=${args.perPage}`,{headers});
   if(name==='zoho_upsert_contact'){
     const data={Email:args.email,First_Name:args.firstName||'',Last_Name:args.lastName||args.email,Phone:args.phone||''};
@@ -317,6 +322,7 @@ async function odooJson2(credential,model,method,body={}){
 async function odoo(credential,name,args){
   if(name==='odoo_contacts') return odooJson2(credential,'res.partner','search_read',{domain:[],fields:['id','name','email','phone','company_type','write_date'],limit:args.limit,order:'write_date desc'});
   if(name==='odoo_sale_orders') return odooJson2(credential,'sale.order','search_read',{domain:[],fields:['id','name','partner_id','amount_total','state','date_order','write_date'],limit:args.limit,order:'write_date desc'});
+  if(name==='odoo_invoices') return odooJson2(credential,'account.move','search_read',{domain:[['move_type','=','out_invoice']],fields:['id','name','partner_id','amount_total','amount_residual','payment_state','invoice_date','write_date'],limit:args.limit,order:'write_date desc'});
   if(name==='odoo_products') return odooJson2(credential,'product.product','search_read',{domain:[],fields:['id','display_name','default_code','list_price','qty_available','write_date'],limit:args.limit,order:'write_date desc'});
   if(name==='odoo_create_contact') return {id:await odooJson2(credential,'res.partner','create',{vals:{name:args.name,email:args.email||false,phone:args.phone||false,company_type:args.companyType}})};
   throw new Error('Unknown Odoo tool');
@@ -334,6 +340,12 @@ export function validateEnterpriseCredential(provider,raw){
   }[provider]?.parse(raw);
   if(!credential) throw new Error('Unsupported enterprise provider');
   if(provider==='dynamics365')dynamics365BaseUrl(credential.environment_url);
+  if(provider==='odoo')enterpriseBaseUrl(credential.base_url);
+  if(provider==='zoho'){
+    const host=new URL(credential.api_domain);
+    if(host.protocol!=='https:'||!/^www\.zohoapis\.(?:com|eu|in|com\.au|jp|com\.cn|ca|sa)$/.test(host.hostname)||host.pathname!=='/'||host.search||host.hash)
+      throw new Error('Zoho API domain must be an approved regional Zoho endpoint');
+  }
   return credential;
 }
 
