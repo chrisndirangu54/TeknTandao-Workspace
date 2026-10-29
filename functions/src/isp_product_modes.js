@@ -109,6 +109,9 @@ export const createIspConfigurationRecord=onCall({region},async req=>{
    const [existing,...refs]=await Promise.all([tx.get(record),...dependencies.map(ref=>tx.get(ref))]);
    if(existing.exists)throw new HttpsError('already-exists','ISP configuration already exists');
    if(refs.some(ref=>!ref.exists))throw new HttpsError('failed-precondition','Referenced plan, site or device must exist within this ISP');
+   if(kind==='subscribers'&&configuration.deviceId&&
+      refs[2].data()?.siteId!==configuration.siteId)
+      throw new HttpsError('failed-precondition','Subscriber and network device must belong to the same ISP site');
    tx.create(record,{...configuration,mode,recordType:'typed_configuration',createdAt:FieldValue.serverTimestamp(),createdBy:uid});
  });
  return {id,kind,mode,created:true,liveNetwork:false};
