@@ -111,7 +111,7 @@ export const connectBusinessTool = callable(async request => {
 export const connectEnterpriseTool = callable(async request => {
   const {org, uid} = await authorize(request);
   const input = z.object({
-    provider: z.enum(['salesforce', 'atlassian', 'zoho', 'odoo', 'microsoft365', 'powerbi']),
+    provider: z.enum(['salesforce', 'atlassian', 'zoho', 'odoo', 'microsoft365', 'powerbi', 'dynamics365']),
     name: z.string().trim().min(1).max(120),
     credential: z.record(z.any()),
   }).strict().parse(request.data.connection);
@@ -164,6 +164,7 @@ function healthProbe(connection) {
     salesforce:['salesforce_accounts',{limit:1}],
     atlassian:['jira_projects',{}],
     zoho:['zoho_contacts',{page:1,perPage:1}],
+    dynamics365:['d365_accounts',{limit:1}],
     microsoft365:['m365_drive_files',{limit:1}],
     powerbi:['powerbi_workspaces',{limit:1}],
     odoo:['odoo_contacts',{limit:1}],
@@ -533,6 +534,7 @@ const dataExchangeReadTools = new Set([
   'notion_search','slack_channels','slack_history','hubspot_contacts','hubspot_deals',
   'salesforce_accounts','salesforce_contacts','salesforce_opportunities',
   'jira_search_issues','jira_projects','zoho_contacts','zoho_deals',
+  'd365_accounts','d365_contacts','d365_opportunities',
   'm365_drive_files','powerbi_workspaces','powerbi_datasets','powerbi_refresh_history',
   'odoo_contacts','odoo_sale_orders','odoo_products',
 ]);
