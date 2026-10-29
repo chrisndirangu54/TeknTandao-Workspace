@@ -8,7 +8,7 @@ const enabled=Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 test('ISP callable functions isolate tenants, enforce roles, and separate platform operations',
   {skip:!enabled},async()=>{
     if(!getApps().length)initializeApp({projectId:process.env.GCLOUD_PROJECT||'demo-tandao'});
-    const {getIspWorkspaceOverview,listIspWorkspaceRecords,saveIspWorkspaceRecord,createIspConfigurationRecord,requestIspServiceActivation,approveIspServiceActivation,previewIspProvisioning,recordIspTelemetrySample,listIspTelemetrySamples}=await import('../src/isp_product_modes.js');
+    const {getIspWorkspaceOverview,listIspWorkspaceRecords,saveIspWorkspaceRecord,createIspConfigurationRecord,requestIspServiceActivation,approveIspServiceActivation,previewIspProvisioning,recordIspTelemetrySample,listIspTelemetrySamples,createIspInvoiceDraft,submitIspPaymentEvidence}=await import('../src/isp_product_modes.js');
     const db=getFirestore(), suffix=randomUUID().replaceAll('-','').slice(0,16);
     const orgA='ispA_'+suffix,orgB='ispB_'+suffix,ownerA='ownerA_'+suffix,ownerB='ownerB_'+suffix;
     const outsider='intruder_'+suffix,viewer='viewer_'+suffix;
@@ -73,6 +73,22 @@ test('ISP callable functions isolate tenants, enforce roles, and separate platfo
         latencyMs:12,utilizationPct:30
       }}));
       assert.equal(telemetry.verified,false);
+      const invoice=await createIspInvoiceDraft.run(payload(ownerA,'managed',orgA,{
+        invoiceId:'invoice_1',subscriberId:'cust_1',period:'2026-10'
+      }));
+      assert.equal(invoice.paymentVerified,false);
+      const evidence=await submitIspPaymentEvidence.run(payload(ownerA,'managed',orgA,{evidence:{
+        invoiceId:'invoice_1',reference:'receipt_1',provider:'mpesa',amountMinor:250000
+      }}));
+      assert.equal(evidence.invoiceSettled,false);
+      await assert.rejects(submitIspPaymentEvidence.run(payload(ownerA,'managed',orgA,{evidence:{
+        invoiceId:'invoice_1',reference:'receipt_1',provider:'mpesa',amountMinor:250000
+      }})),/already submitted/);
+      await assert.rejects(submitIspPaymentEvidence.run(payload(ownerB,'managed',orgB,{evidence:{
+        invoiceId:'invoice_1',reference:'receipt_2',provider:'mpesa',amountMinor:250000
+      }})),/Invoice not found/);
+      assert.equal((await db.doc('organizations/'+orgA+'/ispManagement/workspace/invoices/invoice_1').get()).data().paymentStatus,'unverified');
+
       assert.equal((await listIspTelemetrySamples.run(payload(ownerA,'managed',orgA))).samples.length,1);
       assert.equal((await listIspTelemetrySamples.run(payload(ownerB,'managed',orgB))).samples.length,0);
       await assert.rejects(recordIspTelemetrySample.run(payload(ownerB,'managed',orgB,{sample:{
