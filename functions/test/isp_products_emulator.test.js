@@ -8,7 +8,7 @@ const enabled=Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 test('ISP callable functions isolate tenants, enforce roles, and separate platform operations',
   {skip:!enabled},async()=>{
     if(!getApps().length)initializeApp({projectId:process.env.GCLOUD_PROJECT||'demo-tandao'});
-    const {getIspWorkspaceOverview,listIspWorkspaceRecords,saveIspWorkspaceRecord,createIspConfigurationRecord,requestIspServiceActivation,approveIspServiceActivation}=await import('../src/isp_product_modes.js');
+    const {getIspWorkspaceOverview,listIspWorkspaceRecords,saveIspWorkspaceRecord,createIspConfigurationRecord,requestIspServiceActivation,approveIspServiceActivation,previewIspProvisioning}=await import('../src/isp_product_modes.js');
     const db=getFirestore(), suffix=randomUUID().replaceAll('-','').slice(0,16);
     const orgA='ispA_'+suffix,orgB='ispB_'+suffix,ownerA='ownerA_'+suffix,ownerB='ownerB_'+suffix;
     const outsider='intruder_'+suffix,viewer='viewer_'+suffix;
@@ -47,7 +47,7 @@ test('ISP callable functions isolate tenants, enforce roles, and separate platfo
       const configured=(kind,id,record)=>createIspConfigurationRecord.run(payload(ownerA,'managed',orgA,{kind,id,record}));
       await configured('sites','main',{label:'Main Hub',siteCode:'main',area:'Nairobi'});
       await configured('plans','fibre20',{label:'Fiber 20M',downloadKbps:20000,uploadKbps:10000,priceMinorKes:250000,activationMode:'pppoe',vlanId:100});
-      await configured('devices','router_1',{label:'Router One',vendor:'mikrotik',model:'CCR',siteId:'main',driver:'routeros_rest'});
+      await configured('devices','router_1',{label:'Router One',vendor:'mikrotik',model:'CCR',siteId:'main',driver:'routeros_rest',managementProfileId:'vault_edge_1'});
       await configured('subscribers','cust_1',{label:'Customer One',accountCode:'cust_1',planId:'fibre20',siteId:'main',deviceId:'router_1',accessMode:'fiber'});
       await assert.rejects(createIspConfigurationRecord.run(payload(ownerB,'managed',orgB,{kind:'subscribers',id:'cust_2',
          record:{label:'Intruder',accountCode:'cust_2',planId:'fibre20',siteId:'main',accessMode:'fiber'}})),/within this ISP/);
@@ -59,6 +59,12 @@ test('ISP callable functions isolate tenants, enforce roles, and separate platfo
       const approval=await approveIspServiceActivation.run(payload('approver_'+suffix,'managed',orgA,{requestId:'install_one'}));
       assert.equal(approval.approved,true);
       assert.equal(approval.executed,false);
+      const preview=await previewIspProvisioning.run(payload(ownerA,'managed',orgA,{requestId:'install_one'}));
+      assert.equal(preview.executed,false);
+      assert.equal(preview.preview.command,null);
+      assert.equal(preview.driver.connected,false);
+      await assert.rejects(previewIspProvisioning.run(payload(ownerB,'managed',orgB,{requestId:'install_one'})),/not found/i);
+
       assert.equal((await db.doc('organizations/'+orgA+'/ispManagement/workspace/activationRequests/install_one').get()).data().state,'approved_not_executed');
       await assert.rejects(approveIspServiceActivation.run(payload(ownerB,'managed',orgB,{requestId:'install_one'})),/not found/i);
       await assert.rejects(getIspWorkspaceOverview.run(payload(outsider,'managed',orgA)),/access required/);
