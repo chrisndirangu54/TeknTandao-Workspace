@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
+import 'automation_studio.dart';
 
 class ResellerOnboardingDashboard extends StatefulWidget {
   final SuiteStore store;
@@ -57,6 +58,7 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
   final records=(data['records'] as List? ?? []).whereType<Map>().map((m)=>Map<String,dynamic>.from(m)).toList();
   final stages=Map<String,dynamic>.from(data['stages'] as Map? ?? {});
   return Scaffold(appBar:AppBar(title:const Text('Reseller onboarding and automation'),actions:[
+   IconButton(tooltip:'Microsoft automation connections',onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>AutomationStudio(store:widget.store))),icon:const Icon(Icons.auto_awesome)),
    IconButton(onPressed:busy?null:load,icon:const Icon(Icons.refresh)),
   ]),body:ListView(padding:const EdgeInsets.all(18),children:[
    Wrap(spacing:12,runSpacing:12,children:[
@@ -71,6 +73,7 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
      const Divider(),for(final step in (data['microsoftChecklist'] as List? ?? []))
       ListTile(leading:const Icon(Icons.check_circle_outline),title:Text(step.toString())),
     ]),
+   OutlinedButton.icon(onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>AutomationStudio(store:widget.store))),icon:const Icon(Icons.hub_outlined),label:const Text('Open existing AI Automation Studio and Microsoft connections')),
    const Text('Dynamics 365 synchronization is not yet enabled. Connect your Dataverse account in Automation Studio; these onboarding records stay internal until authorized synchronization is configured.'),
    if(error!=null)Padding(padding:const EdgeInsets.all(12),child:Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),
    if(records.isEmpty)const Padding(padding:EdgeInsets.all(20),child:Text('No applications yet.')),
