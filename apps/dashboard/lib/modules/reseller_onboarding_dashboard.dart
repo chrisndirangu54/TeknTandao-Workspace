@@ -55,6 +55,37 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
   catch(e){if(mounted)setState(()=>error=e.toString());}
   finally{if(mounted)setState(()=>busy=false);}
  }
+ Future<void> advise(String id)async{
+  final seats=TextEditingController(text:'10');
+  final needs=<String>{'collaboration'};
+  const options=['collaboration','email','cloud','crm','erp','analytics','automation','security','devices','education','developer'];
+  try{
+   final approved=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,refresh)=>AlertDialog(
+    title:const Text('AI-guided Microsoft solution assessment'),
+    content:SizedBox(width:440,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+     TextField(controller:seats,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Number of users / seats')),
+     for(final need in options)CheckboxListTile(dense:true,title:Text(need),value:needs.contains(need),
+       onChanged:(value)=>refresh((){if(value==true){needs.add(need);}else{needs.remove(need);}})),
+     const Text('Recommendations are explainable rules, not verified Microsoft licensing offers. Pricing and provisioning require Partner Center confirmation.'),
+    ]))),
+    actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),
+     FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Generate draft'))])));
+   if(approved!=true)return;
+   setState(()=>busy=true);
+   final response=await widget.store.call('generateMicrosoftResellerAdvice',{'id':id,
+    'requirements':{'seats':int.tryParse(seats.text)??0,'needs':needs.toList()}});
+   if(!mounted)return;
+   final draft=Map<String,dynamic>.from(response['draft'] as Map);
+   await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(
+    title:const Text('Microsoft solution recommendations'),
+    content:SizedBox(width:550,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,
+     children:[for(final item in (draft['recommendations'] as List? ?? []))
+      ListTile(title:Text(item['name'].toString()),subtitle:Text('Customer needs: ${(item['rationale'] as List? ?? []).join(', ')}\\nSKU and eligibility unverified')),
+      const Text('Quotation is a draft only. No orders or subscriptions have been created.')]))),
+    actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));
+  }catch(e){if(mounted)setState(()=>error=e.toString());}
+  finally{seats.dispose();if(mounted)setState(()=>busy=false);}
+ }
  @override Widget build(BuildContext context){
   final records=(data['records'] as List? ?? []).whereType<Map>().map((m)=>Map<String,dynamic>.from(m)).toList();
   final stages=Map<String,dynamic>.from(data['stages'] as Map? ?? {});
@@ -83,13 +114,16 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
     title:Text('${record['company'] ?? ''} · ${record['program'] ?? ''}'),
     subtitle:Text('${record['contactEmail'] ?? ''}\nStage: ${record['stage'] ?? ''}\nMicrosoft products: ${(record['microsoftFamilies'] as List? ?? []).join(', ')}\n${record['notes'] ?? ''}'),
     isThreeLine:true,
-    trailing:PopupMenuButton<String>(
+    trailing:Wrap(mainAxisSize:MainAxisSize.min,children:[
+     if(record['program']=='microsoft')IconButton(tooltip:'AI solution advisor',icon:const Icon(Icons.auto_awesome),onPressed:busy?null:()=>advise(record['id'].toString())),
+     PopupMenuButton<String>(
      enabled:!busy,
      tooltip:'Update onboarding stage',
      onSelected:(stage)=>change(record['id'].toString(),stage),
      itemBuilder:(_)=>['lead','qualification','application','verification','approved','provisioning','active','blocked'].map(
       (stage)=>PopupMenuItem(value:stage,child:Text(stage))).toList(),
     ),
+    ]),
    )),
   ]));
  }
