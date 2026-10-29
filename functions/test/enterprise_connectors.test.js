@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   enterpriseBuiltinTools,
   enterpriseBaseUrl,
+  dynamics365BaseUrl,
   validateEnterpriseCredential,
 } from '../src/enterprise_connectors.js';
 
@@ -94,4 +95,23 @@ test('enterprise base URLs reject private networks and unsafe schemes', () => {
     assert.throws(() => enterpriseBaseUrl(url), url);
   }
   assert.equal(enterpriseBaseUrl('https://example.com/'), 'https://example.com');
+});
+
+test('Dynamics 365 connection validates Dataverse environment and token',()=>{
+ const credential=validateEnterpriseCredential('dynamics365',{
+  environment_url:'https://sample.crm4.dynamics.com',
+  access_token:'x'.repeat(32)
+ });
+ assert.equal(dynamics365BaseUrl(credential.environment_url),'https://sample.crm4.dynamics.com');
+ assert.ok(enterpriseBuiltinTools.dynamics365.some(t=>t.name==='d365_accounts'));
+ assert.ok(enterpriseBuiltinTools.dynamics365.some(t=>t.name==='d365_create_contact'));
+ for(const endpoint of ['https://example.com','https://localhost',
+  'http://sample.crm4.dynamics.com','https://sample.crm4.dynamics.com/other',
+  'https://sample.crm4.dynamics.com.evil.com']){
+  assert.throws(()=>validateEnterpriseCredential('dynamics365',{
+    environment_url:endpoint,access_token:'x'.repeat(32)}));
+ }
+ assert.throws(()=>validateEnterpriseCredential('dynamics365',{
+   environment_url:'https://sample.crm4.dynamics.com',
+   access_token:'short'}));
 });
