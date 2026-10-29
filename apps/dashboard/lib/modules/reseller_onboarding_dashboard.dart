@@ -72,8 +72,11 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
      FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Generate draft'))])));
    if(approved!=true)return;
    setState(()=>busy=true);
-   final response=await widget.store.call('generateMicrosoftResellerAiBrief',{'id':id,
-    'requirements':{'seats':int.tryParse(seats.text)??0,'needs':needs.toList()}});
+   final requirements={'seats':int.tryParse(seats.text)??0,'needs':needs.toList()};
+   Map<String,dynamic> response;
+   try{response=await widget.store.call('generateMicrosoftResellerAiBrief',{'id':id,'requirements':requirements});}
+   catch(_){response=await widget.store.call('generateMicrosoftResellerAdvice',{'id':id,'requirements':requirements});}
+
    if(!mounted)return;
    final draft=Map<String,dynamic>.from(response['draft'] as Map);
    final narrative=Map<String,dynamic>.from(response['narrative'] as Map? ?? {});
