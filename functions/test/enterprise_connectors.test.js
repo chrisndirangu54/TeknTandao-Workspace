@@ -115,3 +115,15 @@ test('Dynamics 365 connection validates Dataverse environment and token',()=>{
    environment_url:'https://sample.crm4.dynamics.com',
    access_token:'short'}));
 });
+
+test('Zoho regional domains and Odoo HTTPS endpoints are validated',()=>{
+ for(const host of ['https://www.zohoapis.com','https://www.zohoapis.eu','https://www.zohoapis.in']){
+  assert.equal(validateEnterpriseCredential('zoho',{api_domain:host,access_token:'x'.repeat(24)}).api_domain,host);
+ }
+ for(const host of ['https://localhost','http://www.zohoapis.com','https://www.zohoapis.com.evil.test','https://www.zohoapis.com/redirect']){
+  assert.throws(()=>validateEnterpriseCredential('zoho',{api_domain:host,access_token:'x'.repeat(24)}));
+ }
+ assert.throws(()=>validateEnterpriseCredential('odoo',{base_url:'http://127.0.0.1:8069',api_key:'x'.repeat(20)}));
+ assert.ok(enterpriseBuiltinTools.zoho.some(x=>x.name==='zoho_accounts'));
+ assert.ok(enterpriseBuiltinTools.odoo.some(x=>x.name==='odoo_invoices'));
+});
