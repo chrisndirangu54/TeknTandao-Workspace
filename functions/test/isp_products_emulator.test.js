@@ -8,7 +8,7 @@ const enabled=Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 test('ISP callable functions isolate tenants, enforce roles, and separate platform operations',
   {skip:!enabled},async()=>{
     if(!getApps().length)initializeApp({projectId:process.env.GCLOUD_PROJECT||'demo-tandao'});
-    const {getIspWorkspaceOverview,listIspWorkspaceRecords,saveIspWorkspaceRecord,createIspConfigurationRecord,requestIspServiceActivation,approveIspServiceActivation,previewIspProvisioning}=await import('../src/isp_product_modes.js');
+    const {getIspWorkspaceOverview,listIspWorkspaceRecords,saveIspWorkspaceRecord,createIspConfigurationRecord,requestIspServiceActivation,approveIspServiceActivation,previewIspProvisioning,recordIspTelemetrySample,listIspTelemetrySamples}=await import('../src/isp_product_modes.js');
     const db=getFirestore(), suffix=randomUUID().replaceAll('-','').slice(0,16);
     const orgA='ispA_'+suffix,orgB='ispB_'+suffix,ownerA='ownerA_'+suffix,ownerB='ownerB_'+suffix;
     const outsider='intruder_'+suffix,viewer='viewer_'+suffix;
@@ -68,6 +68,20 @@ test('ISP callable functions isolate tenants, enforce roles, and separate platfo
       assert.equal(preview.executed,false);
       assert.equal(preview.preview.command,null);
       assert.equal(preview.driver.connected,false);
+      const telemetry=await recordIspTelemetrySample.run(payload(ownerA,'managed',orgA,{sample:{
+        deviceId:'router_1',siteId:'main',source:'snmpv3',observedAtMs:Date.now(),
+        latencyMs:12,utilizationPct:30
+      }}));
+      assert.equal(telemetry.verified,false);
+      assert.equal((await listIspTelemetrySamples.run(payload(ownerA,'managed',orgA))).samples.length,1);
+      assert.equal((await listIspTelemetrySamples.run(payload(ownerB,'managed',orgB))).samples.length,0);
+      await assert.rejects(recordIspTelemetrySample.run(payload(ownerB,'managed',orgB,{sample:{
+        deviceId:'router_1',siteId:'main',source:'snmpv3',observedAtMs:Date.now(),latencyMs:10
+      }})),/registered at the same ISP site/);
+      await assert.rejects(recordIspTelemetrySample.run(payload(viewer,'managed',orgA,{sample:{
+        deviceId:'router_1',siteId:'main',source:'snmpv3',observedAtMs:Date.now(),latencyMs:10
+      }})),/access required/);
+
       await assert.rejects(previewIspProvisioning.run(payload(ownerB,'managed',orgB,{requestId:'install_one'})),/not found/i);
 
       assert.equal((await db.doc('organizations/'+orgA+'/ispManagement/workspace/activationRequests/install_one').get()).data().state,'approved_not_executed');
