@@ -1,3 +1,4 @@
+import {draftMicrosoftResellerAdvice} from './microsoft_reseller_ai_domain.js';
 import {microsoftProductFamilies,microsoftResellerChecklist,validateMicrosoftCatalogSelection} from './microsoft_reseller_catalog.js';
 import './index.js';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
@@ -63,4 +64,19 @@ export const updateResellerOnboardingStage=onCall({region},async req=>{
   tx.update(ref,{stage,updatedBy:uid,updatedAt:FieldValue.serverTimestamp()});
  });
  return {id:ref.id,stage,externalAccountProvisioned:false};
+});
+
+export const generateMicrosoftResellerAdvice=onCall({region},async req=>{
+ const {org,uid}=await context(req);
+ const id=identifier(req.data?.id);
+ const ref=org.collection('resellerOnboarding').doc(id);
+ const existing=await ref.get();
+ if(!existing.exists||existing.data()?.program!=='microsoft')
+  throw new HttpsError('failed-precondition','Microsoft onboarding record required');
+ let draft;
+ try{draft=draftMicrosoftResellerAdvice(req.data?.requirements);}
+ catch(e){throw new HttpsError('invalid-argument',e.message);}
+ await ref.collection('adviceDrafts').add({...draft,createdBy:uid,
+  createdAt:FieldValue.serverTimestamp(),source:'rules_engine',approved:false});
+ return {draft,source:'explainable_rules',externalActionsTaken:false};
 });
