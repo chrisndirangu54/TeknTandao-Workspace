@@ -533,10 +533,10 @@ const dataExchangeReadTools = new Set([
   'gmail_search','gmail_read','drive_search','calendar_list_events','sheets_read',
   'notion_search','slack_channels','slack_history','hubspot_contacts','hubspot_deals',
   'salesforce_accounts','salesforce_contacts','salesforce_opportunities',
-  'jira_search_issues','jira_projects','zoho_contacts','zoho_deals',
+  'jira_search_issues','jira_projects','zoho_contacts','zoho_deals','zoho_accounts',
   'd365_accounts','d365_contacts','d365_opportunities',
   'm365_drive_files','powerbi_workspaces','powerbi_datasets','powerbi_refresh_history',
-  'odoo_contacts','odoo_sale_orders','odoo_products',
+  'odoo_contacts','odoo_sale_orders','odoo_products','odoo_invoices',
 ]);
 
 function assertReadOnlyExchangeTool(connection, toolName) {
