@@ -207,6 +207,13 @@ class _AutomationStudioState extends State<AutomationStudio> {
         });
         secretKeys.add('access_token');
         break;
+      case 'dynamics365':
+        fields.addAll({
+          'environment_url': 'Dataverse environment URL (https://org.crm.dynamics.com)',
+          'access_token': 'Dataverse OAuth access token',
+        });
+        secretKeys.add('access_token');
+        break;
       case 'microsoft365':
         fields.addAll({'access_token': 'Microsoft Graph access token'});
         secretKeys.add('access_token');
@@ -895,6 +902,17 @@ class _AutomationStudioState extends State<AutomationStudio> {
       ],
     ),
 
+    _card(
+      'Microsoft Dynamics 365 · Dataverse',
+      'Connect a Dynamics 365 Sales / Dataverse environment. Browse accounts, contacts and opportunities; create contacts with workspace-approved access.',
+      [
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => _enterpriseConnection('dynamics365'),
+          icon: const Icon(Icons.business_center_outlined),
+          label: const Text('Connect Dynamics 365'),
+        ),
+      ],
+    ),
     _card(
       'Microsoft 365 · PowerPoint / Excel / Word',
       'Connect Microsoft Graph so generated PPTX, XLSX, DOCX, PDF and CSV exports can be published directly into OneDrive.',
