@@ -1,3 +1,4 @@
+import {draftIspProvisioningPlan,validateIspDriver} from './isp_integration_contracts.js';
 import {normalizeIspConfig,ispConfigKinds,validateIspActivation,approveIspActivation} from './isp_typed_config_domain.js';
 import {getFirestore,FieldValue,FieldPath} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
@@ -144,4 +145,28 @@ export const approveIspServiceActivation=onCall({region},async req=>{
  });
  return {requestId:id,approved:true,executed:false,
    message:'Approved for a separately authenticated network controller; no command was sent.'};
+});
+
+export const previewIspProvisioning=onCall({region},async req=>{
+ const {root}=await context(req);
+ const id=identifier(req.data?.requestId);
+ const activation=root.collection('activationRequests').doc(id);
+ const approval=await activation.get();
+ if(!approval.exists)throw new HttpsError('not-found','Activation request not found');
+ const request=approval.data();
+ if(request.state!=='approved_not_executed')throw new HttpsError('failed-precondition','Independent approval required');
+ const subscriberDoc=await root.collection('subscribers').doc(identifier(request.subscriberId)).get();
+ if(!subscriberDoc.exists)throw new HttpsError('failed-precondition','Subscriber missing');
+ const subscriber=subscriberDoc.data();
+ if(!subscriber.planId||!subscriber.deviceId)throw new HttpsError('failed-precondition','Linked service plan and network device required');
+ const [planDoc,deviceDoc]=await Promise.all([
+  root.collection('plans').doc(identifier(subscriber.planId)).get(),
+  root.collection('devices').doc(identifier(subscriber.deviceId)).get()
+ ]);
+ if(!planDoc.exists||!deviceDoc.exists)throw new HttpsError('failed-precondition','Referenced ISP equipment or plan missing');
+ try{
+  const driver=validateIspDriver(deviceDoc.data());
+  const preview=draftIspProvisioningPlan({request,subscriber,plan:planDoc.data(),device:deviceDoc.data()});
+  return {preview,driver,executed:false};
+ }catch(error){throw new HttpsError('failed-precondition',error.message);}
 });
