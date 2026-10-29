@@ -266,3 +266,35 @@ export const hospitalReportDownload = api(async request => {
   const [url] = await getStorage().bucket().file(data.storagePath, {generation: data.storageGeneration}).getSignedUrl({version: 'v4', action: 'read', expires: Date.now() + 5 * 60000});
   return {url};
 });
+
+/**
+ * Patient-authenticated bounded export of their own hospital history.
+ * Callers must have a hospital portal profile and active installation.
+ * Does not expose financial or internal staff data.
+ */
+export const hospitalExportPatientHistory = api(async request => {
+  const {org, profile, user, records} = await context(request);
+  const patient = await org.collection('patients').doc(profile.patientId).get();
+  if (!patient.exists || patient.data()?.portalUid !== user) {
+    throw new HttpsError('permission-denied', 'Verified patient portal identity required');
+  }
+  const snapshot = await records.where('patientId', '==', profile.patientId)
+    .orderBy(FieldPath.documentId()).limit(100).get();
+  const allowed = new Set(['appointment', 'encounter', 'prescription', 'labReport',
+    'labTest', 'diagnosis', 'observation', 'procedure']);
+  const entries = snapshot.docs.filter(d => allowed.has(d.data().kind)).map(d => ({
+    id: d.id,
+    kind: d.data().kind,
+    title: String(d.data().name || d.data().kind).slice(0, 200),
+    status: String(d.data().status || '').slice(0, 80),
+    occurredAt: d.data().updatedAt?.toDate?.()?.toISOString() ||
+      d.data().createdAt?.toDate?.()?.toISOString() || null,
+  }));
+  await org.collection('hospitalExportAudit').add({
+    actorUid: user, patientId: profile.patientId, exportCount: entries.length,
+    scope: 'clinical-summary', createdAt: stamp(),
+  });
+  return {schema: 'hulka.hospital-history.v1', source: 'TeknTandao Workspace',
+    organizationId: org.id, exportedAt: new Date().toISOString(),
+    records: entries, truncated: snapshot.size === 100};
+});
