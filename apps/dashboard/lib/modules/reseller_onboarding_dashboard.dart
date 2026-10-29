@@ -72,15 +72,20 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
      FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Generate draft'))])));
    if(approved!=true)return;
    setState(()=>busy=true);
-   final response=await widget.store.call('generateMicrosoftResellerAdvice',{'id':id,
+   final response=await widget.store.call('generateMicrosoftResellerAiBrief',{'id':id,
     'requirements':{'seats':int.tryParse(seats.text)??0,'needs':needs.toList()}});
    if(!mounted)return;
    final draft=Map<String,dynamic>.from(response['draft'] as Map);
+   final narrative=Map<String,dynamic>.from(response['narrative'] as Map? ?? {});
    await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(
     title:const Text('Microsoft solution recommendations'),
     content:SizedBox(width:550,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,
      children:[for(final item in (draft['recommendations'] as List? ?? []))
       ListTile(title:Text(item['name'].toString()),subtitle:Text('Customer needs: ${(item['rationale'] as List? ?? []).join(', ')}\\nSKU and eligibility unverified')),
+      if(narrative['summary']!=null)Text(narrative['summary'].toString()),
+      for(final question in (narrative['discoveryQuestions'] as List? ?? []))ListTile(leading:const Icon(Icons.help_outline),title:Text(question.toString())),
+      for(final step in (narrative['implementationSteps'] as List? ?? []))ListTile(leading:const Icon(Icons.task_alt),title:Text(step.toString())),
+      for(final risk in (narrative['risks'] as List? ?? []))ListTile(leading:const Icon(Icons.warning_amber_outlined),title:Text(risk.toString())),
       const Text('Quotation is a draft only. No orders or subscriptions have been created.')]))),
     actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));
   }catch(e){if(mounted)setState(()=>error=e.toString());}
