@@ -37,6 +37,12 @@ export const enterpriseBuiltinTools = Object.freeze({
       email:string,firstName:string,lastName:string,phone:string,accountName:string
     },['email']),
   ],
+  dynamics365:[
+    tool('d365_accounts','List Dynamics 365 Dataverse accounts',{limit:number}),
+    tool('d365_contacts','List Dynamics 365 Dataverse contacts',{limit:number}),
+    tool('d365_opportunities','List Dynamics 365 opportunities',{limit:number}),
+    tool('d365_create_contact','Create a Dynamics 365 contact',{firstName:string,lastName:string,email:string,phone:string},['lastName']),
+  ],
   microsoft365:[
     tool('m365_drive_files','List files in the connected OneDrive root',{limit:number}),
     tool('m365_user_profile','Read the connected Microsoft 365 user profile',{}),
@@ -133,6 +139,15 @@ const schemas = {
     phone:z.string().max(80).optional(),
     accountName:z.string().max(160).optional(),
   }).strict(),
+  d365_accounts:z.object({limit:commonLimit}).strict(),
+  d365_contacts:z.object({limit:commonLimit}).strict(),
+  d365_opportunities:z.object({limit:commonLimit}).strict(),
+  d365_create_contact:z.object({
+    firstName:z.string().trim().max(120).optional(),
+    lastName:z.string().trim().min(1).max(120),
+    email:z.email().max(254).optional(),
+    phone:z.string().max(80).optional(),
+  }).strict(),
   m365_drive_files:z.object({limit:commonLimit}).strict(),
   m365_user_profile:z.object({}).strict(),
   m365_drive_metadata:z.object({}).strict(),
@@ -225,6 +240,34 @@ async function zoho(credential,name,args){
 }
 
 
+export function dynamics365BaseUrl(raw){
+  const base=enterpriseBaseUrl(raw),url=new URL(base);
+  if(!/^[a-z0-9-]+\.crm(?:[0-9]+)?\.dynamics\.com$/i.test(url.hostname)||
+     url.pathname!=='/')
+    throw new Error('Expected a Microsoft Dataverse organization URL (https://tenant.crm*.dynamics.com)');
+  return base;
+}
+async function dynamics365(credential,name,args){
+  const base=dynamics365BaseUrl(credential.environment_url);
+  const headers={Authorization:`Bearer ${credential.access_token}`,
+    Accept:'application/json','Content-Type':'application/json',
+    'OData-MaxVersion':'4.0','OData-Version':'4.0'};
+  const api=`${base}/api/data/v9.2`;
+  if(name==='d365_accounts')return http(`${api}/accounts?$select=accountid,name,accountnumber,telephone1,websiteurl,modifiedon&$orderby=modifiedon%20desc&$top=${args.limit}`,{headers});
+  if(name==='d365_contacts')return http(`${api}/contacts?$select=contactid,firstname,lastname,emailaddress1,telephone1,modifiedon&$orderby=modifiedon%20desc&$top=${args.limit}`,{headers});
+  if(name==='d365_opportunities')return http(`${api}/opportunities?$select=opportunityid,name,estimatedvalue,estimatedclosedate,statecode,modifiedon&$orderby=modifiedon%20desc&$top=${args.limit}`,{headers});
+  if(name==='d365_create_contact'){
+    const body={lastname:args.lastName};
+    if(args.firstName)body.firstname=args.firstName;
+    if(args.email)body.emailaddress1=args.email;
+    if(args.phone)body.telephone1=args.phone;
+    return http(`${api}/contacts?$select=contactid,fullname,emailaddress1`,{
+      method:'POST',headers:{...headers,Prefer:'return=representation'},body:JSON.stringify(body)
+    });
+  }
+  throw new Error('Unknown Dynamics 365 tool');
+}
+
 async function microsoft365(credential,name,args){
   const headers={Authorization:`Bearer ${credential.access_token}`,'Content-Type':'application/json'};
   if(name==='m365_drive_files'){
@@ -284,11 +327,13 @@ export function validateEnterpriseCredential(provider,raw){
     salesforce:z.object({access_token:z.string().min(10).max(8000),instance_url:z.string().url().max(1000),api_version:z.string().regex(/^v[0-9]+\.[0-9]+$/).optional()}).strict(),
     atlassian:z.object({email:z.string().email().max(254),api_token:z.string().min(10).max(8000),site_url:z.string().url().max(1000)}).strict(),
     zoho:z.object({access_token:z.string().min(10).max(8000),api_domain:z.string().url().max(1000).default('https://www.zohoapis.com')}).strict(),
+    dynamics365:z.object({environment_url:z.url().max(500),access_token:z.string().min(20).max(12000)}).strict(),
     microsoft365:z.object({access_token:z.string().min(20).max(12000)}).strict(),
     powerbi:z.object({access_token:z.string().min(20).max(12000)}).strict(),
     odoo:z.object({base_url:z.string().url().max(1000),database:z.string().max(120).default(''),api_key:z.string().min(8).max(8000)}).strict(),
   }[provider]?.parse(raw);
   if(!credential) throw new Error('Unsupported enterprise provider');
+  if(provider==='dynamics365')dynamics365BaseUrl(credential.environment_url);
   return credential;
 }
 
@@ -297,6 +342,7 @@ export async function validateEnterpriseConnection(provider,credential){
     salesforce:['salesforce_accounts',{limit:1}],
     atlassian:['jira_projects',{}],
     zoho:['zoho_contacts',{page:1,perPage:1}],
+    dynamics365:['d365_accounts',{limit:1}],
     microsoft365:['m365_drive_files',{limit:1}],
     powerbi:['powerbi_workspaces',{limit:1}],
     odoo:['odoo_contacts',{limit:1}],
@@ -310,6 +356,7 @@ export async function callEnterpriseBuiltin(provider,credential,name,raw){
   if(provider==='salesforce') return salesforce(credential,name,args);
   if(provider==='atlassian') return atlassian(credential,name,args);
   if(provider==='zoho') return zoho(credential,name,args);
+  if(provider==='dynamics365') return dynamics365(credential,name,args);
   if(provider==='microsoft365') return microsoft365(credential,name,args);
   if(provider==='powerbi') return powerbi(credential,name,args);
   if(provider==='odoo') return odoo(credential,name,args);
