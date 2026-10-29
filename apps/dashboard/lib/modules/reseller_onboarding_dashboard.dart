@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../suite.dart';
 import 'automation_studio.dart';
+import 'cloud_automation_screen.dart';
 
 class ResellerOnboardingDashboard extends StatefulWidget {
   final SuiteStore store;
@@ -58,6 +59,7 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
   final records=(data['records'] as List? ?? []).whereType<Map>().map((m)=>Map<String,dynamic>.from(m)).toList();
   final stages=Map<String,dynamic>.from(data['stages'] as Map? ?? {});
   return Scaffold(appBar:AppBar(title:const Text('Reseller onboarding and automation'),actions:[
+   IconButton(tooltip:'Cloud automation plans',onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>CloudAutomationScreen(store:widget.store))),icon:const Icon(Icons.cloud_outlined)),
    IconButton(tooltip:'Microsoft automation connections',onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>AutomationStudio(store:widget.store))),icon:const Icon(Icons.auto_awesome)),
    IconButton(onPressed:busy?null:load,icon:const Icon(Icons.refresh)),
   ]),body:ListView(padding:const EdgeInsets.all(18),children:[
