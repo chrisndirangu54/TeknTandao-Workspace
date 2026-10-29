@@ -49,6 +49,11 @@ test('ISP callable functions isolate tenants, enforce roles, and separate platfo
       await configured('plans','fibre20',{label:'Fiber 20M',downloadKbps:20000,uploadKbps:10000,priceMinorKes:250000,activationMode:'pppoe',vlanId:100});
       await configured('devices','router_1',{label:'Router One',vendor:'mikrotik',model:'CCR',siteId:'main',driver:'routeros_rest',managementProfileId:'vault_edge_1'});
       await configured('subscribers','cust_1',{label:'Customer One',accountCode:'cust_1',planId:'fibre20',siteId:'main',deviceId:'router_1',accessMode:'fiber'});
+      await configured('sites','remote',{label:'Remote Hub',siteCode:'remote',area:'Mombasa'});
+      await assert.rejects(configured('subscribers','cust_wrong_site',{
+        label:'Wrong Site Customer',accountCode:'cust_wrong_site',planId:'fibre20',
+        siteId:'remote',deviceId:'router_1',accessMode:'fiber'
+      }),/same ISP site/);
       await assert.rejects(createIspConfigurationRecord.run(payload(ownerB,'managed',orgB,{kind:'subscribers',id:'cust_2',
          record:{label:'Intruder',accountCode:'cust_2',planId:'fibre20',siteId:'main',accessMode:'fiber'}})),/within this ISP/);
       const activation=await requestIspServiceActivation.run(payload(ownerA,'managed',orgA,{request:{
