@@ -278,6 +278,9 @@ export const hospitalExportPatientHistory = api(async request => {
   if (!patient.exists || patient.data()?.portalUid !== user) {
     throw new HttpsError('permission-denied', 'Verified patient portal identity required');
   }
+  if (request.data?.acknowledgeExport !== true) {
+    throw new HttpsError('failed-precondition', 'Explicit patient confirmation required for every export');
+  }
   const snapshot = await records.where('patientId', '==', profile.patientId)
     .orderBy(FieldPath.documentId()).limit(100).get();
   const allowed = new Set(['appointment', 'encounter', 'prescription', 'labReport',
