@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../suite.dart';
+import 'reseller_onboarding_dashboard.dart';
 
 class ResellerStudioScreen extends StatefulWidget {
   final SuiteStore store;
@@ -554,6 +555,13 @@ class _ResellerStudioScreenState extends State<ResellerStudioScreen> {
       appBar: AppBar(
         title: const Text('Reseller Studio'),
         actions: [
+          IconButton(
+            tooltip: 'Reseller onboarding dashboard',
+            icon: const Icon(Icons.dashboard_customize_outlined),
+            onPressed: widget.store.demo ? null : () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => ResellerOnboardingDashboard(store: widget.store)),
+            ),
+          ),
           IconButton(
             onPressed: _busy || widget.store.demo ? null : _load,
             tooltip: 'Refresh reseller data',
