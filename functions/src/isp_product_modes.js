@@ -1,3 +1,4 @@
+import {draftIspInvoice,prepareIspPaymentEvidence} from './isp_billing_domain.js';
 import {draftIspProvisioningPlan,validateIspDriver,normalizeIspTelemetry} from './isp_integration_contracts.js';
 import {normalizeIspConfig,ispConfigKinds,validateIspActivation,approveIspActivation} from './isp_typed_config_domain.js';
 import {getFirestore,FieldValue,FieldPath} from 'firebase-admin/firestore';
@@ -197,4 +198,40 @@ export const listIspTelemetrySamples=onCall({region},async req=>{
  return {samples:snap.docs.map(d=>({id:d.id,...d.data(),
   createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()??null})),
   trustedLiveTelemetry:false,morePagesMayExist:snap.size===pageSize};
+});
+
+export const createIspInvoiceDraft=onCall({region},async req=>{
+ const {root,uid,mode}=await context(req,true);
+ const invoiceId=identifier(req.data?.invoiceId);
+ const subscriberId=identifier(req.data?.subscriberId);
+ const subscriber=await root.collection('subscribers').doc(subscriberId).get();
+ if(!subscriber.exists||subscriber.data()?.recordType!=='typed_configuration')
+  throw new HttpsError('failed-precondition','Typed subscriber required');
+ const planId=identifier(subscriber.data().planId);
+ const plan=await root.collection('plans').doc(planId).get();
+ if(!plan.exists||plan.data()?.recordType!=='typed_configuration')
+  throw new HttpsError('failed-precondition','Installed ISP tariff required');
+ let invoice;
+ try{invoice=draftIspInvoice({subscriberId,planId,
+  priceMinorKes:plan.data().priceMinorKes,period:req.data?.period,reference:invoiceId});}
+ catch(error){throw new HttpsError('invalid-argument',error.message);}
+ await root.collection('invoices').doc(invoiceId).create({
+  ...invoice,mode,createdBy:uid,createdAt:FieldValue.serverTimestamp()});
+ return {invoiceId,created:true,paymentVerified:false};
+});
+export const submitIspPaymentEvidence=onCall({region},async req=>{
+ const {root,uid,mode}=await context(req,true);
+ let evidence;
+ try{evidence=prepareIspPaymentEvidence(req.data?.evidence);}
+ catch(error){throw new HttpsError('invalid-argument',error.message);}
+ const invoice=root.collection('invoices').doc(evidence.invoiceId);
+ const evidenceRef=root.collection('paymentEvidence').doc(evidence.reference);
+ await db.runTransaction(async tx=>{
+  const [bill,prior]=await Promise.all([tx.get(invoice),tx.get(evidenceRef)]);
+  if(!bill.exists)throw new HttpsError('not-found','Invoice not found');
+  if(prior.exists)throw new HttpsError('already-exists','Payment reference already submitted');
+  tx.create(evidenceRef,{...evidence,mode,submittedBy:uid,
+   createdAt:FieldValue.serverTimestamp()});
+ });
+ return {reference:evidence.reference,received:true,verified:false,invoiceSettled:false};
 });
