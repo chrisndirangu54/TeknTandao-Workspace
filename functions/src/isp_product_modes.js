@@ -1,4 +1,4 @@
-import {draftIspProvisioningPlan,validateIspDriver} from './isp_integration_contracts.js';
+import {draftIspProvisioningPlan,validateIspDriver,normalizeIspTelemetry} from './isp_integration_contracts.js';
 import {normalizeIspConfig,ispConfigKinds,validateIspActivation,approveIspActivation} from './isp_typed_config_domain.js';
 import {getFirestore,FieldValue,FieldPath} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
@@ -172,4 +172,29 @@ export const previewIspProvisioning=onCall({region},async req=>{
   const preview=draftIspProvisioningPlan({request,subscriber,plan:planDoc.data(),device:deviceDoc.data()});
   return {preview,driver,executed:false};
  }catch(error){throw new HttpsError('failed-precondition',error.message);}
+});
+
+export const recordIspTelemetrySample=onCall({region},async req=>{
+ const {root,uid,mode}=await context(req,true);
+ let sample;
+ try{sample=normalizeIspTelemetry(req.data?.sample);}
+ catch(error){throw new HttpsError('invalid-argument',error.message);}
+ const device=await root.collection('devices').doc(sample.deviceId).get();
+ if(!device.exists||device.data().recordType!=='typed_configuration'||
+    device.data().siteId!==sample.siteId)
+  throw new HttpsError('failed-precondition','Device must be registered at the same ISP site');
+ const id=root.collection('telemetrySamples').doc();
+ await id.create({...sample,mode,createdAt:FieldValue.serverTimestamp(),
+  submittedBy:uid,sourceType:'admin_submitted_unverified'});
+ return {id:id.id,received:true,verified:false,liveCollector:false};
+});
+export const listIspTelemetrySamples=onCall({region},async req=>{
+ const {root}=await context(req);
+ const pageSize=req.data?.pageSize??30;
+ if(!Number.isInteger(pageSize)||pageSize<1||pageSize>100)
+   throw new HttpsError('invalid-argument','Invalid page size');
+ const snap=await root.collection('telemetrySamples').orderBy('observedAtMs','desc').limit(pageSize).get();
+ return {samples:snap.docs.map(d=>({id:d.id,...d.data(),
+  createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()??null})),
+  trustedLiveTelemetry:false,morePagesMayExist:snap.size===pageSize};
 });
