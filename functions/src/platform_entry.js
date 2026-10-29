@@ -77,3 +77,5 @@ export * from './executive_agent.js';
 export * from './isp_product_modes.js';
 
 export * from './reseller_onboarding.js';
+
+export * from './cloud_automation_workspace.js';
