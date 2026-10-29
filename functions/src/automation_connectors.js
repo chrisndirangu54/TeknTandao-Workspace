@@ -84,6 +84,7 @@ const string = {type: 'string'};
 const tool = (name, description, properties, required = []) => ({name, description, inputSchema: {type: 'object', properties, required, additionalProperties: false}});
 export const builtinTools = {
   google: [
+    tool('google_profile','Verify connected Google account identity', {}),
     tool('gmail_search', 'Find Gmail messages', {query: string}, ['query']),
     tool('gmail_read', 'Read a Gmail message', {messageId: string}, ['messageId']),
     tool('gmail_send', 'Send a plain-text email', {to: string, subject: string, body: string}, ['to', 'subject', 'body']),
@@ -132,6 +133,7 @@ const schemas = {
   notion_search: z.object({query: text.optional()}).strict(),
   notion_create_page: z.object({parentId: z.string().regex(/^[a-fA-F0-9-]{32,36}$/), title: z.string().min(1).max(200), content: z.string().max(2000)}).strict(),
   onedrive_list: z.object({}).strict(),
+  google_profile: z.object({}).strict(),
   onedrive_search: z.object({query: z.string().min(1).max(500)}).strict(),
   powerbi_datasets: z.object({}).strict(),
   powerbi_dataset_tables: z.object({datasetId: z.string().regex(/^[A-Za-z0-9-]{10,100}$/)}).strict(),
@@ -202,6 +204,7 @@ export async function callBuiltin(provider, accessToken, name, raw) {
     case 'docs_get': return providerJson(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(args.documentId)}`, {headers});
     case 'slides_create': return providerJson('https://slides.googleapis.com/v1/presentations', {method:'POST', headers, body:JSON.stringify({title:args.title})});
     case 'slides_get': return providerJson(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(args.presentationId)}`, {headers});
+    case 'google_profile': return providerJson('https://openidconnect.googleapis.com/v1/userinfo', {headers});
     case 'gmail_search': return google(`gmail/v1/users/me/messages?maxResults=20&q=${encodeURIComponent(args.query)}`);
     case 'gmail_read': return google(`gmail/v1/users/me/messages/${args.messageId}?format=full`);
     case 'gmail_send': {
