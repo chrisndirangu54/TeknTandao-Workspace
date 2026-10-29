@@ -1,3 +1,4 @@
+import {microsoftProductFamilies,microsoftResellerChecklist,validateMicrosoftCatalogSelection} from './microsoft_reseller_catalog.js';
 import './index.js';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
@@ -14,6 +15,7 @@ const schema=z.object({
  stage:z.enum(stages).default('lead'),
  partnerReference:z.string().max(120).default(''),
  notes:z.string().max(2000).default(''),
+ microsoftFamilies:z.array(z.string()).optional(),
  dynamicsAccountId:z.string().regex(/^[0-9a-fA-F-]{36}$/).optional(),
 }).strict();
 async function context(req){
@@ -31,12 +33,14 @@ export const getResellerOnboardingDashboard=onCall({region},async req=>{
  const snap=await org.collection('resellerOnboarding').orderBy('createdAt','desc').limit(100).get();
  const records=snap.docs.map(x=>({id:x.id,...x.data(),createdAt:x.data().createdAt?.toDate?.()?.toISOString?.()??null}));
  const stagesSummary=Object.fromEntries(stages.map(stage=>[stage,records.filter(x=>x.stage===stage).length]));
- return {records,stages:stagesSummary,isPartial:snap.size===100,
+ return {records,stages:stagesSummary,isPartial:snap.size===100,microsoftCatalog:microsoftProductFamilies,microsoftChecklist:microsoftResellerChecklist,
   dynamics365:{connected:false,writeSyncEnabled:false,note:'Connect a Dynamics 365 account in Automation Studio; automatic CRM writes require explicit mapping and authorization.'}};
 });
 export const createResellerOnboarding=onCall({region},async req=>{
  const {org,uid}=await context(req);
  const values=schema.parse(req.data?.record);
+ if(values.program==='microsoft')validateMicrosoftCatalogSelection(values.microsoftFamilies);
+ else if(values.microsoftFamilies?.length)throw new HttpsError('invalid-argument','Microsoft products require Microsoft program');
  const ref=org.collection('resellerOnboarding').doc();
  await ref.create({...values,createdBy:uid,createdAt:FieldValue.serverTimestamp(),
   updatedAt:FieldValue.serverTimestamp(),syncState:'not_connected',source:'workspace'});
@@ -54,6 +58,8 @@ export const updateResellerOnboardingStage=onCall({region},async req=>{
    throw new HttpsError('failed-precondition','Active program cannot be reset without review');
   if(stage==='active'&&previous!=='provisioning')
    throw new HttpsError('failed-precondition','Provisioning review must precede activation');
+  if(current.data().program==='microsoft'&&stage==='active')
+   throw new HttpsError('failed-precondition','Microsoft product activation requires verified Partner Center provisioning');
   tx.update(ref,{stage,updatedBy:uid,updatedAt:FieldValue.serverTimestamp()});
  });
  return {id:ref.id,stage,externalAccountProvisioned:false};
