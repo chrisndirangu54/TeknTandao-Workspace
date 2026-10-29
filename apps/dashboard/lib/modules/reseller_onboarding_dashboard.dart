@@ -21,12 +21,18 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
  Future<void> create()async{
   final fields={'company':'Company','contactEmail':'Email','program':'Program: microsoft, google, aws, td_africa, other','notes':'Notes'};
   final controllers=fields.map((k,v)=>MapEntry(k,TextEditingController()));
+  final selected=<String>{};
   try{
-   final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+   final ok=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,refresh)=>AlertDialog(
     title:const Text('New reseller application'),
     content:SizedBox(width:480,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,
-     children:fields.entries.map((e)=>Padding(padding:const EdgeInsets.only(bottom:12),
-      child:TextField(controller:controllers[e.key],decoration:InputDecoration(labelText:e.value)))).toList()))),
+     children:[...fields.entries.map((e)=>Padding(padding:const EdgeInsets.only(bottom:12),
+      child:TextField(controller:controllers[e.key],decoration:InputDecoration(labelText:e.value)))),
+      const Text('Microsoft product families (select when program = microsoft)'),
+      for(final family in (data['microsoftCatalog'] as List? ?? []))
+       CheckboxListTile(dense:true,title:Text(family['name'].toString()),value:selected.contains(family['id'].toString()),
+        onChanged:(v)=>refresh((){if(v==true){selected.add(family['id'].toString());}else{selected.remove(family['id'].toString());}})),
+      ]))),
     actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),
      FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Save application'))]));
    if(ok!=true)return;
@@ -35,7 +41,8 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
     'company':controllers['company']!.text.trim(),
     'contactEmail':controllers['contactEmail']!.text.trim(),
     'program':controllers['program']!.text.trim().toLowerCase(),
-    'notes':controllers['notes']!.text.trim()
+    'notes':controllers['notes']!.text.trim(),
+    if(controllers['program']!.text.trim().toLowerCase()=='microsoft') 'microsoftFamilies':selected.toList()
    }});
    await load();
   }catch(e){if(mounted)setState(()=>error=e.toString());}
@@ -57,12 +64,19 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
     FilledButton.icon(onPressed:busy?null:create,icon:const Icon(Icons.person_add_alt_1),label:const Text('Add application'))
    ]),
    const SizedBox(height:16),
+   if((data['microsoftCatalog'] as List? ?? []).isNotEmpty) ExpansionTile(
+    title:const Text('Microsoft product catalog and onboarding checklist'),
+    children:[for(final item in (data['microsoftCatalog'] as List? ?? []))
+     ListTile(title:Text(item['name'].toString()),subtitle:Text((item['examples'] as List? ?? []).join(' · '))),
+     const Divider(),for(final step in (data['microsoftChecklist'] as List? ?? []))
+      ListTile(leading:const Icon(Icons.check_circle_outline),title:Text(step.toString())),
+    ]),
    const Text('Dynamics 365 synchronization is not yet enabled. Connect your Dataverse account in Automation Studio; these onboarding records stay internal until authorized synchronization is configured.'),
    if(error!=null)Padding(padding:const EdgeInsets.all(12),child:Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),
    if(records.isEmpty)const Padding(padding:EdgeInsets.all(20),child:Text('No applications yet.')),
    for(final record in records)Card(child:ListTile(
     title:Text('${record['company'] ?? ''} · ${record['program'] ?? ''}'),
-    subtitle:Text('${record['contactEmail'] ?? ''}\nStage: ${record['stage'] ?? ''}\n${record['notes'] ?? ''}'),
+    subtitle:Text('${record['contactEmail'] ?? ''}\nStage: ${record['stage'] ?? ''}\nMicrosoft products: ${(record['microsoftFamilies'] as List? ?? []).join(', ')}\n${record['notes'] ?? ''}'),
     isThreeLine:true,
     trailing:PopupMenuButton<String>(
      enabled:!busy,
