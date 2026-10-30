@@ -1,3 +1,4 @@
+import 'modules/seo_cloud_launch_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'suite.dart';
@@ -154,6 +155,9 @@ class _DashboardState extends State<Dashboard> {
   void _navigateToModule(SuiteModule module) {
     Widget targetScreen;
     switch (module.id) {
+      case 'seo_cloud':
+        targetScreen = const SeoCloudLaunchPage();
+        break;
       case 'isp':
         targetScreen = IspProductConsole(workspaceId: store.orgId,initialMode: 'managed');
         break;
