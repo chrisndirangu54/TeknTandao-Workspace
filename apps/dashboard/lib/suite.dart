@@ -106,6 +106,7 @@ class SuiteModule {
 }
 
 const List<SuiteModule> modules = [
+  SuiteModule(id: 'seo_cloud', name: 'SEO Cloud', description: 'AI blog optimization, technical SEO audits and publishing approvals.', icon: Icons.auto_graph_rounded, color: Color(0xFF2563EB), category: 'Sales & Marketing', monthlyPriceKes: 0),
   SuiteModule(id:'isp',name:'Third-party ISP Management',description:'Manage your ISP subscribers, sites, devices and service plans in your workspace.',icon:Icons.router_rounded,color:Color(0xFF2563EB),category:'Connectivity & ISP',monthlyPriceKes:120000),
   // 1. Sales & Marketing
   SuiteModule(
