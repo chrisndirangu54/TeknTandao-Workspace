@@ -36,7 +36,7 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
         onChanged:(v)=>refresh((){if(v==true){selected.add(family['id'].toString());}else{selected.remove(family['id'].toString());}})),
       ]))),
     actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),
-     FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Save application'))]));
+     FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Save application'))])));
    if(ok!=true)return;
    setState(()=>busy=true);
    await widget.store.call('createResellerOnboarding',{'record':{
