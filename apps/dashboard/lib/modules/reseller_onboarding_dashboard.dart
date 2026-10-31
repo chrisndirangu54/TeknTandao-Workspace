@@ -36,7 +36,7 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
         onChanged:(v)=>refresh((){if(v==true){selected.add(family['id'].toString());}else{selected.remove(family['id'].toString());}})),
       ]))),
     actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),
-     FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Save application'))]));
+     FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Save application'))])));
    if(ok!=true)return;
    setState(()=>busy=true);
    await widget.store.call('createResellerOnboarding',{'record':{
@@ -122,7 +122,7 @@ class _ResellerOnboardingDashboardState extends State<ResellerOnboardingDashboar
     title:Text('${record['company'] ?? ''} · ${record['program'] ?? ''}'),
     subtitle:Text('${record['contactEmail'] ?? ''}\nStage: ${record['stage'] ?? ''}\nMicrosoft products: ${(record['microsoftFamilies'] as List? ?? []).join(', ')}\n${record['notes'] ?? ''}'),
     isThreeLine:true,
-    trailing:Wrap(mainAxisSize:MainAxisSize.min,children:[
+    trailing:Wrap(children:[
      if(record['program']=='microsoft')IconButton(tooltip:'AI solution advisor',icon:const Icon(Icons.auto_awesome),onPressed:busy?null:()=>advise(record['id'].toString())),
      PopupMenuButton<String>(
      enabled:!busy,

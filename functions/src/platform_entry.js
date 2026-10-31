@@ -79,3 +79,5 @@ export * from './isp_product_modes.js';
 export * from './reseller_onboarding.js';
 
 export * from './cloud_automation_workspace.js';
+
+export * from './hospital_clinical_ai.js';

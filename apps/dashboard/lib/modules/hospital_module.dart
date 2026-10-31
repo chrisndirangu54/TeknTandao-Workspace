@@ -3,6 +3,7 @@ import '../suite.dart';
 import '../widgets/record_form.dart';
 import 'connected_records.dart';
 import 'hospital_operations.dart';
+import 'hospital_clinical_ai.dart';
 
 class HospitalModuleScreen extends StatelessWidget {
   final SuiteStore store;
@@ -12,14 +13,15 @@ class HospitalModuleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(title: const Text('Hospital & Clinic'), actions: [IconButton(tooltip: 'Hospital operations', icon: const Icon(Icons.settings), onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => HospitalOperations(store: store))))], bottom: const TabBar(tabs: [
-          Tab(text: 'Patients'), Tab(text: 'Clinical records'),
+          Tab(text: 'Patients'), Tab(text: 'Clinical records'), Tab(text: 'Clinical AI'),
         ])),
         body: TabBarView(children: [
           _PatientDirectory(store: store),
           ConnectedRecords(store: store, appId: 'hospital', types: hospitalRecordTypes),
+          HospitalClinicalAiScreen(store: store),
         ]),
       ),
     );
