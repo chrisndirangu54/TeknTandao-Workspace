@@ -124,3 +124,35 @@ export const hospitalClinicalAiRecordEvaluation=onCall({region},async request=>{
   await audit(org,uid,'hospital.ai.evaluation.record',{evaluationId:ref.id,domain});
   return {evaluationId:ref.id,clinicalApproval:false};
 });
+
+/** Independent clinical review; the submitting clinician cannot approve their own source. */
+export const hospitalClinicalAiApproveEvidence=onCall({region},async request=>{
+  const {org,uid}=await context(request);await assertClinician(org,uid);
+  const id=identifier(request.data?.evidenceId);
+  const ref=org.collection('hospitalEvidence').doc(id);
+  await db().runTransaction(async tx=>{
+    const snap=await tx.get(ref),data=snap.data();
+    if(!data)throw new HttpsError('not-found','Evidence not found');
+    if(data.submittedBy===uid)throw new HttpsError('permission-denied','Independent reviewer required');
+    if(data.withdrawn)throw new HttpsError('failed-precondition','Withdrawn evidence cannot be approved');
+    if(data.approved===true)throw new HttpsError('failed-precondition','Already approved');
+    tx.update(ref,{approved:true,reviewerId:uid,status:'approved',
+      reviewedAt:stamp()});
+  });
+  await audit(org,uid,'hospital.evidence.approve',{evidenceId:id});
+  return {evidenceId:id,status:'approved'};
+});
+/** Immediate withdrawal is effective for subsequent model evidence selection. */
+export const hospitalClinicalAiWithdrawEvidence=onCall({region},async request=>{
+  const {org,uid}=await context(request);await assertClinician(org,uid);
+  const id=identifier(request.data?.evidenceId),reason=field(request.data?.reason,400);
+  const ref=org.collection('hospitalEvidence').doc(id);
+  await db().runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    if(!snap.exists)throw new HttpsError('not-found','Evidence not found');
+    tx.update(ref,{approved:false,withdrawn:true,status:'withdrawn',
+      withdrawnBy:uid,withdrawalReason:reason,withdrawnAt:stamp()});
+  });
+  await audit(org,uid,'hospital.evidence.withdraw',{evidenceId:id});
+  return {evidenceId:id,status:'withdrawn'};
+});
