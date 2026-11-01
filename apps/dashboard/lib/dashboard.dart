@@ -33,6 +33,7 @@ import 'modules/generic_module_screen.dart';
 import 'modules/automation_studio.dart';
 import 'modules/reseller_studio.dart';
 import 'modules/reseller_onboarding_dashboard.dart';
+import 'modules/microsoft_commerce_screen.dart';
 import 'modules/smart_intake.dart';
 import 'modules/executive_intelligence.dart';
 import 'isp_suite_console.dart';
@@ -82,6 +83,16 @@ class _DashboardState extends State<Dashboard> {
         }
         if (moduleId == 'reseller-onboarding') {
           if (widget.canSeeReseller) _openResellerOnboarding();
+          return;
+        }
+        if (moduleId == 'microsoft-marketplace') {
+          _openMicrosoftCommerce(seller: false);
+          return;
+        }
+        if (moduleId == 'microsoft-reseller-saas') {
+          // Do not gate by platform root; the seller backend checks the
+          // logged-in workspace owner's approved reseller account.
+          _openMicrosoftCommerce(seller: true);
           return;
         }
         if (moduleId == 'automation') {
@@ -157,6 +168,18 @@ class _DashboardState extends State<Dashboard> {
     if (!widget.canSeeReseller) return;
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ResellerOnboardingDashboard(store: store),
+    ));
+  }
+
+  void _openMicrosoftCommerce({required bool seller}) {
+    if (store.demo) return;
+    final sellerSlug = Uri.base.queryParameters['seller'] ?? 'tekntandao';
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => MicrosoftCommerceScreen(
+        store: store,
+        sellerMode: seller,
+        sellerSlug: sellerSlug,
+      ),
     ));
   }
 
