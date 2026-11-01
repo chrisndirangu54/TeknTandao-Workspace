@@ -32,6 +32,7 @@ import 'modules/documents_module.dart';
 import 'modules/generic_module_screen.dart';
 import 'modules/automation_studio.dart';
 import 'modules/reseller_studio.dart';
+import 'modules/reseller_onboarding_dashboard.dart';
 import 'modules/smart_intake.dart';
 import 'modules/executive_intelligence.dart';
 import 'isp_suite_console.dart';
@@ -77,6 +78,10 @@ class _DashboardState extends State<Dashboard> {
         if (!mounted) return;
         if (moduleId == 'reseller') {
           if (widget.canSeeReseller) _openResellerStudio();
+          return;
+        }
+        if (moduleId == 'reseller-onboarding') {
+          if (widget.canSeeReseller) _openResellerOnboarding();
           return;
         }
         if (moduleId == 'automation') {
@@ -144,6 +149,15 @@ class _DashboardState extends State<Dashboard> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => SmartIntakeScreen(store: store)),
     );
+  }
+
+  // Restricted to the same bootstrap reseller administrator as Reseller Studio.
+  // URL query parameters alone never grant access to onboarding records.
+  void _openResellerOnboarding() {
+    if (!widget.canSeeReseller) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ResellerOnboardingDashboard(store: store),
+    ));
   }
 
   void _openResellerStudio() {
