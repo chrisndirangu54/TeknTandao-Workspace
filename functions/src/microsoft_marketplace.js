@@ -8,6 +8,7 @@ import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {defineSecret} from 'firebase-functions/params';
 import {z} from 'zod';
 import {identifier} from './domain.js';
+import {isBootstrapSuperAdminToken} from './super_admin_domain.js';
 import {providerJson} from './automation_connectors.js';
 import {extractResellerAiNarrative} from './microsoft_reseller_ai_response.js';
 import {microsoftProductFamilies,microsoftResellerChecklist} from './microsoft_reseller_catalog.js';
@@ -60,6 +61,9 @@ export const publishMicrosoftResellerMarketplace=onCall({region},async req=>{
   published:z.boolean().default(true)
  }).strict().parse(req.data?.store);
  const slug=resellerSlug(payload.slug);
+ // The TeknTandao public storefront cannot be claimed by unrelated tenants.
+ if(slug==='tekntandao'&&!isBootstrapSuperAdminToken(req.auth?.token||{}))
+  throw new HttpsError('permission-denied','The TeknTandao storefront is reserved for the platform operator');
  const ref=shops.doc(slug),other=org.collection('microsoftResellerSettings').doc('marketplace');
  await db.runTransaction(async tx=>{
   const [existing,current]=await Promise.all([tx.get(ref),tx.get(other)]);
