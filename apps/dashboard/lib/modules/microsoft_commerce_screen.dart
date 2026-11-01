@@ -49,7 +49,28 @@ class _MicrosoftCommerceScreenState extends State<MicrosoftCommerceScreen> {
   @override
   void initState() {
     super.initState();
-    if (!widget.store.demo) _load();
+    if (!widget.store.demo) {
+      // Hand off only harmless catalogue choices from the public website.
+      // Buyer identity and approval are always collected inside Workspace.
+      final link = Uri.base.queryParameters;
+      final proposed = int.tryParse(link['seats'] ?? '');
+      if (proposed != null && proposed >= 1 && proposed <= 100000) {
+        seats.text = proposed.toString();
+      }
+      final preselected = (link['families'] ?? '').split(',');
+      const allowedFamilies = {
+        'm365', 'azure', 'dynamics', 'power', 'security',
+        'windows365', 'server', 'education', 'marketplace'
+      };
+      selectedFamilies.addAll(preselected.where(allowedFamilies.contains));
+      final preselectedNeeds = (link['needs'] ?? '').split(',');
+      final safeNeeds = preselectedNeeds.where(needs.containsKey).toSet();
+      if (safeNeeds.isNotEmpty) {
+        selectedNeeds.clear();
+        selectedNeeds.addAll(safeNeeds);
+      }
+      _load();
+    }
   }
 
   @override
