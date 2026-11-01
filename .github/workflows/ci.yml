@@ -49,7 +49,7 @@ jobs:
       # Normalize legacy source formatting in the ephemeral CI checkout before
       # static analysis. A repository-wide formatting cleanup can be isolated in
       # a later mechanical-only PR instead of obscuring this platform change.
-      - run: dart format --output=none lib test
+      - run: dart format --output=write lib test
       # Analyzer errors remain fatal; informational lint/deprecation notices do not
       # block release validation while legacy screens are being modernized.
       - run: flutter analyze --no-fatal-infos
