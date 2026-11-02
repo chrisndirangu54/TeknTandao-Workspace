@@ -1,6 +1,6 @@
-import {createHash, randomUUID} from 'node:crypto';
+import {createHash, randomUUID, randomBytes, timingSafeEqual} from 'node:crypto';
 import {getFirestore, FieldValue} from 'firebase-admin/firestore';
-import {onCall, HttpsError} from 'firebase-functions/v2/https';
+import {onCall, onRequest, HttpsError} from 'firebase-functions/v2/https';
 import {defineSecret} from 'firebase-functions/params';
 import {identifier, canAccess} from './domain.js';
 import {carrierDirectory, normalizeCarrier, normalizeShipment,
@@ -146,3 +146,73 @@ export const logisticsTrackDhl=callable(async request=>{
   if(!response.ok)throw new HttpsError('unavailable','DHL tracking request failed ('+response.status+')');
   return {...trackingFromDhl(await response.json()),source:'DHL Unified Tracking API',persisted:false};
 },[dhlKey]);
+
+// Generic B2B carrier webhooks: tenant-specific short-lived credentials with
+// SHA-256 stored at rest. A third-party carrier must opt in to this contract.
+// No claim that DHL/FedEx/etc. natively use this format.
+export const logisticsIssuePartnerToken=callable(async request=>{
+  const {org,user}=await access(request,{owner:true});
+  const carrierId=identifier(request.data.carrierId);
+  if(!(await org.collection('logisticsCarriers').doc(carrierId).get()).exists)
+    throw new HttpsError('not-found','Register the company first');
+  const secret='tfl_'+randomBytes(32).toString('base64url');
+  const tokenHash=createHash('sha256').update(secret).digest('hex');
+  const expiresAt=Date.now()+90*24*60*60*1000;
+  await org.collection('logisticsPartnerTokens').doc(carrierId).set({
+    tokenHash,expiresAt,enabled:true,createdBy:user,createdAt:stamp()});
+  return {carrierId,token:secret,expiresAt,
+    notice:'Copy this one-time credential to the approved carrier. The secret cannot be retrieved again.'};
+});
+export const logisticsRevokePartnerToken=callable(async request=>{
+  const {org}=await access(request,{owner:true});
+  const carrierId=identifier(request.data.carrierId);
+  await org.collection('logisticsPartnerTokens').doc(carrierId).delete();
+  return {revoked:true,carrierId};
+});
+export const logisticsPartnerWebhook=onRequest({region,cors:false},async (req,res)=>{
+  try{
+    if(req.method!=='POST'){res.status(405).json({error:'Method not allowed'});return;}
+    if((req.rawBody?.length||0)>8192){res.status(413).json({error:'Payload too large'});return;}
+    const orgId=identifier(req.get('x-workspace-id'));
+    const carrierId=identifier(req.get('x-carrier-id'));
+    const secret=String(req.get('authorization')||'').replace(/^Bearer /i,'');
+    if(!/^tfl_[A-Za-z0-9_-]{43}$/.test(secret)){res.status(401).json({error:'Unauthorized'});return;}
+    const org=db.doc('organizations/'+orgId);
+    const [token,carrier]=await Promise.all([
+      org.collection('logisticsPartnerTokens').doc(carrierId).get(),
+      org.collection('logisticsCarriers').doc(carrierId).get()
+    ]);
+    const credentials=token.data();
+    if(!carrier.exists||!credentials?.enabled||credentials.expiresAt<Date.now()){
+      res.status(401).json({error:'Unauthorized'});return;
+    }
+    const given=createHash('sha256').update(secret).digest();
+    const expected=Buffer.from(credentials.tokenHash||'','hex');
+    if(expected.length!==given.length||!timingSafeEqual(given,expected)){
+      res.status(401).json({error:'Unauthorized'});return;
+    }
+    const shipmentId=identifier(req.body?.shipmentId);
+    const eventId=identifier(req.body?.eventId);
+    const input=normalizeMilestone(req.body?.event);
+    const eventRef=org.collection('logisticsMilestones').doc(
+      createHash('sha256').update(carrierId+':'+eventId).digest('hex'));
+    const shipmentRef=org.collection('logisticsShipments').doc(shipmentId);
+    const result=await db.runTransaction(async tx=>{
+      const [shipment,prior]=await Promise.all([tx.get(shipmentRef),tx.get(eventRef)]);
+      if(prior.exists)return {duplicate:true};
+      if(!shipment.exists||shipment.data().carrierId!==carrierId)
+        throw new Error('Shipment not assigned to this carrier');
+      if(req.body?.trackingNumber&&String(req.body.trackingNumber)!==shipment.data().trackingNumber)
+        throw new Error('Tracking number mismatch');
+      transitionShipment(shipment.data().status,input.status);
+      tx.update(shipmentRef,{status:input.status,updatedAt:stamp(),updatedBy:'partner:'+carrierId});
+      tx.create(eventRef,{...input,source:'partner',carrierId,partnerEventId:eventId,
+        shipmentId,actor:'partner:'+carrierId,createdAt:stamp()});
+      return {accepted:true};
+    });
+    res.status(200).json(result);
+  }catch(e){
+    // Do not leak tenant/carrier/tracking identifiers to untrusted callbacks.
+    res.status(400).json({error:'Invalid or unauthorized carrier event'});
+  }
+});
