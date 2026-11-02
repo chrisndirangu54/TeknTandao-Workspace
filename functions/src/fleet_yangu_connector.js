@@ -195,3 +195,22 @@ export const logisticsSendFleetYanguDispatch=callable(async request=>{
     status:'awaiting_fleet_dispatcher_review',
     notice:'Sent for Fleet Yangu dispatcher approval; no vehicle control was executed'};
 });
+
+export const logisticsFleetYanguDispatchStatus=callable(async request=>{
+  const {org}=await owner(request);
+  const shipmentId=safeId(request.data.shipmentId);
+  const shipment=(await org.collection('logisticsShipments').doc(shipmentId).get()).data();
+  if(!shipment?.fleetYanguTripId)
+    throw new HttpsError('failed-precondition','No confirmed Fleet Yangu handoff for this shipment');
+  const source=await current(org);
+  const result=await remote({sourceOrgId:source.sourceOrgId,workspaceOrgId:org.id,
+    token:source.token,action:'dispatch-status?dispatchId='+shipmentId});
+  if(result.sourceDispatchId!==shipmentId||
+     !['awaiting_fleet_dispatcher_review','accepted','declined'].includes(result.status))
+    throw new HttpsError('failed-precondition','Unrecognized Fleet Yangu dispatch status');
+  await org.collection('logisticsShipments').doc(shipmentId).update({
+    fleetYanguDispatchStatus:result.status,fleetYanguLastCheckedAt:stamp()
+  });
+  return {shipmentId,status:result.status,source:'fleet_yangu',
+    reviewedAt:result.reviewedAt||null,notice:'Fleet Yangu dispatch review only; Workspace shipment milestone unchanged'};
+});
