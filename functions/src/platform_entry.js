@@ -87,3 +87,5 @@ export * from './microsoft_marketplace.js';
 export * from './logistics.js';
 
 export * from './fleet_yangu_connector.js';
+
+export * from './bima_guardian_fleet.js';
