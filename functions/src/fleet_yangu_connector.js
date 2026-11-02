@@ -71,6 +71,9 @@ export const logisticsConnectFleetYangu=callable(async request=>{
   const sourceOrgId=safeId(request.data.sourceOrgId);
   const token=String(request.data.token||'');
   const encryptedToken=encryptBridgeToken(token,encryptionKey.value());
+  const existing=(await org.collection('logisticsIntegrations').doc('fleetYangu').get()).data();
+  if(existing?.enabled===true&&existing.sourceOrgId!==sourceOrgId)
+    throw new HttpsError('failed-precondition','Disconnect the existing Fleet Yangu organization before switching');
   const result=await remote({sourceOrgId,workspaceOrgId:org.id,token});
   if(result.organisationId!==sourceOrgId||result.workspaceOrgId!==org.id||
      !Array.isArray(result.vehicles))
@@ -100,8 +103,8 @@ export const logisticsFleetYanguVehicles=callable(async request=>{
   const [result,links]=await Promise.all([
     snapshot(org,source),org.collection('fleetYanguVehicleLinks').limit(100).get()
   ]);
-  const mappings=links.docs.map(doc=>({fleetVehicleId:doc.id,
-    workspaceVehicleId:doc.data().workspaceVehicleId}));
+  const mappings=links.docs.filter(doc=>doc.data().sourceOrgId===source.sourceOrgId)
+    .map(doc=>({fleetVehicleId:doc.id,workspaceVehicleId:doc.data().workspaceVehicleId}));
   return {connected:true,sourceOrgId:source.sourceOrgId,
     vehicles:fleetVehicleStatus(result,mappings),
     alerts:(result.alerts||[]).slice(0,100).map(e=>({
@@ -126,8 +129,9 @@ export const logisticsLinkFleetYanguVehicle=callable(async request=>{
   return db.runTransaction(async tx=>{
     const [v,l]=await Promise.all([tx.get(vehicle),tx.get(link)]);
     if(!v.exists)throw new HttpsError('not-found','Workspace vehicle not found');
-    if(l.exists&&l.data().workspaceVehicleId!==workspaceVehicleId)
-      throw new HttpsError('already-exists','Fleet Yangu vehicle linked to another workspace vehicle');
+    if(l.exists&&(l.data().workspaceVehicleId!==workspaceVehicleId||
+       l.data().sourceOrgId!==source.sourceOrgId))
+      throw new HttpsError('already-exists','An existing source vehicle mapping must be unlinked first');
     if(v.data().fleetYanguVehicleId&&v.data().fleetYanguVehicleId!==fleetVehicleId)
       throw new HttpsError('failed-precondition','Unlink existing mapping before reassignment');
     tx.set(link,{workspaceVehicleId,sourceOrgId:source.sourceOrgId,
