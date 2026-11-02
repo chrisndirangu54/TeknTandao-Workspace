@@ -85,3 +85,5 @@ export * from './microsoft_marketplace.js';
 
 // Tenant-scoped transport management and carrier integration endpoints.
 export * from './logistics.js';
+
+export * from './fleet_yangu_connector.js';
