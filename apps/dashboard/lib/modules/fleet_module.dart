@@ -16,6 +16,8 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
   bool loading = true;
   String? error;
   Map<String, dynamic> data = const {};
+  Map<String, dynamic>? lastGpsSnapshot;
+  Map<String, dynamic>? lastRoutePlan;
   List<Map<String, dynamic>> get shipments => _rows('shipments');
   List<Map<String, dynamic>> get carriers => _rows('carriers');
   List<Map<String, dynamic>> get vehicles => _rows('vehicles');
@@ -82,6 +84,74 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
       'destination': values[3], 'weightKg': weight,
       'description': values[5], 'mode': 'road', 'currency': 'KES',
     }}, success: 'Shipment created as draft');
+  }
+
+  Future<void> _setDestination(Map<String, dynamic> shipment) async {
+    final values = await recordForm(context, 'Verified destination coordinates',
+      ['Latitude (decimal)', 'Longitude (decimal)',
+        'Delivery window start (minutes after 00:00)', 'Window end (0–1440)']);
+    if (values == null || values.length < 4) return;
+    final lat = double.tryParse(values[0]), lon = double.tryParse(values[1]);
+    final start = int.tryParse(values[2]), end = int.tryParse(values[3]);
+    if (lat == null || lon == null || start == null || end == null) {
+      _notice('Coordinates and delivery windows must be numeric');
+      return;
+    }
+    await _action('logisticsSetDestinationCoordinates', {
+      'shipmentId': shipment['id'], 'destination': {'lat': lat, 'lon': lon},
+      'startMinute': start, 'endMinute': end,
+    }, success: 'Destination coordinates saved for road routing');
+  }
+
+  Future<void> _optimizeRoutes() async {
+    final values = await recordForm(context, 'Optimize road dispatch',
+      ['Depot latitude', 'Depot longitude']);
+    if (values == null || values.length < 2) return;
+    final lat = double.tryParse(values[0]), lon = double.tryParse(values[1]);
+    if (lat == null || lon == null) {
+      _notice('Enter verified depot coordinates'); return;
+    }
+    try {
+      if (widget.store.demo) throw StateError('Unavailable in preview mode');
+      final result = await widget.store.call('logisticsOptimizeRoadRoutes',
+        {'depot': {'lat': lat, 'lon': lon}});
+      if (!mounted) return;
+      setState(() => lastRoutePlan = result);
+      final routes = (result['routes'] as List? ?? const []);
+      _notice('Created route proposal with ${routes.length} vehicle routes. '
+        'Review and explicitly approve before reserving vehicles.');
+    } catch (e) { _notice('Road optimization unavailable: $e'); }
+  }
+
+  Future<void> _approveRoute() async {
+    final plan = lastRoutePlan;
+    if (plan == null) return;
+    final confirmed = await showDialog<bool>(context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Approve dispatch plan?'),
+        content: const Text('This will reserve vehicles and assign shipments '
+          'in the current workspace. It does not make carrier bookings or '
+          'notify drivers automatically.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reserve vehicles')),
+        ]));
+    if (confirmed != true) return;
+    await _action('logisticsApproveRoutePlan',
+      {'planId': plan['planId'], 'confirm': true},
+      success: 'Dispatch plan approved; vehicles reserved');
+    if (mounted) setState(() => lastRoutePlan = null);
+  }
+
+  Future<void> _gpsSnapshot() async {
+    try {
+      if (widget.store.demo) throw StateError('Unavailable in preview mode');
+      final result = await widget.store.call('logisticsTraccarSnapshot');
+      if (!mounted) return;
+      setState(() => lastGpsSnapshot = result);
+    } catch (e) { _notice('GPS unavailable: $e'); }
   }
 
   Future<void> _newCarrier() async {
@@ -323,6 +393,7 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                         trailing: PopupMenuButton<String>(
                           tooltip: 'Shipment actions',
                           onSelected: (value) {
+                            if (value == 'coordinates') { _setDestination(s); }
                             if (value == 'assign') { _assignTransport(s); }
                             if (value == 'milestone') { _milestone(s); }
                             if (value == 'tariff') {
@@ -336,6 +407,7 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                           },
                           itemBuilder: (_) => const [
                             PopupMenuItem(value: 'assign', child: Text('Assign carrier / vehicle')),
+                            PopupMenuItem(value: 'coordinates', child: Text('Set destination coordinates')),
                             PopupMenuItem(value: 'milestone', child: Text('Record milestone')),
                             PopupMenuItem(value: 'tariff', child: Text('Compare tariffs')),
                             PopupMenuItem(value: 'tracking', child: Text('DHL live tracking')),
@@ -390,6 +462,67 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                   ]),
                   action: TextButton.icon(onPressed: _newVehicle,
                     icon: const Icon(Icons.add), label: const Text('Add vehicle'))),
+                const SizedBox(height: 16),
+                _section('Road-network route optimization · OR-Tools + Valhalla',
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Requires verified shipment destination coordinates, '
+                      'a real Valhalla road matrix, and the private OR-Tools service. '
+                      'Plans are proposals until a workspace owner approves them.'),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: _optimizeRoutes,
+                      icon: const Icon(Icons.alt_route),
+                      label: const Text('Optimize road routes')),
+                    if (lastRoutePlan != null) ...[
+                      const SizedBox(height: 12),
+                      Text('Plan ID: ${lastRoutePlan!['planId']}'),
+                      ...(lastRoutePlan!['routes'] as List? ?? const [])
+                        .whereType<Map>().map((route) => ListTile(
+                          leading: const Icon(Icons.route),
+                          title: Text('Vehicle ${route['vehicleId']}'),
+                          subtitle: Text(
+                            'Road distance: ${route['distanceKm']} km · '
+                            'Duration: ${route['durationMinutes']} min · '
+                            'Stops: ${(route['stops'] as List? ?? const []).length}'),
+                        )),
+                      Text('Unassigned: ${(lastRoutePlan!['unassigned'] as List? ?? const []).length}'),
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                        onPressed: _approveRoute,
+                        icon: const Icon(Icons.verified_user_outlined),
+                        label: const Text('Approve and reserve vehicles')),
+                    ]
+                  ])),
+                const SizedBox(height: 16),
+                _section('Fleet GPS · Traccar latest positions',
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Owner-only on-demand GPS snapshots. '
+                      'Devices require platform approval and a recorded tracking '
+                      'consent reference. Stale or invalid GPS data is labelled.'),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _gpsSnapshot,
+                      icon: const Icon(Icons.gps_fixed),
+                      label: const Text('Refresh fleet GPS')),
+                    if (lastGpsSnapshot != null) ...[
+                      const SizedBox(height: 8),
+                      Text(lastGpsSnapshot!['warning']?.toString() ?? ''),
+                      if ((lastGpsSnapshot!['positions'] as List? ?? const []).isEmpty)
+                        const Text('No authorized GPS fixes returned.'),
+                      ...(lastGpsSnapshot!['positions'] as List? ?? const [])
+                        .whereType<Map>().map((p) => ListTile(
+                          leading: Icon(p['stale'] == true
+                            ? Icons.warning_amber_rounded : Icons.location_on_outlined),
+                          title: Text(p['registration']?.toString() ?? 'Vehicle'),
+                          subtitle: Text(
+                            'Latitude ${p['lat']} · Longitude ${p['lon']} · '
+                            'Speed ${p['speedKmh'] ?? '-'} km/h · '
+                            'Fix ${p['fixAt'] ?? '-'}'),
+                          trailing: Text(p['stale'] == true ? 'Stale'
+                            : p['valid'] == true ? 'Current fix' : 'Unverified fix'),
+                        )),
+                    ],
+                  ])),
                 const SizedBox(height: 16),
                 _section('Carrier integration catalogue',
                   providers.isEmpty
