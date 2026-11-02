@@ -55,6 +55,8 @@ export function normalizeCarrier(input){
   if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Invalid carrier');
   const providerId=input.providerId||'other';
   if(!carrierDirectory.some(x=>x.id===providerId))throw new Error('Unsupported provider');
+  const currency=input.currency||'KES';
+  if(!['KES','USD','EUR','GBP','UGX','TZS','RWF'].includes(currency))throw new Error('Unsupported currency');
   return {
     providerId,
     company:text(input.company,'company name',160),
@@ -63,7 +65,7 @@ export function normalizeCarrier(input){
     connectionStatus:'manual', // only server-side verified connections may become live
     tariffMinor:nonnegative(input.tariffMinor??0,'indicative tariff',1000000000000),
     tariffPerKgMinor:nonnegative(input.tariffPerKgMinor??0,'weight tariff',1000000000000),
-    currency:input.currency||'KES'
+    currency
   };
 }
 export function transitionShipment(current,status){
@@ -91,7 +93,8 @@ export function dispatchProposal(shipments,vehicles){
   const active=vehicles.filter(v=>v&&v.available===true&&Number.isFinite(v.capacityKg)&&v.capacityKg>0)
     .map(v=>({id:v.id,capacityKg:v.capacityKg,remainingKg:v.capacityKg,assigned:[]}));
   const unassigned=[];
-  for(const s of shipments.filter(x=>x&&['draft','booked'].includes(x.status))){
+  for(const s of shipments.filter(x=>x&&['draft','booked'].includes(x.status))
+    .sort((a,b)=>Number(b.weightKg||0)-Number(a.weightKg||0))){
     const weight=nonnegative(s.weightKg??0,'shipment weight');
     const fit=active.filter(v=>v.remainingKg>=weight).sort((a,b)=>a.remainingKg-b.remainingKg)[0];
     if(!fit){unassigned.push({shipmentId:s.id,reason:'No vehicle with remaining capacity'});continue;}
