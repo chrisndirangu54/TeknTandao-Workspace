@@ -88,3 +88,4 @@ export * from './logistics.js';
 
 // Read-only, source-attributed Kenya Open Data with tenant auth.
 export * from './kenya_open_data.js';
+export * from './kenya_open_data_federation.js';
