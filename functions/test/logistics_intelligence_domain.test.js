@@ -28,3 +28,16 @@ test('Traccar position must belong to approved device and reveal age/staleness',
   assert.throws(()=>normalizeTraccarPosition(raw,55,now),/Wrong GPS/);
   assert.throws(()=>normalizeTraccarPosition({...raw,latitude:100},44,now),/latitude/);
 });
+
+test('route validator rejects duplicate vehicle journeys and invalid ETA',()=>{
+  const input=routePlanningInput([shipment('a',-1.2,36.8),shipment('b',-1.1,36.9)],
+    [vehicle('v1'),vehicle('v2')],{lat:-1.3,lon:36.8});
+  const metrics={distanceKm:17,durationMinutes:30};
+  assert.throws(()=>assertRoutePlanResponse(input,{routes:[
+    {vehicleId:'v1',stops:[{shipmentId:'a',etaMinutes:10}],...metrics},
+    {vehicleId:'v1',stops:[{shipmentId:'b',etaMinutes:15}],...metrics},
+  ],unassigned:[]}),/Duplicate optimizer vehicle/);
+  assert.throws(()=>assertRoutePlanResponse(input,{routes:[
+    {vehicleId:'v1',stops:[{shipmentId:'a',etaMinutes:1800}],...metrics},
+  ],unassigned:[{shipmentId:'b'}]}),/delivery time window/);
+});
