@@ -82,3 +82,6 @@ export * from './cloud_automation_workspace.js';
 
 // Tenant-isolated, quote-first Microsoft commerce SaaS for approved resellers.
 export * from './microsoft_marketplace.js';
+
+// Tenant-scoped transport management and carrier integration endpoints.
+export * from './logistics.js';
