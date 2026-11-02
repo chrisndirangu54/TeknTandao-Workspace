@@ -85,3 +85,6 @@ export * from './microsoft_marketplace.js';
 
 // Tenant-scoped transport management and carrier integration endpoints.
 export * from './logistics.js';
+
+// Read-only, source-attributed Kenya Open Data with tenant auth.
+export * from './kenya_open_data.js';
