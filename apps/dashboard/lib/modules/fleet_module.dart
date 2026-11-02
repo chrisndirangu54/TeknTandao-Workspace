@@ -159,6 +159,62 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
     }}, success: 'Vehicle registered');
   }
 
+  Future<void> _assignTransport(Map<String, dynamic> shipment) async {
+    if (carriers.isEmpty) {
+      _notice('Register a logistics company first'); return;
+    }
+    String carrierId = carriers.first['id'].toString();
+    String vehicleId = '';
+    final tracking = TextEditingController(
+        text: shipment['trackingNumber']?.toString() ?? '');
+    try {
+      final confirmed = await showDialog<bool>(context: context,
+        builder: (ctx) => StatefulBuilder(builder: (ctx, update) => AlertDialog(
+          title: const Text('Assign carrier and vehicle'),
+          content: SizedBox(width: 460, child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              DropdownButtonFormField<String>(
+                initialValue: carrierId,
+                decoration: const InputDecoration(labelText: 'Carrier'),
+                items: carriers.map((c) => DropdownMenuItem<String>(
+                  value: c['id'].toString(),
+                  child: Text(c['company']?.toString() ?? 'Carrier'),
+                )).toList(),
+                onChanged: (value) { if (value != null) update(() => carrierId = value); },
+              ),
+              const SizedBox(height: 12),
+              TextField(controller: tracking, decoration: const InputDecoration(
+                labelText: 'Carrier tracking / waybill number')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: vehicleId,
+                decoration: const InputDecoration(labelText: 'Fleet vehicle (optional)'),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('External carrier')),
+                  ...vehicles.map((v) => DropdownMenuItem<String>(
+                    value: v['id'].toString(),
+                    child: Text(v['registration']?.toString() ?? 'Vehicle'),
+                  )),
+                ],
+                onChanged: (value) { if (value != null) update(() => vehicleId = value); },
+              ),
+            ]),
+          )),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Assign')),
+          ],
+        )));
+      if (confirmed != true) return;
+      await _action('logisticsAssignTransport', {
+        'shipmentId': shipment['id'], 'carrierId': carrierId,
+        'vehicleId': vehicleId, 'trackingNumber': tracking.text.trim(),
+      }, success: 'Carrier assignment saved');
+    } finally { tracking.dispose(); }
+  }
+
   Future<void> _milestone(Map<String, dynamic> shipment) async {
     final values = await recordForm(context, 'Record shipment milestone',
       ['New status (booked, picked_up, in_transit, at_hub, customs_hold, exception, out_for_delivery, delivered, cancelled)',
@@ -263,10 +319,11 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                       ListTile(
                         title: Text('${s['reference']} · ${s['customer']}'),
                         subtitle: Text('${s['origin']} → ${s['destination']} · '
-                          '${s['weightKg']} kg · ${s['status']}'),
+                          '${s['weightKg']} kg · ${s['status']} · Tracking: ${s['trackingNumber'] ?? '-'}'),
                         trailing: PopupMenuButton<String>(
                           tooltip: 'Shipment actions',
                           onSelected: (value) {
+                            if (value == 'assign') { _assignTransport(s); }
                             if (value == 'milestone') { _milestone(s); }
                             if (value == 'tariff') {
                               _insight('logisticsCompareTariffs',
@@ -278,6 +335,7 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                             }
                           },
                           itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'assign', child: Text('Assign carrier / vehicle')),
                             PopupMenuItem(value: 'milestone', child: Text('Record milestone')),
                             PopupMenuItem(value: 'tariff', child: Text('Compare tariffs')),
                             PopupMenuItem(value: 'tracking', child: Text('DHL live tracking')),
