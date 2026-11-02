@@ -1,5 +1,6 @@
 // Server-to-server access for separately deployed products; no browser CORS or Firebase ID tokens.
 import {onRequest} from 'firebase-functions/v2/https';
+import {defineSecret} from 'firebase-functions/params';
 import {OAuth2Client} from 'google-auth-library';
 import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
@@ -8,6 +9,7 @@ import './index.js';
 import {loadDataset, DATASETS} from './kenya_open_data_domain.js';
 
 const db = getFirestore();
+const approvedClients = defineSecret('KENYA_DATA_CLIENTS_JSON');
 const region = 'europe-west1';
 const known = new Set(DATASETS.map(item => item.id));
 const schema = z.object({
@@ -57,16 +59,18 @@ async function countUsage(client) {
 }
 
 export const kenyaOpenDataFederation = onRequest({
-  region,timeoutSeconds:30,maxInstances:10,cors:false
+  region,timeoutSeconds:30,maxInstances:10,cors:false,invoker:'private',secrets:[approvedClients]
 }, async (request,response)=>{
   response.set('Cache-Control','no-store');
   if(request.method!=='POST') return response.status(405).json({error:'method_not_allowed'});
   const audience=process.env.KENYA_DATA_GATEWAY_AUDIENCE;
-  const clientJson=process.env.KENYA_DATA_CLIENTS_JSON;
+  const clientJson=approvedClients.value();
   if(!audience || !clientJson) return response.status(503).json({error:'gateway_not_configured'});
   let clients,body;
-  try {clients=parseGatewayClients(clientJson);body=schema.parse(request.body);}
-  catch {return response.status(400).json({error:'invalid_request_or_configuration'});}
+  try {clients=parseGatewayClients(clientJson);}
+  catch {return response.status(503).json({error:'invalid_gateway_configuration'});}
+  try {body=schema.parse(request.body);}
+  catch {return response.status(400).json({error:'invalid_request'});}
   if(!known.has(body.datasetId)) return response.status(400).json({error:'unknown_dataset'});
   const bearer=/^Bearer ([A-Za-z0-9_.-]+)$/.exec(request.get('Authorization')||'');
   if(!bearer) return response.status(401).json({error:'identity_required'});
