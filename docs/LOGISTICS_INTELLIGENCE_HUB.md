@@ -23,7 +23,7 @@ Implemented:
 Every call automatically includes the active `orgId` through `SuiteStore.call`.
 - `logisticsControlTower()`: limited current snapshot (up to 150 shipments; 100 carriers and vehicles). Add cursor pagination before large scale.
 - `logisticsCreateShipment({shipment})`: server-validated draft record, unique normalized reference
-- `logisticsRecordMilestone({shipmentId,event:{status,location,note}})`: transactional lifecycle update and event log
+- `logisticsAssignTransport({shipmentId,carrierId,vehicleId,trackingNumber})`: owner-only assignment restricted to draft/booked shipments and tenant-registered carriers/vehicles\n- `logisticsRecordMilestone({shipmentId,event:{status,location,note}})`: transactional lifecycle update and event log
 - `logisticsRegisterCarrier({carrier})`: owner-only; accepts tariff inputs, does **not** establish API credentials
 - `logisticsRegisterVehicle({vehicle})`: owner-only capacity registry
 - `logisticsCompareTariffs({shipmentId})`: operator-entered nonbinding rates
