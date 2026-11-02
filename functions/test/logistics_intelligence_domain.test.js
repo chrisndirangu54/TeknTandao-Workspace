@@ -14,10 +14,10 @@ test('rejects missing geocodes rather than estimating a fake route',()=>{
 });
 test('route result must account for every shipment and obey vehicle capacities',()=>{
   const input=routePlanningInput([shipment('a',-1.2,36.8),shipment('b',-1.1,36.9)],[vehicle('v1')],{lat:-1.3,lon:36.8});
-  const ok=assertRoutePlanResponse(input,{routes:[{vehicleId:'v1',stops:[{shipmentId:'a',etaMinutes:17},{shipmentId:'b',etaMinutes:42}]}],unassigned:[]});
+  const ok=assertRoutePlanResponse(input,{routes:[{vehicleId:'v1',distanceKm:18,durationMinutes:50,stops:[{shipmentId:'a',etaMinutes:17},{shipmentId:'b',etaMinutes:42}]}],unassigned:[]});
   assert.equal(ok.routes.length,1);
-  assert.throws(()=>assertRoutePlanResponse(input,{routes:[{vehicleId:'v1',stops:[{shipmentId:'a',etaMinutes:17}]}],unassigned:[]}),/omitted/);
-  assert.throws(()=>assertRoutePlanResponse(input,{routes:[{vehicleId:'v1',stops:[{shipmentId:'a',etaMinutes:17},{shipmentId:'a',etaMinutes:18}]}],unassigned:[{shipmentId:'b'}]}),/duplicate/);
+  assert.throws(()=>assertRoutePlanResponse(input,{routes:[{vehicleId:'v1',distanceKm:18,durationMinutes:50,stops:[{shipmentId:'a',etaMinutes:17}]}],unassigned:[]}),/omitted/);
+  assert.throws(()=>assertRoutePlanResponse(input,{routes:[{vehicleId:'v1',distanceKm:18,durationMinutes:50,stops:[{shipmentId:'a',etaMinutes:17},{shipmentId:'a',etaMinutes:18}]}],unassigned:[{shipmentId:'b'}]}),/duplicate/);
 });
 test('Traccar position must belong to approved device and reveal age/staleness',()=>{
   const now=Date.parse('2026-11-02T15:00:00Z');
