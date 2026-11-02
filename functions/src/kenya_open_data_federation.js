@@ -1,6 +1,6 @@
 // Server-to-server access for separately deployed products; no browser CORS or Firebase ID tokens.
 import {onRequest} from 'firebase-functions/v2/https';
-import {GoogleAuth} from 'google-auth-library';
+import {OAuth2Client} from 'google-auth-library';
 import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
 import {z} from 'zod';
@@ -72,7 +72,7 @@ export const kenyaOpenDataFederation = onRequest({
   if(!bearer) return response.status(401).json({error:'identity_required'});
   let claims;
   try {
-    const token=await new GoogleAuth().verifyIdToken({idToken:bearer[1],audience});
+    const token=await new OAuth2Client().verifyIdToken({idToken:bearer[1],audience});
     claims=token.getPayload();
   } catch {return response.status(401).json({error:'invalid_identity'});}
   const client=grantForIdentity(clients,claims,body.datasetId);
