@@ -85,3 +85,6 @@ export * from './microsoft_marketplace.js';
 
 // Tenant-scoped transport management and carrier integration endpoints.
 export * from './logistics.js';
+
+// Private route optimization, safe geocoding and consent-gated GPS snapshots.
+export * from './logistics_intelligence.js';
