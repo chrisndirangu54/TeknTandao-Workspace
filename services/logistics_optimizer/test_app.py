@@ -3,7 +3,14 @@ from app import OptimizeRequest, parse_valhalla_matrix, solve, app
 
 def test_requires_auth(monkeypatch):
     monkeypatch.setenv("LOGISTICS_OPTIMIZER_KEY", "example")
-    assert TestClient(app).post("/v1/optimize", json={}).status_code == 422
+    payload = {"depot": {"lat": -1.2, "lon": 36.8},
+               "vehicles": [{"id": "v1", "capacityGrams": 1000}],
+               "stops": [{"id": "s1", "lat": -1.3, "lon": 36.9,
+                          "demandGrams": 100, "timeWindow": [0, 120],
+                          "serviceMinutes": 5}]}
+    assert TestClient(app).post("/v1/optimize", json=payload).status_code == 401
+    assert TestClient(app).post("/v1/optimize", json=payload,
+                               headers={"x-logistics-service-key": "wrong"}).status_code == 401
 
 def test_bad_valhalla_is_rejected():
     try:
