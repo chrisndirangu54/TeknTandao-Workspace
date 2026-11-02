@@ -39,3 +39,7 @@ Server module: `functions/src/fleet_yangu_connector.js`; pure security and norma
 - Dispatch creates a **request pending fleet dispatcher review**, not an automatic trip, not an on-road action and not a CAN/ECU command.
 - GPS/Traccar, Valhalla and OR-Tools remain separately managed in [phase 2](LOGISTICS_INTELLIGENCE_PHASE2.md); the associated PR has not necessarily been merged. This connector runs independently against the current Fleet/Freight module.
 - Production acceptance: test revocation, cross-tenant mismatch, key rotation, direct Firestore rules, stale diagnostic data, source outages, duplicate dispatch, partial downstream failure and rate limits. No external fleet data has been connected in this source change.
+
+## Reviewing and reconciling a dispatch request
+
+The Fleet Yangu app includes a **Workspace Dispatch Inbox** with authenticated dispatcher acceptance/decline. Workspace's `logisticsFleetYanguDispatchStatus` callable can retrieve a request's current review state by its original shipment ID and update the Workspace's `fleetYanguDispatchStatus` field without altering the shipment lifecycle state. Use the shipment menu **Check Fleet Yangu dispatch status** after sending a request. Repeated handoffs retain the original Fleet Yangu trip ID and current review state. Source-side Firestore rules block direct client mutation of Workspace-originated trip records; the Fleet Yangu review callable verifies the dispatcher's role and original pending state.
