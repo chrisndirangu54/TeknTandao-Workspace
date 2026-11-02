@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../suite.dart';
 import '../widgets/record_form.dart';
 
@@ -95,6 +96,55 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
       'contact': values[2], 'serviceRegion': values[3], 'currency': 'KES',
       'tariffMinor': (base * 100).round(), 'tariffPerKgMinor': 0,
     }}, success: 'Carrier saved; API connection remains unconfigured');
+  }
+
+  Future<void> _issuePartnerKey(Map<String, dynamic> carrier) async {
+    try {
+      if (widget.store.demo) throw StateError('Preview mode only');
+      final result = await widget.store.call('logisticsIssuePartnerToken',
+          {'carrierId': carrier['id']});
+      if (!mounted) return;
+      final token = result['token']?.toString() ?? '';
+      await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+        title: Text('One-time integration key · ${carrier['company']}'),
+        content: SizedBox(width: 520, child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Share only with the approved logistics partner. '
+                'This token grants shipment milestone updates for this carrier '
+                'within this workspace. It expires in 90 days.'),
+            const SizedBox(height: 12),
+            SelectableText(token),
+          ],
+        )),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: token));
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            icon: const Icon(Icons.copy), label: const Text('Copy and close')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ));
+      await _refresh();
+    } catch (e) { _notice('Cannot issue carrier key: $e'); }
+  }
+
+  Future<void> _revokePartnerKey(Map<String, dynamic> carrier) async {
+    final accepted = await showDialog<bool>(context: context, builder: (ctx) =>
+      AlertDialog(title: const Text('Revoke integration key?'),
+        content: Text('Stop external updates from ${carrier['company']} immediately?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Revoke')),
+        ]));
+    if (accepted != true) return;
+    await _action('logisticsRevokePartnerToken',
+      {'carrierId': carrier['id']}, success: 'Partner token revoked');
   }
 
   Future<void> _newVehicle() async {
@@ -245,7 +295,22 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                           leading: const Icon(Icons.business_outlined),
                           title: Text('${c['company']}'),
                           subtitle: Text('${c['providerId']} · ${c['serviceRegion']}'),
-                          trailing: const Chip(label: Text('Manual / not connected')),
+                          trailing: PopupMenuButton<String>(
+                            tooltip: 'Carrier integration settings',
+                            onSelected: (choice) {
+                              if (choice == 'issue') { _issuePartnerKey(c); }
+                              if (choice == 'revoke') { _revokePartnerKey(c); }
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(value: 'issue',
+                                child: Text('Issue 90-day partner key')),
+                              PopupMenuItem(value: 'revoke',
+                                child: Text('Revoke partner key')),
+                            ],
+                            child: Chip(label: Text(
+                              c['connectionStatus'] == 'partner_webhook_ready'
+                                  ? 'B2B webhook active' : 'Manual / not connected')),
+                          ),
                         )).toList()),
                   action: TextButton.icon(onPressed: _newCarrier,
                     icon: const Icon(Icons.add_business), label: const Text('Add company'))),
