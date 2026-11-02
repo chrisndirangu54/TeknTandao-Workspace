@@ -662,11 +662,23 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                       if (_bimaRows('quotes').isEmpty)
                         const Text('No quotes have been requested.'),
-                      ..._bimaRows('quotes').take(12).map((q) => ListTile(
+                      ..._bimaRows('quotes').take(12).map((q) => ExpansionTile(
                         leading: const Icon(Icons.price_check_outlined),
                         title: Text('Vehicle ${q['vehicleId']} · ${q['subtype']}'),
                         subtitle: Text('Source: ${q['source']} · ${q['status']} · '
                           '${(q['options'] as List? ?? const []).length} options'),
+                        children: [
+                          if (q['source'] == 'demo')
+                            const ListTile(
+                              title: Text('Demonstration premium estimates'),
+                              subtitle: Text('Not an insurer-backed binding offer.')),
+                          ...((q['options'] as List? ?? const []).whereType<Map>()
+                            .map((o) => ListTile(
+                              title: Text(o['insurerName']?.toString() ?? 'Provider'),
+                              subtitle: const Text('Indicative premium; not confirmed cover'),
+                              trailing: Text('KES ${o['estimatedPremiumKes'] ?? '-'}'),
+                            ))),
+                        ],
                       )),
                       const SizedBox(height: 12),
                       Text('Policy register & renewal watch (${_bimaRows('policies').length})',
