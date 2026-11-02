@@ -485,7 +485,12 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                             'Duration: ${route['durationMinutes']} min · '
                             'Stops: ${(route['stops'] as List? ?? const []).length}'),
                         )),
-                      Text('Unassigned: ${(lastRoutePlan!['unassigned'] as List? ?? const []).length}'),
+                      Text('Unassigned by solver: ${(lastRoutePlan!['unassigned'] as List? ?? const []).length}'),
+                      Text('Excluded before routing: ${((lastRoutePlan!['diagnostics'] as Map?)?['excluded'] as List? ?? const []).length}'),
+                      ...(((lastRoutePlan!['diagnostics'] as Map?)?['excluded'] as List? ?? const [])
+                        .whereType<Map>().take(5).map((e) =>
+                          Text('${e['shipmentId']}: ${e['reason']}',
+                            style: const TextStyle(color: Color(0xFFB45309))))),
                       const SizedBox(height: 8),
                       FilledButton.icon(
                         onPressed: _approveRoute,
