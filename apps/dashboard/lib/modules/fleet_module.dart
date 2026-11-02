@@ -246,6 +246,20 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
     await _loadFleetYangu();
   }
 
+  Future<void> _checkFleetYanguDispatch(Map<String, dynamic> shipment) async {
+    try {
+      if (widget.store.demo) throw StateError('Not available in preview mode');
+      final response = await widget.store.call('logisticsFleetYanguDispatchStatus',
+        {'shipmentId': shipment['id']});
+      if (!mounted) return;
+      _notice('Fleet Yangu dispatcher status: ${response['status']}. '
+        'Workspace shipment status was not automatically changed.');
+      await _refresh();
+    } catch (e) {
+      _notice('Cannot verify Fleet Yangu dispatch status: $e');
+    }
+  }
+
   Future<void> _handoffFleetYangu(Map<String, dynamic> shipment) async {
     final approved = await showDialog<bool>(
       context: context, builder: (ctx) => AlertDialog(
@@ -431,6 +445,7 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                           onSelected: (value) {
                             if (value == 'assign') { _assignTransport(s); }
                             if (value == 'fleet_yangu') { _handoffFleetYangu(s); }
+                            if (value == 'fleet_yangu_status') { _checkFleetYanguDispatch(s); }
                             if (value == 'milestone') { _milestone(s); }
                             if (value == 'tariff') {
                               _insight('logisticsCompareTariffs',
@@ -444,6 +459,7 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                           itemBuilder: (_) => const [
                             PopupMenuItem(value: 'assign', child: Text('Assign carrier / vehicle')),
                             PopupMenuItem(value: 'fleet_yangu', child: Text('Submit to Fleet Yangu')),
+                            PopupMenuItem(value: 'fleet_yangu_status', child: Text('Check Fleet Yangu dispatch status')),
                             PopupMenuItem(value: 'milestone', child: Text('Record milestone')),
                             PopupMenuItem(value: 'tariff', child: Text('Compare tariffs')),
                             PopupMenuItem(value: 'tracking', child: Text('DHL live tracking')),
