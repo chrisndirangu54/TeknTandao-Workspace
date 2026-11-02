@@ -1,3 +1,4 @@
+import {KENYA_SOURCE_EXTENSIONS} from './kenya_open_data_source_extensions.js';
 // Kenya-first, read-only public-data registry. Never accept arbitrary upstream URLs.
 const wb = 'https://api.worldbank.org/v2/country/KEN/indicator/';
 const boundary = 'https://www.geoboundaries.org/api/current/gbOpen/KEN/ADM1/';
@@ -14,7 +15,8 @@ export const SOURCES = Object.freeze([
   {id:'kenada', name:'KNBS Kenya National Data Archive', homepage:'https://statistics.knbs.or.ke/nada/index.php/home',
     api:'https://statistics.knbs.or.ke/nada/index.php/api/catalog/search',
     licensing:'Microdata and survey-specific access terms; do not ingest private records without approval',
-    commercialUse:'restricted', access:'catalog_only'}
+    commercialUse:'restricted', access:'catalog_only'},
+  ...KENYA_SOURCE_EXTENSIONS
 ]);
 export const DATASETS = Object.freeze([
   {id:'population', title:'Population, total', sourceId:'world_bank', indicator:'SP.POP.TOTL', unit:'people', geography:'Kenya national', cadence:'annual'},
