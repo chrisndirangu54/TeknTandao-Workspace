@@ -184,16 +184,17 @@ export const logisticsSendFleetYanguDispatch=callable(async request=>{
       destination:String(shipment.destination||'').slice(0,160),
       weightKg:Number(shipment.weightKg||0)
     }});
-  if(reply.accepted!==true||reply.status!=='awaiting_fleet_dispatcher_review')
+  if(reply.accepted!==true||
+    !['awaiting_fleet_dispatcher_review','accepted','declined'].includes(reply.status))
     throw new HttpsError('unavailable','Fleet Yangu did not acknowledge dispatch handoff');
   await org.collection('logisticsShipments').doc(shipmentId).update({
-    fleetYanguDispatchStatus:'awaiting_fleet_dispatcher_review',
+    fleetYanguDispatchStatus:reply.status,
     fleetYanguTripId:String(reply.tripId||'').slice(0,80),
     fleetYanguSentBy:user,fleetYanguSentAt:stamp()
   });
   return {accepted:true,duplicate:reply.duplicate===true,tripId:reply.tripId,
-    status:'awaiting_fleet_dispatcher_review',
-    notice:'Sent for Fleet Yangu dispatcher approval; no vehicle control was executed'};
+    status:reply.status,
+    notice:'Fleet Yangu returned its current dispatcher decision; no vehicle control was executed'};
 });
 
 export const logisticsFleetYanguDispatchStatus=callable(async request=>{
