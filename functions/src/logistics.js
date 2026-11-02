@@ -91,6 +91,34 @@ export const logisticsCreateShipment=callable(async request=>{
   }
   return {shipmentId:id,status:'draft'};
 });
+export const logisticsAssignTransport=callable(async request=>{
+  const {org,user}=await access(request,{owner:true});
+  const shipmentId=identifier(request.data.shipmentId);
+  const carrierId=identifier(request.data.carrierId);
+  const vehicleId=request.data.vehicleId?identifier(request.data.vehicleId):'';
+  const trackingNumber=String(request.data.trackingNumber||'').trim();
+  if(trackingNumber&&!/^[A-Za-z0-9_-]{4,100}$/.test(trackingNumber))
+    throw new HttpsError('invalid-argument','Invalid tracking number');
+  const carrierRef=org.collection('logisticsCarriers').doc(carrierId);
+  const vehicleRef=vehicleId?org.collection('logisticsVehicles').doc(vehicleId):null;
+  const shipmentRef=org.collection('logisticsShipments').doc(shipmentId);
+  return db.runTransaction(async tx=>{
+    const [shipment,carrier,vehicle]=await Promise.all([
+      tx.get(shipmentRef),tx.get(carrierRef),vehicleRef?tx.get(vehicleRef):Promise.resolve(null)]);
+    if(!shipment.exists)throw new HttpsError('not-found','Shipment not found');
+    if(!carrier.exists||(vehicleId&&!vehicle?.exists))
+      throw new HttpsError('not-found','Carrier or vehicle not found in this Workspace');
+    if(!['draft','booked'].includes(shipment.data().status))
+      throw new HttpsError('failed-precondition','Transport assignments are locked after pickup');
+    if(vehicle&&vehicle.data().available!==true)
+      throw new HttpsError('failed-precondition','Vehicle is not currently available');
+    if(carrier.data().providerId==='dhl'&&!trackingNumber)
+      throw new HttpsError('invalid-argument','DHL waybill required for tracking');
+    tx.update(shipmentRef,{carrierId,vehicleId,trackingNumber,
+      updatedBy:user,updatedAt:stamp()});
+    return {shipmentId,carrierId,vehicleId,assigned:true};
+  });
+});
 export const logisticsRecordMilestone=callable(async request=>{
   const {org,user}=await access(request);
   const shipmentId=identifier(request.data.shipmentId);
