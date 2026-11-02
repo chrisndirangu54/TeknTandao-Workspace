@@ -16,6 +16,8 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
   bool loading = true;
   String? error;
   Map<String, dynamic> data = const {};
+  Map<String, dynamic>? fleetYanguState;
+  Map<String, dynamic>? fleetYanguData;
   List<Map<String, dynamic>> get shipments => _rows('shipments');
   List<Map<String, dynamic>> get carriers => _rows('carriers');
   List<Map<String, dynamic>> get vehicles => _rows('vehicles');
@@ -157,6 +159,110 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
       'registration': values[0], 'capacityKg': capacity,
       'driver': values[2], 'available': true,
     }}, success: 'Vehicle registered');
+  }
+
+  Future<void> _connectFleetYangu() async {
+    final values = await recordForm(context, 'Connect Fleet Yangu',
+      ['Fleet Yangu organisation ID', 'One-time Fleet Yangu Workspace key']);
+    if (values == null || values.length < 2) return;
+    await _action('logisticsConnectFleetYangu', {
+      'sourceOrgId': values[0].trim(), 'token': values[1].trim()
+    }, success: 'Fleet Yangu connected. Refresh the vehicle intelligence snapshot.');
+    await _loadFleetYangu();
+  }
+
+  Future<void> _loadFleetYangu() async {
+    try {
+      if (widget.store.demo) throw StateError('Not available in preview mode');
+      final state = await widget.store.call('logisticsFleetYanguStatus');
+      if (!mounted) return;
+      if (state['connected'] != true) {
+        setState(() { fleetYanguState = state; fleetYanguData = null; });
+        return;
+      }
+      final result = await widget.store.call('logisticsFleetYanguVehicles');
+      if (mounted) setState(() {
+        fleetYanguState = state;
+        fleetYanguData = result;
+      });
+    } catch (e) { _notice('Fleet Yangu connection unavailable: $e'); }
+  }
+
+  Future<void> _disconnectFleetYangu() async {
+    final confirmed = await showDialog<bool>(
+      context: context, builder: (ctx) => AlertDialog(
+        title: const Text('Disconnect Fleet Yangu?'),
+        content: const Text('Workspace will stop retrieving Fleet Yangu data. '
+          'Revoke the key in Fleet Yangu Admin as well to invalidate it at the source.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disconnect')),
+        ]));
+    if (confirmed != true) return;
+    await _action('logisticsDisconnectFleetYangu', {},
+      success: 'Fleet Yangu disconnected; revoke source key too');
+    if (mounted) setState(() {
+      fleetYanguState = {'connected': false};
+      fleetYanguData = null;
+    });
+  }
+
+  Future<void> _linkFleetYangu(Map<String, dynamic> fleetVehicle) async {
+    if (vehicles.isEmpty) { _notice('Register a Workspace vehicle first'); return; }
+    String workspaceVehicleId = vehicles.first['id'].toString();
+    final approved = await showDialog<bool>(context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setDialog) =>
+        AlertDialog(
+          title: const Text('Link Fleet Yangu vehicle'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('Fleet Yangu: ${fleetVehicle['registration']} '
+              '(${fleetVehicle['fleetVehicleId']})'),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: workspaceVehicleId,
+              decoration: const InputDecoration(labelText: 'Workspace vehicle'),
+              items: vehicles.map((v) => DropdownMenuItem<String>(
+                value: v['id'].toString(),
+                child: Text(v['registration']?.toString() ?? 'Vehicle'))).toList(),
+              onChanged: (value) {
+                if (value != null) setDialog(() => workspaceVehicleId = value);
+              },
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Link vehicle')),
+          ],
+        )));
+    if (approved != true) return;
+    await _action('logisticsLinkFleetYanguVehicle', {
+      'workspaceVehicleId': workspaceVehicleId,
+      'fleetVehicleId': fleetVehicle['fleetVehicleId'],
+    }, success: 'Fleet Yangu vehicle linked to Workspace');
+    await _loadFleetYangu();
+  }
+
+  Future<void> _handoffFleetYangu(Map<String, dynamic> shipment) async {
+    final approved = await showDialog<bool>(
+      context: context, builder: (ctx) => AlertDialog(
+        title: const Text('Send to Fleet Yangu dispatcher?'),
+        content: Text('Send booked shipment ${shipment['reference']} '
+          'to the paired Fleet Yangu vehicle for review? '
+          'This does not start a trip or control vehicle hardware.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Submit for fleet review')),
+        ]));
+    if (approved != true) return;
+    await _action('logisticsSendFleetYanguDispatch', {
+      'shipmentId': shipment['id'], 'confirm': true,
+    }, success: 'Fleet Yangu dispatch request submitted for review');
   }
 
   Future<void> _assignTransport(Map<String, dynamic> shipment) async {
@@ -324,6 +430,7 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                           tooltip: 'Shipment actions',
                           onSelected: (value) {
                             if (value == 'assign') { _assignTransport(s); }
+                            if (value == 'fleet_yangu') { _handoffFleetYangu(s); }
                             if (value == 'milestone') { _milestone(s); }
                             if (value == 'tariff') {
                               _insight('logisticsCompareTariffs',
@@ -336,6 +443,7 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                           },
                           itemBuilder: (_) => const [
                             PopupMenuItem(value: 'assign', child: Text('Assign carrier / vehicle')),
+                            PopupMenuItem(value: 'fleet_yangu', child: Text('Submit to Fleet Yangu')),
                             PopupMenuItem(value: 'milestone', child: Text('Record milestone')),
                             PopupMenuItem(value: 'tariff', child: Text('Compare tariffs')),
                             PopupMenuItem(value: 'tracking', child: Text('DHL live tracking')),
@@ -390,6 +498,55 @@ class _FleetModuleScreenState extends State<FleetModuleScreen> {
                   ]),
                   action: TextButton.icon(onPressed: _newVehicle,
                     icon: const Icon(Icons.add), label: const Text('Add vehicle'))),
+                const SizedBox(height: 16),
+                _section('Fleet Yangu · Vehicle intelligence integration',
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Connect a Fleet Yangu organization to this Workspace '
+                      'using its owner-issued 90-day key. Vehicle mappings and '
+                      'dispatch permissions require explicit authorization.'),
+                    const SizedBox(height: 10),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      FilledButton.icon(onPressed: _connectFleetYangu,
+                        icon: const Icon(Icons.link),
+                        label: const Text('Connect Fleet Yangu')),
+                      OutlinedButton.icon(onPressed: _loadFleetYangu,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Refresh vehicle intelligence')),
+                      if (fleetYanguState?['connected'] == true)
+                        OutlinedButton.icon(onPressed: _disconnectFleetYangu,
+                          icon: const Icon(Icons.link_off),
+                          label: const Text('Disconnect')),
+                    ]),
+                    const SizedBox(height: 12),
+                    if (fleetYanguState != null)
+                      Text(fleetYanguState?['connected'] == true
+                        ? 'Paired organization: ${fleetYanguState?['sourceOrgId']}'
+                        : 'Not connected'),
+                    if (fleetYanguData != null) ...[
+                      const SizedBox(height: 8),
+                      Text('Fleet snapshot · '
+                        '${(fleetYanguData!['vehicles'] as List? ?? const []).length} vehicles · '
+                        'Dispatch permission: ${fleetYanguData!['dispatchAllowed'] == true ? 'enabled' : 'read only'}'),
+                      ...((fleetYanguData!['vehicles'] as List? ?? const [])
+                        .whereType<Map>().map((v) => ListTile(
+                          leading: const Icon(Icons.monitor_heart_outlined),
+                          title: Text(v['registration']?.toString() ?? 'Fleet vehicle'),
+                          subtitle: Text('Health ${v['healthScore'] ?? 'not reported'}/100 · '
+                            'Risk ${v['fleetRiskScore'] ?? 'not reported'}/100 · '
+                            'Last telemetry ${v['lastTelemetryAt'] ?? 'unknown'} · '
+                            'Workspace: ${v['workspaceVehicleId'] ?? 'not linked'}'),
+                          trailing: TextButton(onPressed: () =>
+                            _linkFleetYangu(Map<String, dynamic>.from(v)),
+                            child: Text(v['workspaceVehicleId'] == null ? 'Link' : 'Linked')),
+                        ))),
+                      const SizedBox(height: 8),
+                      Text('Safety alerts: ${(fleetYanguData!['alerts'] as List? ?? const []).length} · '
+                        'Maintenance orders: ${(fleetYanguData!['workOrders'] as List? ?? const []).length}'),
+                      const Text('Fleet Yangu snapshots are on-demand. Vehicle commands '
+                        'and raw hardware telemetry are not exposed.',
+                        style: TextStyle(color: Color(0xFF64748B))),
+                    ],
+                  ])),
                 const SizedBox(height: 16),
                 _section('Carrier integration catalogue',
                   providers.isEmpty
