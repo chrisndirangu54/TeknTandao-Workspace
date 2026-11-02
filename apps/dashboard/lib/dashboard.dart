@@ -30,6 +30,7 @@ import 'modules/restaurant_module.dart';
 import 'modules/ngo_module.dart';
 import 'modules/documents_module.dart';
 import 'modules/generic_module_screen.dart';
+import 'modules/kenya_open_data_module.dart';
 import 'modules/automation_studio.dart';
 import 'modules/reseller_studio.dart';
 import 'modules/reseller_onboarding_dashboard.dart';
@@ -214,6 +215,9 @@ class _DashboardState extends State<Dashboard> {
         break;
       case 'helpdesk':
         targetScreen = HelpdeskModuleScreen(store: store);
+        break;
+      case 'analytics':
+        targetScreen = KenyaOpenDataModuleScreen(store: store);
         break;
       case 'hospital':
         targetScreen = HospitalModuleScreen(store: store);
