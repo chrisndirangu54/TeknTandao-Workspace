@@ -252,6 +252,7 @@ class _DashboardState extends State<Dashboard> {
         targetScreen = FieldServiceModuleScreen(store: store);
         break;
       case 'fleet':
+      case 'freight':
         targetScreen = FleetModuleScreen(store: store);
         break;
       case 'hotel':
