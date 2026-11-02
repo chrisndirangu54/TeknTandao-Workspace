@@ -47,16 +47,25 @@ export function assertRoutePlanResponse(input,result) {
   const stops=new Set(input.stops.map(s=>s.id));
   const vehicles=new Set(input.vehicles.map(v=>v.id));
   const assigned=new Set();
+  const routedVehicles=new Set();
   for(const route of result.routes) {
     if(!vehicles.has(route.vehicleId)||!Array.isArray(route.stops))
       throw new Error('Unknown vehicle or invalid route');
+    if(routedVehicles.has(route.vehicleId))throw new Error('Duplicate optimizer vehicle');
+    routedVehicles.add(route.vehicleId);
+    if(!Number.isFinite(route.distanceKm)||route.distanceKm<0||
+       !Number.isFinite(route.durationMinutes)||route.durationMinutes<0)
+      throw new Error('Invalid optimizer route duration or distance');
     let load=0;
     const cap=input.vehicles.find(v=>v.id===route.vehicleId).capacityGrams;
     for(const stop of route.stops) {
       if(!stops.has(stop.shipmentId)||assigned.has(stop.shipmentId)||
           !finite(stop.etaMinutes)||stop.etaMinutes<0)
         throw new Error('Invalid or duplicate optimizer stop');
-      load+=input.stops.find(x=>x.id===stop.shipmentId).demandGrams;
+      const original=input.stops.find(x=>x.id===stop.shipmentId);
+      if(stop.etaMinutes<original.timeWindow[0]||stop.etaMinutes>original.timeWindow[1])
+        throw new Error('Optimizer violated delivery time window');
+      load+=original.demandGrams;
       assigned.add(stop.shipmentId);
     }
     if(load>cap)throw new Error('Optimizer exceeded vehicle payload');
