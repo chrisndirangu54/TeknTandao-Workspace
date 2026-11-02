@@ -368,7 +368,7 @@ const List<SuiteModule> modules = [
   SuiteModule(
     id: 'fleet',
     name: 'Fleet & Vehicle Logistics',
-    description: 'Vehicle Tracking, Fuel Logs, Maintenance Reminders & Trip Route Costing',
+    description: 'Multi-carrier logistics control tower, fleet registry, freight dispatch and tracking',
     icon: Icons.directions_car_rounded,
     color: Color(0xFF0369A1),
     category: 'Operations',
@@ -798,7 +798,7 @@ const List<SuiteModule> modules = [
   SuiteModule(
     id: 'freight',
     name: 'Cargo Freight & Customs',
-    description: 'Bills of Lading, Container Shipping Tracking, Customs Clearance & Port Handling',
+    description: 'Shipping milestones, third-party carrier registry, freight control tower and customs exceptions',
     icon: Icons.directions_boat_rounded,
     color: Color(0xFF0284C7),
     category: 'Logistics',
