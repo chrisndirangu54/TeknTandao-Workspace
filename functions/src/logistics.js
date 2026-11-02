@@ -40,15 +40,17 @@ const list=async(collection,limit=100)=>{
 };
 export const logisticsControlTower=callable(async request=>{
   const {org}=await access(request);
-  const [shipments,carriers,vehicles,events]=await Promise.all([
+  const [shipments,carriers,vehicles,events,partnerTokens]=await Promise.all([
     list(org.collection('logisticsShipments'),150),
     list(org.collection('logisticsCarriers'),100),
     list(org.collection('logisticsVehicles'),100),
-    list(org.collection('logisticsMilestones'),100)
+    list(org.collection('logisticsMilestones'),100),
+    list(org.collection('logisticsPartnerTokens'),100)
   ]);
   const counter=status=>shipments.filter(s=>s.status===status).length;
   const exceptions=shipments.filter(s=>s.status==='exception'||s.status==='customs_hold');
-  return {shipments,carriers,vehicles,events:events.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,40),
+  const activePartners=new Set(partnerTokens.filter(t=>t.enabled===true&&t.expiresAt>Date.now()).map(t=>t.id));
+  return {shipments,carriers:carriers.map(c=>({...c,connectionStatus:activePartners.has(c.id)?'partner_webhook_ready':'manual'})),vehicles,events:events.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,40),
     kpis:{total:shipments.length,inTransit:counter('in_transit')+counter('out_for_delivery'),
       delivered:counter('delivered'),exceptions:exceptions.length},
     providers:carrierDirectory.map(p=>({...p,connectionStatus:p.id==='dhl'?'requires_api_key':'requires_onboarding'})),
