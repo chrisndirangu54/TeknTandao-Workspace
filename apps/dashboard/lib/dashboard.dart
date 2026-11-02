@@ -217,7 +217,22 @@ class _DashboardState extends State<Dashboard> {
         targetScreen = HelpdeskModuleScreen(store: store);
         break;
       case 'analytics':
-        targetScreen = KenyaOpenDataModuleScreen(store: store);
+        targetScreen = DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Analytics & Intelligence'),
+              bottom: const TabBar(tabs: [
+                Tab(text: 'Business Analytics'),
+                Tab(text: 'Kenya Open Data'),
+              ]),
+            ),
+            body: TabBarView(children: [
+              GenericEnterpriseModuleScreen(module: module, store: store),
+              KenyaOpenDataModuleScreen(store: store),
+            ]),
+          ),
+        );
         break;
       case 'hospital':
         targetScreen = HospitalModuleScreen(store: store);
