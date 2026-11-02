@@ -92,9 +92,13 @@ export const logisticsOptimizeRoadRoutes=callable(async request=>{
     throw new HttpsError('unavailable','Verified road optimization is unavailable; no synthetic route generated');
   }
   const planRef=org.collection('logisticsRoutePlans').doc(randomUUID());
+  const originalShipments=new Map(shipmentsSnap.docs.map(d=>[d.id,d.updateTime?.toMillis()]));
+  const originalVehicles=new Map(vehiclesSnap.docs.map(d=>[d.id,d.updateTime?.toMillis()]));
   const snapshot={
     shipmentIds:input.stops.map(s=>s.id),
-    vehicleIds:input.vehicles.map(v=>v.id)
+    vehicleIds:input.vehicles.map(v=>v.id),
+    shipmentRevisions:Object.fromEntries(input.stops.map(s=>[s.id,originalShipments.get(s.id)])),
+    vehicleRevisions:Object.fromEntries(input.vehicles.map(v=>[v.id,originalVehicles.get(v.id)]))
   };
   await planRef.create({routes:result.routes,unassigned:result.unassigned,
     diagnostics:result.diagnostics,snapshot,createdBy:uid,createdAt:stamp(),
@@ -125,11 +129,16 @@ export const logisticsApproveRoutePlan=callable(async request=>{
     const shipmentRefs=shipmentIds.map(id=>org.collection('logisticsShipments').doc(id));
     const docs=await Promise.all([...vehicleRefs,...shipmentRefs].map(doc=>tx.get(doc)));
     for(let i=0;i<vehicleIds.length;i++) {
+      if(docs[i].updateTime?.toMillis()!==plan.snapshot?.vehicleRevisions?.[vehicleIds[i]])
+        throw new HttpsError('failed-precondition','Vehicle modified since planning; recompute the route');
       const v=docs[i].data();
       if(!v||v.available!==true||v.routePlanId)
         throw new HttpsError('failed-precondition','Vehicle availability changed; recompute the route');
     }
     for(let i=0;i<shipmentIds.length;i++) {
+      if(docs[vehicleIds.length+i].updateTime?.toMillis()!==
+          plan.snapshot?.shipmentRevisions?.[shipmentIds[i]])
+        throw new HttpsError('failed-precondition','Shipment modified since planning; recompute the route');
       const s=docs[vehicleIds.length+i].data();
       if(!s||!['draft','booked'].includes(s.status)||s.dispatchPlanId)
         throw new HttpsError('failed-precondition','Shipment changed; recompute the route');
