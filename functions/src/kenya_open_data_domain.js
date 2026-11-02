@@ -6,7 +6,7 @@ export const SOURCES = Object.freeze([
     api:'https://api.worldbank.org/v2/', licensing:'Dataset-specific World Bank Open Data terms; verify before commercial redistribution',
     commercialUse:'review', access:'live_api'},
   {id:'geoboundaries', name:'geoBoundaries gbOpen', homepage:'https://www.geoboundaries.org/',
-    api:boundary, licensing:'CC BY 4.0 with attribution; check boundary metadata',
+    api:boundary, licensing:'gbOpen CC BY 4.0 or ODbL; inspect layer metadata and attribution/share-alike obligations',
     commercialUse:'attribution', access:'live_api'},
   {id:'knbs', name:'Kenya National Bureau of Statistics', homepage:'https://repository.knbs.or.ke/',
     api:'https://repository.knbs.or.ke/', licensing:'Repository default CC BY-NC 4.0 unless individual item says otherwise',
