@@ -21,7 +21,7 @@ export function foundationIdempotencyKey(value) {
   return value;
 }
 export function foundationMembershipAllows(member, operation) {
-  if (!member || member.status === 'disabled') return false;
+  if (!member || ['disabled','invited','suspended','revoked'].includes(member.status)) return false;
   if (!['owner','admin','member'].includes(member.role)) return false;
   return operation === 'read' || ['owner','admin'].includes(member.role);
 }
