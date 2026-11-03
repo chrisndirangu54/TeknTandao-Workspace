@@ -533,3 +533,21 @@ test('foundation collections remain server-only and tenant-isolated', async () =
     }
   }
 });
+
+
+test('approval and governance records cannot be read or altered directly',async()=>{
+  await env.withSecurityRulesDisabled(async context=>{
+    const db=context.firestore();
+    await setDoc(doc(db,'organizations/a/foundationApprovals/approval1'),{
+      kind:'data_migration',status:'pending',createdBy:'a',tenantId:'a'
+    });
+  });
+  for(const db of [env.authenticatedContext('a').firestore(),
+    env.authenticatedContext('clerk').firestore(),
+    env.authenticatedContext('b').firestore()]){
+    await assertFails(getDoc(doc(db,'organizations/a/foundationApprovals/approval1')));
+    await assertFails(setDoc(doc(db,'organizations/a/foundationApprovals/forged'),{
+      status:'approved',createdBy:'attacker'
+    }));
+  }
+});
