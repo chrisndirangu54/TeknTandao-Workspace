@@ -33,6 +33,8 @@ jobs:
       - run: npm run test:rules
       - name: Verify concurrent financial transactions in Firestore emulator
         run: npx firebase emulators:exec --project demo-tandao --only firestore "node --test functions/test/customer_settlement_emulator.test.js"
+      - name: Verify foundation outbox delivery and tenant isolation in Firestore emulator
+        run: npx firebase emulators:exec --project demo-tandao --only firestore "node --test functions/test/foundation_emulator.test.js"
 
   flutter:
     runs-on: ubuntu-latest
