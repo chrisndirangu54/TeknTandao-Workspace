@@ -85,3 +85,6 @@ export * from './microsoft_marketplace.js';
 
 // Tenant-scoped transport management and carrier integration endpoints.
 export * from './logistics.js';
+
+// Phase 1: tenant-safe enterprise party foundation.
+export * from './foundation.js';
