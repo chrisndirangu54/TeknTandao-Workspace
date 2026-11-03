@@ -88,3 +88,7 @@ export * from './logistics.js';
 
 // Phase 1: tenant-safe enterprise party foundation.
 export * from './foundation.js';
+
+// Phase 1: branch directory and recoverable Firestore event relay.
+export * from './foundation_branches.js';
+export * from './foundation_outbox.js';
