@@ -498,3 +498,38 @@ test('ISP product records deny direct client access across tenants and operator 
   await assertFails(getDoc(doc(anon,tenantPath)));
   await assertFails(getDoc(doc(anon,platformPath)));
 });
+
+
+test('foundation collections remain server-only and tenant-isolated', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db=context.firestore();
+    for (const org of ['a','b']) {
+      await setDoc(doc(db,`organizations/${org}/enterpriseParties/party1`),
+        {kind:'organization',displayName:'Private',tenantId:org});
+      await setDoc(doc(db,`organizations/${org}/foundationBranches/branch1`),
+        {name:'Main Office',tenantId:org});
+      await setDoc(doc(db,`organizations/${org}/foundationOutbox/event1`),
+        {eventType:'enterprise.party.created',tenantId:org,status:'pending'});
+      await setDoc(doc(db,`organizations/${org}/foundationAudit/audit1`),
+        {action:'enterprise.party.create',tenantId:org});
+      await setDoc(doc(db,`organizations/${org}/foundationIdempotency/key1`),
+        {fingerprint:'internal',tenantId:org});
+    }
+  });
+  const ownerA=env.authenticatedContext('a').firestore();
+  const memberA=env.authenticatedContext('clerk').firestore();
+  for (const collectionName of [
+    'enterpriseParties','foundationBranches','foundationOutbox',
+    'foundationAudit','foundationIdempotency'
+  ]) {
+    const suffix=collectionName==='foundationBranches'?'branch1':
+      collectionName==='foundationOutbox'?'event1':
+      collectionName==='foundationAudit'?'audit1':
+      collectionName==='foundationIdempotency'?'key1':'party1';
+    for (const db of [ownerA,memberA]) {
+      await assertFails(getDoc(doc(db,`organizations/a/${collectionName}/${suffix}`)));
+      await assertFails(getDoc(doc(db,`organizations/b/${collectionName}/${suffix}`)));
+      await assertFails(setDoc(doc(db,`organizations/a/${collectionName}/forged`),{tenantId:'b'}));
+    }
+  }
+});
