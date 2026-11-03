@@ -18,8 +18,28 @@
       "collectionGroup": "attendancePunches",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "employeeUid", "order": "ASCENDING"},
-        {"fieldPath": "date", "order": "DESCENDING"}
+        {
+          "fieldPath": "employeeUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "foundationOutbox",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
