@@ -57,3 +57,22 @@ npx firebase emulators:exec --project demo-tandao --only firestore "node --test 
 - Independent security audit, performance baseline, production SLO acceptance.
 
 **Status:** Draft PR implementation, not a completed or production-certified foundation.
+
+## Governance and migration safeguards (second increment)
+- `foundationRequestApproval` creates 24-hour expiring approval requests for `data_migration`, `module_activation`, and `connector_enablement` plans. Requester must be an owner.
+- `foundationDecideApproval` requires a different, currently authorized owner to approve or reject; transactions prevent double decisions and append a tenant-local audit record.
+- These decisions are **records only**, not automatic operations. A separate authorized executor, change control and operational validation will be needed before activation.
+- `foundationListApprovals` provides a 50-record bounded owner-only governance listing.
+- `foundationAssessLegacyContacts` samples up to 200 source contacts, reports name/external-reference statistics, and performs **zero writes**; it neither exports personal information nor determines final migration eligibility.
+- `foundationOperationalReadiness` provides owner-only 50-record bounded samples for pending/delivered events, pending approvals, and party records, with a warning on backlog age >600 seconds or >=50 pending. It is not a whole-service observability system.
+- Foundation membership checks now deny invited, suspended, revoked and disabled accounts. Existing legacy memberships with no status field remain compatible.
+
+## Recovery runbook (manual verification required)
+1. Confirm that Firestore point-in-time recovery or scheduled backup coverage is enabled in the actual deployed Google Cloud project; inspect retention and IAM.
+2. Restore a snapshot into a separate, access-restricted test project or database. Never overwrite live data during a drill.
+3. Compare document counts and sampled integrity hashes for organizations, members, parties, branches, outbox receipts, and audit records; exclude PII from logs.
+4. Re-run tenant-isolation and replay-safe delivery emulator tests against the restore.
+5. Record restoration start/end times, the most recent recoverable mutation and any missing records; compute actual RPO/RTO, then have an operator sign off.
+6. Establish alert routing and escalation owners before enabling scheduled recovery in production.
+
+These are deployment and test procedures only; no production backup settings, telemetry sinks or restore drills have been executed by this branch.
