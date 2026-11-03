@@ -95,3 +95,6 @@ export * from './foundation_outbox.js';
 
 // Phase 1: approval gates and read-only migration assessment.
 export * from './foundation_governance.js';
+
+// Phase 1: tenant-scoped operational health snapshot.
+export * from './foundation_readiness.js';
