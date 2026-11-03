@@ -92,3 +92,6 @@ export * from './foundation.js';
 // Phase 1: branch directory and recoverable Firestore event relay.
 export * from './foundation_branches.js';
 export * from './foundation_outbox.js';
+
+// Phase 1: approval gates and read-only migration assessment.
+export * from './foundation_governance.js';
