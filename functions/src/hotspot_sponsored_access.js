@@ -163,3 +163,16 @@ export const hotspotV2SponsorAdminList=callable(async req=>{
   startsAtMs:d.data().startsAtMs,endsAtMs:d.data().endsAtMs,
   sponsorBilled:false})),limit:100};
 });
+
+export const hotspotV2PauseSponsorCampaign=callable(async req=>{
+ exact(req.data,['orgId','campaignId']);const {root:space,uid}=await admin(req);
+ if(!valid(req.data.campaignId))fail('invalid-argument','Invalid campaign');
+ const ref=space.collection('sponsorCampaigns').doc(req.data.campaignId);
+ await db().runTransaction(async tx=>{
+  const doc=await tx.get(ref);
+  if(!doc.exists||doc.data().status!=='active')fail('failed-precondition','Campaign not active');
+  tx.update(ref,{status:'paused',pausedBy:uid,pausedAt:timestamp()});
+  audit(tx,space,uid,'sponsor_campaign_paused',ref.id);
+ });
+ return {paused:true,existingPassesRevoked:false};
+});
