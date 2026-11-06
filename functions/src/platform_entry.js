@@ -114,3 +114,6 @@ export * from './hotspot_v2_health.js';
 export * from './hotspot_v2_radius_endpoint.js';
 export * from './hotspot_v2_mpesa_callback.js';
 export * from './hotspot_gateway_approvals.js';
+
+// Independent lab-only RADIUS verification and free-voucher authorization.
+export * from './hotspot_v2_lab_activation.js';
