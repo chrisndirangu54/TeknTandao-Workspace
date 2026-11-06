@@ -12,7 +12,7 @@ test('cloud service schema accepts Azure and rejects unsupported hosts',()=>{
  const base={name:'Customer Web',repository:'https://github.com/acme/example',
  branch:'main',cloudRegion:'europe-west1',serviceName:'customer-web',
  monthlyBudgetUsd:25,autoDeploy:true,customerConsent:true};
- assert.equal(serviceSchema.parse({...base,cloudProvider:'azure_container_apps'}).cloudProvider,
+ assert.equal(serviceSchema.parse({...base,cloudProvider:'azure_container_apps',cloudRegion:'westeurope'}).cloudProvider,
    'azure_container_apps');
  assert.throws(()=>serviceSchema.parse({...base,cloudProvider:'unknown_cloud'}));
 });
