@@ -88,3 +88,6 @@ export * from './logistics.js';
 
 // Secure hotspot site, tariff and voucher management.
 export * from './hotspot_management.js';
+
+// Server-side signed RADIUS accounting collector (no automatic network access).
+export * from './hotspot_accounting.js';
