@@ -1,5 +1,5 @@
 // Hotspot v2 M-Pesa sandbox adapter. Does not enable live charges or grant Wi-Fi.
-import {randomUUID} from 'node:crypto';
+import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {defineSecret} from 'firebase-functions/params';
@@ -31,6 +31,7 @@ export const hotspotV2StartSandboxMpesa=run(async req=>{
  if(!valid(voucherId)||typeof phone!=='string'||!/^254[17][0-9]{8}$/.test(phone))
   fail('invalid-argument','Invalid voucher or phone');
  const order=workspace.collection('paymentIntents').doc(voucherId);
+ const token=randomBytes(24).toString('hex');
  let price;
  await getFirestore().runTransaction(async tx=>{
   const voucher=await tx.get(workspace.collection('vouchers').doc(voucherId));
@@ -46,10 +47,17 @@ export const hotspotV2StartSandboxMpesa=run(async req=>{
   price=plan.data().priceKes;
   tx.create(order,{voucherId,siteId:site.id,planId:plan.id,amountKes:price,
     state:'initiating',provider:'safaricom_sandbox',phoneLast4:phone.slice(-4),
-    receiptVerified:false,createdAt:FieldValue.serverTimestamp()});
+    receiptVerified:false,callbackTokenHash:createHash('sha256').update(token).digest('hex'),
+    createdAt:FieldValue.serverTimestamp()});
  });
  try{
-  const response=await initiateMpesa(config(),{phone,amount:price,reference:voucherId.slice(0,12),description:'Wi-Fi sandbox pilot'});
+  const paymentConfig=config();
+  const url=new URL(paymentConfig.callbackUrl);
+  url.searchParams.set('orgId',req.data.orgId);
+  url.searchParams.set('voucherId',voucherId);
+  url.searchParams.set('token',token);
+  paymentConfig.callbackUrl=url.toString();
+  const response=await initiateMpesa(paymentConfig,{phone,amount:price,reference:voucherId.slice(0,12),description:'Wi-Fi sandbox pilot'});
   if(!response.CheckoutRequestID)throw new Error('No checkout reference');
   await order.update({state:'pending_verification',checkoutRequestId:response.CheckoutRequestID,
    merchantRequestId:response.MerchantRequestID||null,updatedAt:FieldValue.serverTimestamp()});
