@@ -109,6 +109,58 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
       await load();
     }catch(e){if(mounted)setState(()=>message='Revocation failed: $e');}
   }
+  Future<void> operate(Map<String,dynamic> item,String action) async {
+    if(busy)return;
+    try{
+      if(action=='revoke'){await revoke(item['id'].toString());return;}
+      final payload=<String,dynamic>{'orgId':org.text.trim()};
+      String endpoint='';
+      if(action=='commission'){
+        final nas=TextEditingController();
+        final checks={'vlanIsolated':false,'radiusTested':false,'accountingTested':false,'noticePublished':false};
+        try{
+          final confirmed=await showDialog<bool>(context:context,builder:(dialogContext)=>
+            StatefulBuilder(builder:(ctx,update)=>AlertDialog(
+              title:const Text('Commission site'),
+              content:SizedBox(width:450,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+                const Text('Confirm each check only after testing it on your own network. Commissioning does not establish live connectivity.'),
+                TextField(controller:nas,onChanged:(_)=>update((){}),decoration:const InputDecoration(labelText:'Registered NAS identifier')),
+                for(final entry in checks.keys)CheckboxListTile(
+                  title:Text(entry),value:checks[entry],
+                  onChanged:(v)=>update(()=>checks[entry]=v??false)),
+              ]))),
+              actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext,false),child:const Text('Cancel')),
+                FilledButton(onPressed:nas.text.trim().isNotEmpty&&checks.values.every((v)=>v)
+                  ?()=>Navigator.pop(dialogContext,true):null,child:const Text('Record checks'))],
+            )));
+          if(confirmed!=true)return;
+          endpoint='hotspotV2CommissionSite';
+          payload.addAll({'siteId':item['id'],'nasId':nas.text.trim(),'checks':checks});
+        }finally{nas.dispose();}
+      }else if(action=='publish'){
+        endpoint='hotspotV2PublishPlan';payload['planId']=item['id'];
+      }else if(action=='prepare'){
+        endpoint='hotspotV2PrepareVoucher';payload['voucherId']=item['id'];
+      }else if(action=='disconnect'){
+        final reason=TextEditingController();
+        try{
+          final ok=await showDialog<bool>(context:context,builder:(dialogContext)=>AlertDialog(
+            title:const Text('Request gateway disconnection'),
+            content:TextField(controller:reason,minLines:2,maxLines:3,
+              decoration:const InputDecoration(labelText:'Reason for disconnect request')),
+            actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext,false),child:const Text('Cancel')),
+              FilledButton(onPressed:()=>Navigator.pop(dialogContext,true),child:const Text('Request review'))]));
+          if(ok!=true)return;
+          endpoint='hotspotV2RequestDisconnect';payload.addAll({'voucherId':item['id'],'reason':reason.text.trim()});
+        }finally{reason.dispose();}
+      }else{return;}
+      setState(()=>busy=true);
+      final res=await call(endpoint,payload);
+      if(mounted)setState(()=>message='Recorded: ${res['ok']}. No router commands or customer charges executed.');
+      await load();
+    }catch(e){if(mounted)setState(()=>message='Action failed: $e');}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
   @override Widget build(BuildContext context){
     final filtered=records.where((r)=>
       r.toString().toLowerCase().contains(search.text.toLowerCase())).toList();
@@ -156,9 +208,21 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
                       resource=='plans'?Icons.speed_outlined:Icons.confirmation_number_outlined),
                     title:Text((row['name']??row['codeLast4']??row['id']).toString()),
                     subtitle:Text('Status: ${row['state']??'draft'} · ID: ${row['id']}',maxLines:2),
-                    trailing:resource=='vouchers'&&row['state']!='revoked'?
-                      IconButton(tooltip:'Revoke voucher record',onPressed:()=>revoke(row['id'].toString()),
-                        icon:const Icon(Icons.block)):null,
+                    trailing:PopupMenuButton<String>(
+                      tooltip:'Manage record',onSelected:(action)=>operate(row,action),
+                      itemBuilder:(_)=>[
+                        if(resource=='sites'&&row['state']=='draft')
+                          const PopupMenuItem(value:'commission',child:Text('Commission site')),
+                        if(resource=='plans'&&row['state']=='draft')
+                          const PopupMenuItem(value:'publish',child:Text('Publish plan')),
+                        if(resource=='vouchers'&&row['state']=='draft')
+                          const PopupMenuItem(value:'prepare',child:Text('Prepare voucher')),
+                        if(resource=='vouchers'&&row['state']!='revoked')
+                          const PopupMenuItem(value:'revoke',child:Text('Revoke voucher')),
+                        if(resource=='vouchers'&&row['state']=='revoked')
+                          const PopupMenuItem(value:'disconnect',child:Text('Request disconnection')),
+                      ],
+                    ),
                   ));
               })),
           if(cursor!=null)Align(alignment:Alignment.center,child:TextButton(
