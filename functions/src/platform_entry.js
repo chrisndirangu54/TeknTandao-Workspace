@@ -193,3 +193,6 @@ export * from './cloud_source_uploads.js';
 
 // Verified prepaid cloud billing: Paystack checkout and Kenya M-Pesa through Paystack.
 export * from './managed_cloud_payments.js';
+
+// Namecheap reseller: sandbox domain availability, pricing and review-only hosting/domain orders.
+export * from './namecheap_reseller.js';
