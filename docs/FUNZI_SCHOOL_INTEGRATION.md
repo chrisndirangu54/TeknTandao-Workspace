@@ -24,3 +24,17 @@ Both systems must be deployed and configured before buttons can complete linking
 The login-to-login flow is not yet a universal single-sign-on system. It currently needs the user to copy a one-time code, and it does not deploy itself. The curriculum feed remains read-only and excludes names, grades, attendance, payments, medical records and student roster data.
 
 Revocation: use `linkFunziStudent` with `active:false` from the school owner, or disable the Funzi integration globally.
+
+## School partner tutoring packages (separate from student linking)
+
+The School Management dashboard now exposes a **Funzi tutoring** tab for school partners. It copies the authoritative Workspace organization ID and can open Funzi when the Workspace Flutter app is built with:
+
+```bash
+flutter build web --dart-define=FUNZI_PUBLIC_URL=https://YOUR_LIVE_FUNZI_HOST
+```
+
+A school representative signs into Funzi, selects **Tutoring → School tutoring partner**, provides the school name, their Workspace organization ID and a contact address, and submits an application. Funzi places the application in **pending** status. A Funzi platform moderator must independently verify that the representative has control of the named Workspace organization before approving the school to submit tutoring packages. Publishing individual/group packages requires a second moderation decision. The Funzi MVP does not collect payments or provision video meetings.
+
+**This publisher workflow never grants school access to learner data.** Only the existing dual-authenticated student link and approved class-scoped `funziSchoolFeed` authorize curriculum synchronization to one Funzi learner at a time. School publisher status does not replace student/guardian consent, and gradebooks, rosters, attendance, financial and personal records remain excluded.
+
+Deployment and safeguarded launch requirements are documented in Funzi `docs/TUTORING_MARKETPLACE.md`. The school tab does not claim that the Funzi web host or cloud integration is already deployed.
