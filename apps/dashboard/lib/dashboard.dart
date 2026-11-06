@@ -1,4 +1,5 @@
 import 'modules/seo_cloud_launch_page.dart';
+import 'modules/eset_security_console.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'suite.dart';
@@ -193,6 +194,9 @@ class _DashboardState extends State<Dashboard> {
   void _navigateToModule(SuiteModule module) {
     Widget targetScreen;
     switch (module.id) {
+      case 'eset_security':
+        targetScreen = EsetSecurityConsole(store: store);
+        break;
       case 'seo_cloud':
         targetScreen = const SeoCloudLaunchPage();
         break;

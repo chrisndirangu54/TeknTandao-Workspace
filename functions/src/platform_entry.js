@@ -181,3 +181,12 @@ export * from './hotspot_google_rewards.js';
 
 // Multi-operator ad inventory, independently reviewed sites and campaign pilot planning.
 export * from './hotspot_network_marketplace.js';
+
+// ESET MSP / PROTECT Hub read-only connection verification (no provisioning).
+export * from './eset_workspace.js';
+
+// Tenant-scoped ESET Connect read-only inventory, detections, and binding approvals.
+export * from './eset_security_sync.js';
+
+// ESET customer change requests, explicit manual review only.
+export * from './eset_operations.js';
