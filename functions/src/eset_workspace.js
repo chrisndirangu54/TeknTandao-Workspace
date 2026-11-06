@@ -5,6 +5,7 @@ import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {defineSecret} from 'firebase-functions/params';
 import {identifier} from './domain.js';
+import {isBootstrapSuperAdminToken} from './super_admin_domain.js';
 import {checkEsetMspAccount} from './eset_msp_client.js';
 
 const region = 'europe-west1';
@@ -40,6 +41,8 @@ export const verifyEsetMspConnection = onCall({
   secrets: [username, password]
 }, async req => {
   const orgId = await requireOwner(req);
+  if (!isBootstrapSuperAdminToken(req.auth.token || {}))
+    throw new HttpsError('permission-denied', 'Platform operator approval required for centrally managed ESET credentials');
   if (!username.value() || !password.value())
     throw new HttpsError('failed-precondition', 'ESET MSP API secrets not configured');
   try {
