@@ -60,7 +60,8 @@ def load_samples(path:Path,site_id:str)->pd.DataFrame:
     df["weekday_cos"]=np.cos(2*np.pi*weekday/7)
     df["clients_lag_1"]=df["clients"].shift(1)
     df["clients_roll_4"]=df["clients"].shift(1).rolling(4,min_periods=1).mean()
-    df=df.dropna(subset=["clients_lag_1","clients_roll_4"])
+    df["target_next_clients"]=df["clients"].shift(-1)
+    df=df.dropna(subset=["clients_lag_1","clients_roll_4","target_next_clients"])
     return df
 
 def train_site_model(df:pd.DataFrame,site_id:str,output:Path)->dict:
@@ -74,11 +75,11 @@ def train_site_model(df:pd.DataFrame,site_id:str,output:Path)->dict:
     if not 1<=cadence_minutes<=120:raise ValueError("unsupported sampling cadence")
     model=Pipeline([("scale",RobustScaler()),
       ("regressor",HistGradientBoostingRegressor(random_state=44,max_iter=100,max_leaf_nodes=15))])
-    model.fit(train[FEATURES],train["clients"])
+    model.fit(train[FEATURES],train["target_next_clients"])
     prediction=np.maximum(0,model.predict(test[FEATURES]))
-    baseline=test["clients_lag_1"].to_numpy()
-    mae=float(mean_absolute_error(test["clients"],prediction))
-    baseline_mae=float(mean_absolute_error(test["clients"],baseline))
+    baseline=test["clients"].to_numpy()
+    mae=float(mean_absolute_error(test["target_next_clients"],prediction))
+    baseline_mae=float(mean_absolute_error(test["target_next_clients"],baseline))
     # Choose the trained forecast only if it outperforms the naive baseline.
     selected="hist_gradient_boosting" if mae<baseline_mae else "last_observation"
     anomaly=Pipeline([("scale",RobustScaler()),
