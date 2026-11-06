@@ -1,0 +1,18 @@
+# FreeRADIUS 3 module prototype; use only inside an isolated lab.
+# Install as mods-available/hotspot_rest, then symlink into mods-enabled.
+# This bridge requires RADIUS PAP User-Name and User-Password.
+# FreeRADIUS connects to bridge on private Docker network only.
+rest hotspot_rest {
+  connect_uri = "http://hotspot-bridge:8080"
+  authorize {
+    uri = "${..connect_uri}/authorize"
+    method = "post"
+    body = "json"
+    force_to = "json"
+  }
+  pool {
+    start = 2
+    min = 2
+    max = 8
+  }
+}
