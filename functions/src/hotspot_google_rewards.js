@@ -14,6 +14,44 @@ const fail=(c,m)=>{throw new HttpsError(c,m);};
 const valid=(o,fields)=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).every(k=>fields.includes(k));
 const auth=fn=>onCall({region:'europe-west1',timeoutSeconds:40,enforceAppCheck:true},fn);
 const hash=x=>createHash('sha256').update(x).digest('hex');
+async function operator(req){
+ if(!req.auth||!id(req.data?.orgId))fail('unauthenticated','Sign in required');
+ const member=await getFirestore().collection('organizations').doc(req.data.orgId)
+  .collection('members').doc(req.auth.uid).get();
+ if(!member.exists||!['owner','admin'].includes(member.data()?.role))
+  fail('permission-denied','Operator approval required');
+ return root(req.data.orgId);
+}
+export const hotspotV2RequestGoogleSite=auth(async req=>{
+ if(!valid(req.data,['orgId','siteId','adUnit','ssvTestReference'])||
+ !id(req.data?.siteId)||typeof req.data.adUnit!=='string'||
+ !/^\/[A-Za-z0-9_\/-]{5,200}$/.test(req.data.adUnit)||
+ !id(req.data.ssvTestReference))fail('invalid-argument','Ad unit and traceable SSV test required');
+ const space=await operator(req),site=await space.collection('sites').doc(req.data.siteId).get();
+ if(!site.exists||site.data().gatewayVerified!==true||site.data().labOnly!==true)
+  fail('failed-precondition','Approved lab gateway required');
+ await space.collection('googleAdUnitConfigs').doc(req.data.siteId).create({
+  adUnit:req.data.adUnit,ssvTestReference:req.data.ssvTestReference,
+  state:'awaiting_second_admin',enabled:false,requestedBy:req.auth.uid,
+  requestedAt:FieldValue.serverTimestamp()});
+ return {enabled:false,independentApprovalRequired:true};
+});
+export const hotspotV2ApproveGoogleSite=auth(async req=>{
+ if(!valid(req.data,['orgId','siteId'])||!id(req.data?.siteId))
+  fail('invalid-argument','Invalid site');
+ const space=await operator(req),ref=space.collection('googleAdUnitConfigs').doc(req.data.siteId);
+ await getFirestore().runTransaction(async tx=>{
+  const cfg=await tx.get(ref);
+  if(!cfg.exists||cfg.data().state!=='awaiting_second_admin'||
+   cfg.data().requestedBy===req.auth.uid)fail('failed-precondition','Independent SSV validation approval required');
+  const site=await tx.get(space.collection('sites').doc(req.data.siteId));
+  if(!site.exists||site.data().gatewayVerified!==true||site.data().labOnly!==true)
+   fail('failed-precondition','Site not commissioned');
+  tx.update(ref,{state:'approved_lab',enabled:true,approvedBy:req.auth.uid,
+   approvedAt:FieldValue.serverTimestamp()});
+ });
+ return {enabled:true,verificationBasis:'two_person_field_attestation_not_remote_google_proof'};
+});
 export const hotspotV2StartGoogleBundle=auth(async req=>{
  if(!req.auth||!valid(req.data,['orgId','siteId','planId','requiredAds','consent'])||
  ![req.data.orgId,req.data.siteId,req.data.planId].every(id)||req.data.consent!==true)
@@ -21,8 +59,11 @@ export const hotspotV2StartGoogleBundle=auth(async req=>{
  const {orgId,siteId,planId,requiredAds}=req.data;
  if(![3,4,5].includes(requiredAds))fail('invalid-argument','Choose three to five ads');
  const space=root(orgId);
- const [site,plan]=await Promise.all([space.collection('sites').doc(siteId).get(),
-   space.collection('plans').doc(planId).get()]);
+ const [site,plan,googleConfig]=await Promise.all([space.collection('sites').doc(siteId).get(),
+   space.collection('plans').doc(planId).get(),
+   space.collection('googleAdUnitConfigs').doc(siteId).get()]);
+ if(!googleConfig.exists||googleConfig.data().state!=='approved_lab'||
+ googleConfig.data().enabled!==true)fail('failed-precondition','Google SSV verifier not independently approved for this site');
  if(!site.exists||!plan.exists||site.data().gatewayVerified!==true||
    site.data().radiusEnabled!==true||site.data().labOnly!==true||
    plan.data().siteId!==site.id||plan.data().state!=='published'||
@@ -33,7 +74,8 @@ export const hotspotV2StartGoogleBundle=auth(async req=>{
  const expiresAtMs=Date.now()+20*60000;
  await bundle.create({uidHash:hash(req.auth.uid),siteId,planId,requiredAds,
   verifiedRewards:0,status:'collecting',createdAt:FieldValue.serverTimestamp(),
-  expiresAtMs,expiresAt:new Date(expiresAtMs),claimed:false});
+  expiresAtMs,expiresAt:new Date(expiresAtMs),claimed:false,
+  expectedAdUnit:googleConfig.data().adUnit});
  return {bundleId:bundle.id,requiredAds,verifiedRewards:0,expiresAtMs,
    googleAdUnitConfiguredExternally:true,googleSsvVerifierRequired:true};
 });
@@ -71,6 +113,10 @@ export const hotspotV2VerifiedRewardIntake=onRequest({region:'europe-west1',
    if(!b.exists||duplicate.exists||b.data().status!=='collecting'||
     b.data().expiresAtMs<Date.now()||b.data().verifiedRewards>=b.data().requiredAds)
     throw new Error('Unknown, duplicate or completed reward');
+   const config=await tx.get(space.collection('googleAdUnitConfigs').doc(b.data().siteId));
+   if(!config.exists||config.data().state!=='approved_lab'||
+    config.data().enabled!==true||config.data().adUnit!==d.adUnit||
+    b.data().expectedAdUnit!==d.adUnit)throw new Error('Unapproved or mismatched Google ad unit');
    const count=b.data().verifiedRewards+1;
    tx.create(unique,{orgId:d.orgId,bundleId:d.bundleId,
       verificationSource:'trusted_external_ssv_verifier',createdAt:FieldValue.serverTimestamp()});
