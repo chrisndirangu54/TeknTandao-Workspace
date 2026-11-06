@@ -67,7 +67,7 @@ class _HotspotConsoleState extends State<HotspotConsole> {
             mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
               Text(siteMode?'Only confirm controls you have personally tested. These are operator attestations, NOT evidence of a live gateway connection.':'Enter an already commissioned site ID. This publishes pricing only.'),
               const SizedBox(height:14),
-              TextField(controller:input,decoration:InputDecoration(
+              TextField(controller:input,onChanged:(_)=>update((){}),decoration:InputDecoration(
                 labelText:siteMode?'Registered NAS ID':'Commissioned site ID',
                 border:const OutlineInputBorder())),
               if(siteMode)...[
@@ -89,7 +89,7 @@ class _HotspotConsoleState extends State<HotspotConsole> {
           actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext,false),
              child:const Text('Cancel')),
             FilledButton(
-              onPressed:siteMode&&!checks.values.every((v)=>v)
+              onPressed:input.text.trim().isEmpty || (siteMode&&!checks.values.every((v)=>v))
                 ? null:()=>Navigator.pop(dialogContext,true),
               child:const Text('Confirm checks'))],
         )));
