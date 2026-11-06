@@ -3,20 +3,22 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onRequest} from 'firebase-functions/v2/https';
-import {defineSecret} from 'firebase-functions/params';
 import {verifySignedRadiusRequest} from './hotspot_radius_authorization_domain.js';
 import {normalizeV2Session} from './hotspot_session_domain.js';
-const key=defineSecret('HOTSPOT_RADIUS_BRIDGE_HMAC_KEY');
 export const hotspotV2RadiusAccounting=onRequest({
- region:'europe-west1',secrets:[key],invoker:'public',timeoutSeconds:12,maxInstances:10
+ region:'europe-west1',invoker:'public',timeoutSeconds:12,maxInstances:10
 },async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST'){res.status(405).end();return;}
- if(!verifySignedRadiusRequest({raw:req.rawBody,timestamp:req.get('x-hotspot-timestamp'),
-  signature:req.get('x-hotspot-signature'),secret:key.value()})){res.status(401).end();return;}
  let entry;try{entry=normalizeV2Session(JSON.parse(req.rawBody.toString('utf8')));}
  catch{res.status(400).end();return;}
  const root=getFirestore().collection('organizations').doc(entry.orgId).collection('hotspotV2').doc('control');
+ const credential=await root.collection('gatewaySecrets').doc(entry.siteId).get();
+ if(!credential.exists||credential.data().enabled!==true||
+ !verifySignedRadiusRequest({raw:req.rawBody,timestamp:req.get('x-hotspot-timestamp'),
+   signature:req.get('x-hotspot-signature'),secret:credential.data().secret})){
+   res.status(401).end();return;
+ }
  const nonce=root.collection('radiusNonces').doc(entry.nonce);
  const event=root.collection('accountingEvents').doc(entry.eventId);
  const session=root.collection('gatewaySessions').doc(createHash('sha256').update(
