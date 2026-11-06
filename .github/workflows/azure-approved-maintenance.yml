@@ -1,0 +1,47 @@
+name: Approved Azure maintenance
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        required: true
+        description: Customer-approved resource group
+      container_app:
+        required: true
+        description: Existing managed Container App
+      operation:
+        required: true
+        type: choice
+        options: [inspect, restart-revision]
+      approval_ticket:
+        required: true
+        description: Customer-authorized change record
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  operations:
+    runs-on: ubuntu-latest
+    environment: azure-production-customer-approval
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Inspect or restart a specifically approved resource
+        env:
+          GROUP: ${{ inputs.resource_group }}
+          APP: ${{ inputs.container_app }}
+          OPERATION: ${{ inputs.operation }}
+          TICKET: ${{ inputs.approval_ticket }}
+        run: |
+          set -euo pipefail
+          [[ "${#TICKET}" -ge 8 ]] || { echo 'Missing authorization reference'; exit 1; }
+          az containerapp show --resource-group "$GROUP" --name "$APP" --query "{name:name,id:id,provisioningState:properties.provisioningState}" -o json
+          if [[ "$OPERATION" == "restart-revision" ]]; then
+            REVISION=$(az containerapp revision list --resource-group "$GROUP" --name "$APP" --query "[?properties.active==\`true\`]|[0].name" -o tsv)
+            [[ -n "$REVISION" ]] || { echo 'No active revision'; exit 1; }
+            az containerapp revision restart --resource-group "$GROUP" --name "$APP" --revision "$REVISION"
+          elif [[ "$OPERATION" != "inspect" ]]; then
+            exit 1
+          fi

@@ -1,0 +1,32 @@
+name: Cloud Automation Safety
+on:
+  pull_request:
+    paths:
+      - 'functions/src/cloud_*'
+      - 'functions/test/cloud_*'
+      - 'scripts/cloud-ops/**'
+      - 'infra/azure/**'
+      - '.github/workflows/azure-*.yml'
+      - '.github/workflows/cloud-automation-safety.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  node-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm --prefix functions ci
+      - run: npm --prefix functions test
+  bicep-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/cli@v2
+        with:
+          inlineScript: az bicep build --file infra/azure/container-app.bicep

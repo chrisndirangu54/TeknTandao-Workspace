@@ -1,82 +1,127 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../suite.dart';
-import 'automation_studio.dart';
-import 'reseller_onboarding_dashboard.dart';
 
 class CloudAutomationScreen extends StatefulWidget {
- final SuiteStore store;
- const CloudAutomationScreen({super.key,required this.store});
- @override State<CloudAutomationScreen> createState()=>_CloudAutomationScreenState();
+  final SuiteStore store;
+  const CloudAutomationScreen({super.key,required this.store});
+  @override
+  State<CloudAutomationScreen> createState()=>_CloudAutomationScreenState();
 }
 class _CloudAutomationScreenState extends State<CloudAutomationScreen>{
- final app=TextEditingController(),repo=TextEditingController(),budget=TextEditingController(text:'40');
- String stack='Flutter web',provider='Azure';
- Map<String,dynamic>? preview;
- List<dynamic> saved=[];
- String? error;
- bool busy=false;
- @override void initState(){super.initState();reload();}
- @override void dispose(){app.dispose();repo.dispose();budget.dispose();super.dispose();}
- Map<String,dynamic> get plan=>{
-  'schemaVersion':1,'kind':'cloud-automation-migration-request',
-  'appName':app.text.trim(),'repositoryUrl':repo.text.trim(),'stack':stack,
-  'provider':provider,'monthlyBudgetUsd':double.tryParse(budget.text)??0,
-  'mode':'planning-only','source':'tekntandao-html'
- };
- Future<void> reload() async{
-  if(widget.store.demo)return;
-  try{
-   final r=await widget.store.call('listCloudAutomationPlans');
-   if(mounted)setState(()=>saved=r['plans'] as List? ?? []);
-  }catch(e){if(mounted)setState(()=>error=e.toString());}
- }
- Future<void> execute(String action)async{
-  if(busy)return;
-  setState((){busy=true;error=null;});
-  try{
-   final result=await widget.store.call(action,{'plan':plan});
-   if(mounted)setState(()=>preview=result);
-   if(action=='importCloudAutomationPlan')await reload();
-  }catch(e){if(mounted)setState(()=>error=e.toString());}
-  finally{if(mounted)setState(()=>busy=false);}
- }
- void open(Widget screen)=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>screen));
- @override Widget build(BuildContext context)=>Scaffold(
- appBar:AppBar(title:const Text('AI-assisted cloud automation'),actions:[
-  IconButton(tooltip:'Automation Studio',icon:const Icon(Icons.auto_awesome),onPressed:()=>open(AutomationStudio(store:widget.store))),
-  IconButton(tooltip:'Microsoft reseller onboarding',icon:const Icon(Icons.storefront),onPressed:()=>open(ResellerOnboardingDashboard(store:widget.store))),
- ]),
- body:ListView(padding:const EdgeInsets.all(20),children:[
-  const Text('Azure, AWS, Google Cloud and private infrastructure deployment planning. This is a preview: no AI call, cloud resource or customer license is provisioned.'),
-  const SizedBox(height:16),
-  TextField(controller:app,maxLength:120,decoration:const InputDecoration(labelText:'Application name')),
-  TextField(controller:repo,decoration:const InputDecoration(labelText:'GitHub repository HTTPS URL (optional)')),
-  DropdownButtonFormField<String>(value:stack,decoration:const InputDecoration(labelText:'Application stack'),
-   items:['Flutter web','React','Node.js','Python FastAPI','Docker container'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),
-   onChanged:(v)=>setState(()=>stack=v??stack)),
-  DropdownButtonFormField<String>(value:provider,decoration:const InputDecoration(labelText:'Cloud provider'),
-   items:['Azure','AWS','Google Cloud','Private infrastructure'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),
-   onChanged:(v)=>setState(()=>provider=v??provider)),
-  TextField(controller:budget,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Maximum estimated monthly spend (USD)')),
-  const SizedBox(height:12),
-  Wrap(spacing:10,runSpacing:10,children:[
-   FilledButton(onPressed:busy?null:()=>execute('previewCloudAutomationPlan'),child:const Text('Generate deployment checklist')),
-   OutlinedButton(onPressed:busy?null:()=>execute('importCloudAutomationPlan'),child:const Text('Save plan in Workspace')),
-  ]),
-  if(error!=null)Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error)),
-  if(preview!=null)Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-   Text(preview!['imported']==true?'Saved for review — no deployment':'Proposed checklist',style:Theme.of(context).textTheme.titleMedium),
-   for(final item in (preview!['checklist'] as List? ?? []))Text('• $item'),
-   const Text('Budget is a planning ceiling only; cloud cost limits are not enforced.'),
-  ]))),
-  const SizedBox(height:18),
-  Text('Saved Workspace plans',style:Theme.of(context).textTheme.titleMedium),
-  for(final row in saved.whereType<Map>())Card(child:ListTile(
-   title:Text(row['appName']?.toString()??'Application'),
-   subtitle:Text('${row['provider']} · ${row['stack']} · USD ${row['monthlyBudgetUsd']}/month (estimate)\nNot connected · not deployed'),
-   isThreeLine:true)),
-  const Divider(),
-  OutlinedButton.icon(onPressed:()=>open(AutomationStudio(store:widget.store)),icon:const Icon(Icons.hub),label:const Text('Open existing Automation Studio / Dynamics 365')),
-  OutlinedButton.icon(onPressed:()=>open(ResellerOnboardingDashboard(store:widget.store)),icon:const Icon(Icons.assignment),label:const Text('Open Microsoft reseller onboarding')),
- ]));
+  final jsonInput=TextEditingController();
+  bool busy=false;
+  String message='';
+  List<Map<String,dynamic>> plans=[];
+  List<Map<String,dynamic>> jobs=[];
+  @override
+  void initState(){super.initState();if(!widget.store.demo) refresh();}
+  @override
+  void dispose(){jsonInput.dispose();super.dispose();}
+  Future<void> refresh()async{
+    try{
+      final result=await widget.store.call('cloudListMigrationPlans');
+      final operations=await widget.store.call('cloudListOperations');
+      if(mounted)setState((){
+        plans=(result['plans'] as List? ?? []).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
+        jobs=(operations['jobs'] as List? ?? []).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
+      });
+    }catch(e){if(mounted)setState(()=>message='Unable to load plans: $e');}
+  }
+  Future<void> importPlan()async{
+    if(busy)return;
+    setState((){busy=true;message='';});
+    try{
+      if(widget.store.demo)throw StateError('Sign in to a real workspace to import plans.');
+      final plan=jsonDecode(jsonInput.text);
+      if(plan is! Map<String,dynamic>)throw FormatException('Expected a JSON object');
+      final result=await widget.store.call('cloudImportMigrationPlan',{'plan':plan});
+      if(mounted)setState(()=>message='Imported plan ${result['id']}. Awaiting review; no resources deployed.');
+      await refresh();
+    }catch(e){if(mounted)setState(()=>message='Import failed: $e');}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> previewPlan(String id)async{
+    try{
+      final result=await widget.store.call('cloudPreviewPlan',{'planId':id});
+      if(mounted)showDialog<void>(context:context,builder:(context)=>AlertDialog(
+        title:const Text('Cloud deployment preview — no changes made'),
+        content:SizedBox(width:600,child:SingleChildScrollView(child:SelectableText(
+          const JsonEncoder.withIndent('  ').convert(result['blueprint'])))),
+        actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
+    }catch(e){if(mounted)setState(()=>message='Preview unavailable: $e');}
+  }
+  Future<void> createOperation(String planId)async{
+    if(busy)return;
+    setState(()=>busy=true);
+    try{
+      await widget.store.call('cloudCreateOperation',{'planId':planId,'kind':'deployment',
+        'reason':'Customer requested a scoped cloud deployment review'});
+      if(mounted)setState(()=>message='Deployment request created; no cloud resources changed.');
+      await refresh();
+    }catch(e){if(mounted)setState(()=>message='Cannot create request: $e');}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> advanceJob(String jobId,String decision)async{
+    if(busy)return;
+    setState(()=>busy=true);
+    try{
+      await widget.store.call('cloudAdvanceOperation',{'jobId':jobId,'decision':decision});
+      await refresh();
+    }catch(e){if(mounted)setState(()=>message='Cannot advance job: $e');}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> review(String id,String decision)async{
+    if(busy)return;
+    setState(()=>busy=true);
+    try{
+      await widget.store.call('cloudReviewMigrationPlan',{'planId':id,'decision':decision});
+      if(mounted)setState(()=>message='Review saved. Live deployment remains disabled.');
+      await refresh();
+    }catch(e){if(mounted)setState(()=>message='Review failed: $e');}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  @override
+  Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Cloud Automation & Migration')),
+    body:ListView(padding:const EdgeInsets.all(20),children:[
+      const Text('Import an HTML deployment plan',style:TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
+      const SizedBox(height:8),
+      const Text('Paste the JSON exported from TeknTandao HTML. Plans are scoped to your current workspace and require owner review. This feature does not deploy cloud resources.'),
+      const SizedBox(height:16),
+      TextField(controller:jsonInput,maxLines:8,decoration:const InputDecoration(labelText:'Migration request JSON',border:OutlineInputBorder())),
+      const SizedBox(height:12),
+      FilledButton(onPressed:busy?null:importPlan,child:const Text('Import into Workspace')),
+      if(message.isNotEmpty)Padding(padding:const EdgeInsets.all(12),child:SelectableText(message)),
+      const Divider(height:32),
+      Row(children:[const Expanded(child:Text('Migration plans',style:TextStyle(fontSize:22,fontWeight:FontWeight.bold))),IconButton(onPressed:refresh,icon:const Icon(Icons.refresh))]),
+      ...plans.map((plan)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text(plan['appName']?.toString()??'Application',style:const TextStyle(fontWeight:FontWeight.bold)),
+        Text('${plan['provider']} · ${plan['stack']} · USD ${plan['monthlyBudgetUsd']}/month requested'),
+        Text('Status: ${plan['state']} · execution disabled'),
+        OutlinedButton(onPressed:busy?null:()=>previewPlan(plan['id'].toString()),
+          child:const Text('View cloud blueprint')),
+        if(plan['state']=='approved_for_manual_setup')
+          OutlinedButton(onPressed:busy?null:()=>createOperation(plan['id'].toString()),child:const Text('Request deployment review')),
+        if(plan['state']=='awaiting_review')Wrap(spacing:10,children:[
+          OutlinedButton(onPressed:busy?null:()=>review(plan['id'].toString(),'reject'),child:const Text('Reject')),
+          FilledButton(onPressed:busy?null:()=>review(plan['id'].toString(),'approve'),child:const Text('Approve planning record'))
+        ])
+      ])))),
+      const Divider(height:32),
+      const Text('Operations approval queue',style:TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
+      const Text('Operator approval and live execution remain disabled pending verified platform credentials.'),
+      ...jobs.map((job)=>Card(child:ListTile(
+        title:Text('${job['kind']} — ${job['state']}'),
+        subtitle:Text(job['reason']?.toString()??''),
+        trailing:job['state']=='proposed'
+          ?TextButton(onPressed:busy?null:()=>advanceJob(job['id'].toString(),'validate'),child:const Text('Validate'))
+          :job['state']=='validated'
+          ?TextButton(onPressed:busy?null:()=>advanceJob(job['id'].toString(),'request_customer'),child:const Text('Request approval'))
+          :job['state']=='awaiting_customer'
+          ?TextButton(onPressed:busy?null:()=>advanceJob(job['id'].toString(),'approve_customer'),child:const Text('Customer approve'))
+          :null,
+      ))),
+    ]),
+  );
 }
