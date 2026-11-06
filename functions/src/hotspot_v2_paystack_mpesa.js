@@ -31,10 +31,13 @@ export const hotspotV2StartPaystackMpesaTest=fn(async req=>{
  fail('invalid-argument','Invalid voucher, email or phone');
  const key=secret(),reference='HS'+randomBytes(12).toString('hex');
  const payment=space.collection('paymentIntents').doc(voucherId);
+ const lookup=db().collection('hotspotPaystackReferences').doc(reference);
  let price=0;
  await db().runTransaction(async tx=>{
   const voucher=await tx.get(space.collection('vouchers').doc(voucherId));
   const exists=await tx.get(payment);
+  const priorReference=await tx.get(lookup);
+  if(priorReference.exists)fail('already-exists','Reference collision');
   if(exists.exists)fail('already-exists','Checkout already exists. Verify status; do not retry blindly');
   if(!voucher.exists||voucher.data().state!=='pending_payment')fail('failed-precondition','Paid voucher must be prepared');
   const [site,plan]=await Promise.all([tx.get(space.collection('sites').doc(voucher.data().siteId)),
@@ -44,6 +47,7 @@ export const hotspotV2StartPaystackMpesaTest=fn(async req=>{
     !Number.isSafeInteger(plan.data().priceKes)||plan.data().priceKes<1||plan.data().priceKes>1000000)
     fail('failed-precondition','Published paid plan required');
   price=plan.data().priceKes;
+  tx.create(lookup,{orgId:req.data.orgId,voucherId,createdAt:FieldValue.serverTimestamp()});
   tx.create(payment,{id:voucherId,voucherId,siteId:site.id,planId:plan.id,
     reference,provider:'paystack_mpesa_test',state:'initiating',amountKes:price,
     receiptVerified:false,customerEmailHash:createHash('sha256').update(email).digest('hex'),
