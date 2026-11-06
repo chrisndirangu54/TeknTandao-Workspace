@@ -44,5 +44,7 @@ jobs:
       - run: node --check functions/src/hotspot_v2_radius_endpoint.js
       - run: node --check functions/src/hotspot_gateway_approvals.js
       - run: node --check functions/src/hotspot_v2_lab_activation.js
+      - run: node --check functions/src/hotspot_paystack_domain.js
+      - run: node --check functions/src/hotspot_v2_paystack_mpesa.js
       - run: node --check infrastructure/hotspot-radius/bridge.mjs
-      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js functions/test/hotspot_payment_domain.test.js functions/test/hotspot_v2_domain.test.js functions/test/hotspot_lifecycle_domain.test.js functions/test/hotspot_settlement_domain.test.js functions/test/hotspot_radius_authorization_domain.test.js
+      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js functions/test/hotspot_payment_domain.test.js functions/test/hotspot_v2_domain.test.js functions/test/hotspot_lifecycle_domain.test.js functions/test/hotspot_settlement_domain.test.js functions/test/hotspot_radius_authorization_domain.test.js functions/test/hotspot_paystack_domain.test.js
