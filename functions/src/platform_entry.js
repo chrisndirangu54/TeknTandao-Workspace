@@ -100,3 +100,6 @@ export * from './hotspot_payment_intents.js';
 
 // Tenant-scoped next-generation hotspot inventory; legacy pilot stays separate.
 export * from './hotspot_v2.js';
+
+// V2 scoped site, plan, voucher and disconnect workflows; gateway side effects disabled.
+export * from './hotspot_v2_operations.js';
