@@ -128,3 +128,9 @@ export * from './hotspot_v2_paystack_webhook.js';
 export * from './hotspot_sponsored_access.js';
 export * from './hotspot_iot_analytics.js';
 export * from './hotspot_geospatial.js';
+
+// Per-site signed gateway accounting and private bridge credential rotation.
+export * from './hotspot_v2_accounting.js';
+
+// Per-site signed gateway accounting and private bridge credential rotation.
+export * from './hotspot_gateway_credentials.js';
