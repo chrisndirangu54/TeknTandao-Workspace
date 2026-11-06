@@ -13,6 +13,7 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
  final org=TextEditingController(),site=TextEditingController(),plan=TextEditingController();
  final title=TextEditingController(),advertiser=TextEditingController();
  final creative=TextEditingController(),destination=TextEditingController();
+ final googleAdUnit=TextEditingController(),ssvTestReference=TextEditingController();
  final latitude=TextEditingController(),longitude=TextEditingController(),iotLabel=TextEditingController(),deviceId=TextEditingController();
  List<Map<String,dynamic>> campaigns=[];
  List<Map<String,dynamic>> sponsorApplicants=[];
@@ -28,7 +29,7 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
   }catch(_){}
  }
  @override void dispose(){
-  for(final c in [org,site,plan,title,advertiser,creative,destination,latitude,longitude,iotLabel,deviceId])c.dispose();
+  for(final c in [org,site,plan,title,advertiser,creative,destination,googleAdUnit,ssvTestReference,latitude,longitude,iotLabel,deviceId])c.dispose();
   super.dispose();
  }
  Future<Map<String,dynamic>> invoke(String method,Map<String,dynamic> data)async{
@@ -135,6 +136,24 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
            child:const Text('Pause')):null),
       const Text('Ad impressions and sponsor billing are not verified by the time gate.',
         style:TextStyle(fontSize:12)),
+    ]),
+    section('Google rewarded Wi-Fi: 3–5 ads for 30 minutes',[
+      const Text('Configure an Ad Manager rewarded WEB ad unit. Enabling requires independently verified SSV and a second administrator. No ad is presented before site approval.'),
+      field('Google rewarded ad unit path',googleAdUnit),
+      field('SSV end-to-end test reference',ssvTestReference),
+      Wrap(spacing:10,runSpacing:8,children:[
+        OutlinedButton.icon(icon:const Icon(Icons.verified_user_outlined),
+          onPressed:busy?null:()=>execute('hotspotV2RequestGoogleSite',{
+            'siteId':site.text.trim(),'adUnit':googleAdUnit.text.trim(),
+            'ssvTestReference':ssvTestReference.text.trim()
+          },success:'Google site review requested. A separate admin must verify SSV.'),
+          label:const Text('Request Google site review')),
+        FilledButton.icon(icon:const Icon(Icons.check_circle_outline),
+          onPressed:busy?null:()=>execute('hotspotV2ApproveGoogleSite',{
+            'siteId':site.text.trim()
+          },success:'Google site approved by second admin. Confirm actual Google SSV verification is running.'),
+          label:const Text('Second-admin approval')),
+      ]),
     ]),
     section('Gateway credentials and IoT telemetry',[
       OutlinedButton.icon(
