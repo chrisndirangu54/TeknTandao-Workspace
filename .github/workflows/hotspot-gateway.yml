@@ -29,4 +29,6 @@ jobs:
       - run: node --check functions/src/hotspot_pilot.js
       - run: node --check functions/src/hotspot_accounting.js
       - run: node --check functions/src/hotspot_domain.js
-      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js
+      - run: node --check functions/src/hotspot_payment_domain.js
+      - run: node --check functions/src/hotspot_payment_intents.js
+      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js functions/test/hotspot_payment_domain.test.js
