@@ -51,9 +51,6 @@ class CostAwareFirebaseSuiteStore extends SuiteStore {
       FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   Duration? _cacheTtl(String name) {
-    // OAuth completes in a separate browser tab; refresh must see its new
-    // connection immediately, as well as asynchronous workflow results.
-    if (['getAutomationStudio', 'getResellerStudio', 'getClientBundleInvoices'].contains(name)) return Duration.zero;
     if (name == 'getCatalog') return const Duration(minutes: 5);
     if (name == 'getWorkspaceContext') return const Duration(minutes: 2);
     if (name == 'getFirebaseCostPolicy') return const Duration(minutes: 5);
@@ -154,7 +151,7 @@ class CostAwareFirebaseSuiteStore extends SuiteStore {
           .collection('organizations/$orgId/$path')
           .limit(limit),
       onStart: () => listenerStarts += 1,
-      onDocuments: (docCount) => observedDocuments += docCount,
+      onDocuments: (count) => observedDocuments += count,
     );
     _watches[key] = watch;
     return watch.stream;
