@@ -11,6 +11,7 @@ export function cloudPaymentDecision(order, provider){
  return {valid:true,providerTransactionId:String(provider.id)};
 }
 export function isCloudServicePaid(payment,now=Date.now()){
- return Boolean(payment?.receiptVerified===true&&payment?.status==='paid'&&
+ return Boolean(payment?.paymentEnvironment==='live'&&
+  payment?.receiptVerified===true&&payment?.status==='paid'&&
   typeof payment.paidUntilMs==='number'&&payment.paidUntilMs>now);
 }
