@@ -37,13 +37,13 @@ export const cloudStartSubscriptionCheckout=onCall({
  const project=await projectRef(org,input.projectId).get();
  if(!project.exists)throw new HttpsError('not-found','Cloud project not found');
  if(input.method==='mpesa'&&!input.phone)throw new HttpsError('invalid-argument','M-Pesa phone required');
+ const merchant=key(),paymentEnvironment=merchant.startsWith('sk_live_')?'live':'test';
  const plan=cloudPlanCatalog[input.plan],ref='TC'+randomBytes(14).toString('hex');
  const payment=db.collection('managedCloudCheckoutOrders').doc(ref);
  const config={orgId:org.id,projectId:input.projectId,plan:input.plan,priceKes:plan.priceKes,
   method:input.method,status:'initiating',reference:ref,createdBy:uid,
-  receiptVerified:false,createdAt:FieldValue.serverTimestamp()};
+  receiptVerified:false,paymentEnvironment,createdAt:FieldValue.serverTimestamp()};
  await payment.create(config);
- const merchant=key();
  try{
   let response;
   if(input.method==='paystack') {
@@ -101,6 +101,7 @@ export async function reconcileManagedCloudPayment(reference, expectedOrgId=null
     createdAt:FieldValue.serverTimestamp()});
   tx.set(bill,{status:'paid',receiptVerified:true,plan:p.data().plan,
     paidUntilMs,amountKes:p.data().priceKes,currency:'KES',lastReference:reference,
+    paymentEnvironment:p.data().paymentEnvironment,
     verifiedAt:FieldValue.serverTimestamp(),paymentProvider:'paystack',
     updatedAt:FieldValue.serverTimestamp()},{merge:true});
   tx.update(payment,{status:'paid',receiptVerified:true,verifiedAt:FieldValue.serverTimestamp(),
@@ -120,6 +121,7 @@ export const cloudGetSubscriptionStatus=onCall({region,enforceAppCheck:true},asy
  if(!(await project.get()).exists)throw new HttpsError('not-found','Project not found');
  const bill=(await billingRef(org,project.id).get()).data();
  return {paid:isCloudServicePaid(bill),paidUntilMs:bill?.paidUntilMs||null,
+  paymentEnvironment:bill?.paymentEnvironment||null,
   plan:bill?.plan||null,status:bill?.status||'unpaid',
   currency:'KES',plans:cloudPlanCatalog,cloudProviderFeesIncluded:false,
   note:'Service charge only; provider usage is separately billed. M-Pesa renewals require manual payment.'};
