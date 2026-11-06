@@ -26,15 +26,20 @@ export function evaluateSponsoredCompletion({challenge,consent,dwellNow=Date.now
  if(elapsed>300000||elapsed<0)return {allowed:false,reason:'expired_challenge'};
  return {allowed:true,reason:'time_gate_passed_not_verified_view'};
 }
-export function scoreHotspotAnomaly({failedAdmissions=0,replayedNonces=0,disconnectBacklog=0,missingHeartbeatMinutes=null}={}){
- for(const value of [failedAdmissions,replayedNonces,disconnectBacklog])if(!Number.isSafeInteger(value)||value<0)return {available:false,reason:'invalid_inputs'};
+export function scoreHotspotAnomaly({failedAdmissions=null,replayedNonces=null,disconnectBacklog=null,missingHeartbeatMinutes=null}={}){
+ for(const value of [failedAdmissions,replayedNonces,disconnectBacklog])
+  if(value!==null&&(!Number.isSafeInteger(value)||value<0))return {available:false,reason:'invalid_inputs'};
  if(missingHeartbeatMinutes!==null&&(!Number.isFinite(missingHeartbeatMinutes)||missingHeartbeatMinutes<0))return {available:false,reason:'invalid_heartbeat'};
+ const factors={failedAdmissions,replayedNonces,disconnectBacklog,missingHeartbeatMinutes};
+ const measured=Object.values(factors).filter(v=>v!==null).length;
+ if(!measured)return {available:false,reason:'no_operational_evidence',factors};
  const score=Math.min(100,Math.round(
-  Math.min(40,failedAdmissions*3)+Math.min(25,replayedNonces*9)+
-  Math.min(20,disconnectBacklog*5)+Math.min(15,(missingHeartbeatMinutes??0)/5)
+  Math.min(40,(failedAdmissions??0)*3)+Math.min(25,(replayedNonces??0)*9)+
+  Math.min(20,(disconnectBacklog??0)*5)+Math.min(15,(missingHeartbeatMinutes??0)/5)
  ));
  return {available:true,score,severity:score>=70?'high':score>=35?'medium':'low',
-  method:'rule_based_not_trained_ml',factors:{failedAdmissions,replayedNonces,disconnectBacklog,missingHeartbeatMinutes}};
+  evidenceCompleteness:measured+'/4',method:'partial_rule_based_not_trained_ml',factors,
+  caveat:'Missing factors are unknown, not zero risk'};
 }
 export function classifyEnvironmentalRisk({rainfallMm24h=null,windKph=null,backupBatteryPercent=null}={}){
  const flags=[];
