@@ -15,6 +15,7 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
  final creative=TextEditingController(),destination=TextEditingController();
  final latitude=TextEditingController(),longitude=TextEditingController(),iotLabel=TextEditingController(),deviceId=TextEditingController();
  List<Map<String,dynamic>> campaigns=[];
+ List<Map<String,dynamic>> sponsorApplicants=[];
  Map<String,dynamic>? intelligence,environment;
  String status='Select a site for sponsored passes, signed IoT devices and geospatial analytics.';
  bool busy=false;
@@ -42,6 +43,10 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
    if(name=='hotspotV2SponsorAdminList'){
     setState(()=>campaigns=(out['campaigns'] as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList());
    }
+   if(name=='hotspotV2SponsorAdminCampaigns')setState(()=>campaigns=(out['campaigns'] as List)
+     .map((e)=>Map<String,dynamic>.from(e as Map)).toList());
+   if(name=='hotspotV2SponsorListApplicants')setState(()=>sponsorApplicants=(out['applicants'] as List)
+     .map((e)=>Map<String,dynamic>.from(e as Map)).toList());
    if(name=='hotspotV2OperationsIntelligence')setState(()=>intelligence=out);
    if(name=='hotspotV2RefreshNasaPower')setState(()=>environment=out);
    if(name=='hotspotV2RegisterIoTDevice'&&out['oneTimeSecret']!=null){
@@ -83,6 +88,19 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
     field('Active Workspace ID',org),field('Site ID',site),field('Free Plan ID',plan),
     if(busy)const LinearProgressIndicator(),
     Padding(padding:const EdgeInsets.symmetric(vertical:12),child:Text(status)),
+    section('Local sponsor onboarding and approvals',[
+      const Text('Local businesses apply through the advertiser website. An operator independently approves them. Funded campaigns need a separate activation review.'),
+      OutlinedButton.icon(onPressed:busy?null:()=>execute('hotspotV2SponsorListApplicants',{}),
+        icon:const Icon(Icons.business_outlined),label:const Text('Review sponsor applications')),
+      for(final applicant in sponsorApplicants)
+        ListTile(title:Text(applicant['businessName']?.toString()??'Advertiser'),
+          subtitle:Text('Status: ${applicant['status']} · ${applicant['contactEmail']??''}'),
+          trailing:applicant['status']=='pending_review'?TextButton(
+            onPressed:busy?null:()=>execute('hotspotV2SponsorApprove',{'sponsorUid':applicant['uid']},
+              success:'Advertiser approved. Refresh applicants to confirm status.'),
+            child:const Text('Approve')):null),
+      const Text('Advertiser portal: hotspot-advertisers.html · Google rewarded portal: hotspot-google-rewards.html'),
+    ]),
     section('Sponsored access instead of payment',[
       field('Sponsor campaign title',title),field('Advertiser',advertiser),
       field('Creative image HTTPS URL',creative),field('Sponsor destination HTTPS URL',destination),
@@ -99,10 +117,15 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
         OutlinedButton(onPressed:busy?null:()=>execute('hotspotV2SponsorAdminList',{}),
           child:const Text('Load campaigns')),
       ]),
+      OutlinedButton.icon(onPressed:busy?null:()=>execute('hotspotV2SponsorAdminCampaigns',{}),
+        icon:const Icon(Icons.receipt_long_outlined),label:const Text('Review funded campaigns')),
       for(final c in campaigns)ListTile(
         title:Text(c['title']?.toString()??'Campaign'),
         subtitle:Text('${c['advertiser']} · ${c['status']} · rewards ${c['rewardedCount']}/${c['rewardLimit']}'),
-        trailing:c['status']=='draft'?TextButton(onPressed:busy?null:
+        trailing:c['status']=='awaiting_review'?TextButton(onPressed:busy?null:
+          ()=>execute('hotspotV2SponsorActivateCampaign',{'campaignId':c['id']},
+            success:'Verified test-funded sponsor campaign approved.'),child:const Text('Activate')):
+          c['status']=='draft'?TextButton(onPressed:busy?null:
           ()=>execute('hotspotV2ApproveSponsorCampaign',{'campaignId':c['id']},
             success:'Campaign approved for approved laboratory sites only.'),
           child:const Text('Approve')):
