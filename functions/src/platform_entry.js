@@ -184,3 +184,6 @@ export * from './hotspot_network_marketplace.js';
 
 // ESET MSP / PROTECT Hub read-only connection verification (no provisioning).
 export * from './eset_workspace.js';
+
+// Tenant-scoped ESET Connect read-only inventory, detections, and binding approvals.
+export * from './eset_security_sync.js';
