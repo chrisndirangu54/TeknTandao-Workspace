@@ -1,0 +1,77 @@
+# Copy into CLIENT REPOSITORY as .github/workflows/tekntandao-cloud-run.yml.
+# DO NOT place untrusted client code or secrets into the TeknTandao control-plane repo.
+# Cloud Build executes the client's source in their isolated GCP project.
+name: TeknTandao Managed Cloud Run
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: tekntandao-cloud-run-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - name: Checkout approved source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to customer-scoped Google Cloud project
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Deploy from source to private Cloud Run service
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v3
+        with:
+          service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          region: ${{ vars.GCP_CLOUD_RUN_REGION }}
+          source: .
+          flags: '--no-allow-unauthenticated'
+
+      - name: Report deployment result to TeknTandao Workspace
+        if: always()
+        continue-on-error: true
+        env:
+          CI_TOKEN: ${{ secrets.TEKNTANDAO_INGEST_TOKEN }}
+          INGEST_URL: ${{ vars.TEKNTANDAO_INGEST_URL }}
+          ORG_ID: ${{ vars.TEKNTANDAO_ORG_ID }}
+          PROJECT_ID: ${{ vars.TEKNTANDAO_PROJECT_ID }}
+          CLOUD_RUN_URL: ${{ steps.deploy.outputs.url }}
+          DEPLOY_STATUS: ${{ steps.deploy.outcome }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          node <<'NODE' > /tmp/tekntandao-ci-report.json
+          const env=process.env;
+          const payload={
+            orgId:env.ORG_ID,
+            projectId:env.PROJECT_ID,
+            run:{
+              runId:env.GITHUB_RUN_ID,
+              sha:env.GITHUB_SHA,
+              branch:env.GITHUB_REF_NAME,
+              status:env.DEPLOY_STATUS==='success'?'success':env.DEPLOY_STATUS==='cancelled'?'cancelled':'failure'
+            }
+          };
+          if(payload.run.status==='success'&&env.CLOUD_RUN_URL)
+            payload.run.serviceUrl=env.CLOUD_RUN_URL;
+          process.stdout.write(JSON.stringify(payload));
+          NODE
+          curl --fail-with-body --retry 2 --max-time 20 \
+            -H "Authorization: Bearer ${CI_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/tekntandao-ci-report.json \
+            "${INGEST_URL}"
+          rm -f /tmp/tekntandao-ci-report.json
