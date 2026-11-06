@@ -51,5 +51,10 @@ jobs:
       - run: node --check functions/src/hotspot_sponsored_access.js
       - run: node --check functions/src/hotspot_iot_analytics.js
       - run: node --check functions/src/hotspot_geospatial.js
+      - run: node --check functions/src/hotspot_session_domain.js
+      - run: node --check functions/src/hotspot_v2_accounting.js
+      - run: node --check functions/src/hotspot_gateway_credentials.js
+      - run: node --check functions/src/hotspot_statistics_domain.js
+      - run: node --check infrastructure/hotspot-radius/disconnect-worker.mjs
       - run: node --check infrastructure/hotspot-radius/bridge.mjs
-      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js functions/test/hotspot_payment_domain.test.js functions/test/hotspot_v2_domain.test.js functions/test/hotspot_lifecycle_domain.test.js functions/test/hotspot_settlement_domain.test.js functions/test/hotspot_radius_authorization_domain.test.js functions/test/hotspot_paystack_domain.test.js functions/test/hotspot_sponsored_domain.test.js
+      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js functions/test/hotspot_payment_domain.test.js functions/test/hotspot_v2_domain.test.js functions/test/hotspot_lifecycle_domain.test.js functions/test/hotspot_settlement_domain.test.js functions/test/hotspot_radius_authorization_domain.test.js functions/test/hotspot_paystack_domain.test.js functions/test/hotspot_sponsored_domain.test.js functions/test/hotspot_session_domain.test.js functions/test/hotspot_statistics_domain.test.js
