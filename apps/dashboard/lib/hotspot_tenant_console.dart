@@ -161,6 +161,32 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
           endpoint='hotspotV2CommissionSite';
           payload.addAll({'siteId':item['id'],'nasId':nas.text.trim(),'checks':checks});
         }finally{nas.dispose();}
+      }else if(action=='lab_gateway_request'){
+        final fields=['routerTestRef','radiusTestRef','accountingTestRef','isolationTestRef'];
+        final controllers={for(final name in fields)name:TextEditingController()};
+        try{
+          final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+            title:const Text('Request lab gateway verification'),
+            content:SizedBox(width:440,child:SingleChildScrollView(child:Column(
+              mainAxisSize:MainAxisSize.min,children:[
+                const Text('Enter traceable references to real network tests. A different administrator must approve.'),
+                for(final name in fields)Padding(padding:const EdgeInsets.only(top:10),
+                  child:TextField(controller:controllers[name],
+                    decoration:InputDecoration(labelText:name,border:const OutlineInputBorder()))),
+              ]))),
+            actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),
+              FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Submit evidence'))]));
+          if(ok!=true)return;
+          endpoint='hotspotV2RequestLabGateway';
+          payload.addAll({'siteId':item['id'],
+            'fieldEvidence':{for(final field in fields)field:controllers[field]!.text.trim()}});
+        }finally{for(final t in controllers.values)t.dispose();}
+      }else if(action=='lab_gateway_approve'){
+        endpoint='hotspotV2ApproveLabGateway';payload['siteId']=item['id'];
+      }else if(action=='lab_free_request'){
+        endpoint='hotspotV2RequestFreePass';payload['voucherId']=item['id'];
+      }else if(action=='lab_free_approve'){
+        endpoint='hotspotV2ApproveFreePass';payload['voucherId']=item['id'];
       }else if(action=='publish'){
         endpoint='hotspotV2PublishPlan';payload['planId']=item['id'];
       }else if(action=='prepare'){
@@ -279,6 +305,14 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
                       itemBuilder:(_)=>[
                         if(resource=='sites'&&row['state']=='draft')
                           const PopupMenuItem(value:'commission',child:Text('Commission site')),
+                        if(resource=='sites'&&row['state']=='commissioned'&&row['gatewayVerified']!=true)
+                          const PopupMenuItem(value:'lab_gateway_request',child:Text('Request lab gateway review')),
+                        if(resource=='sites'&&row['state']=='commissioned'&&row['gatewayVerified']!=true)
+                          const PopupMenuItem(value:'lab_gateway_approve',child:Text('Approve lab gateway review')),
+                        if(resource=='vouchers'&&row['state']=='issued')
+                          const PopupMenuItem(value:'lab_free_request',child:Text('Request free lab pass')),
+                        if(resource=='vouchers'&&row['state']=='issued')
+                          const PopupMenuItem(value:'lab_free_approve',child:Text('Approve free lab pass')),
                         if(resource=='plans'&&row['state']=='draft')
                           const PopupMenuItem(value:'publish',child:Text('Publish plan')),
                         if(resource=='vouchers'&&row['state']=='draft')
