@@ -125,3 +125,58 @@ export const hotspotNetworkCampaignPreview=callable(async req=>{
   executable:false,advertiserCharged:false,operatorPaid:false,
   limitation:'This is a planning preview; no ad impression billing or settlement'};
 });
+
+export const hotspotNetworkCreatePilot=callable(async req=>{
+ if(!shape(req.data,['title','budgetKes','category','maxLocations','operatorShareBps'])||
+ typeof req.data?.title!=='string'||req.data.title.trim().length<5||
+ req.data.title.length>120||!Number.isSafeInteger(req.data.budgetKes)||
+ req.data.budgetKes<0||req.data.budgetKes>5000000||
+ !['all','hostel','residential','retail','transport','campus','event','other'].includes(req.data.category)||
+ !Number.isSafeInteger(req.data.maxLocations)||req.data.maxLocations<1||
+ req.data.maxLocations>100||!validateShare(req.data.operatorShareBps))
+ fail('invalid-argument','Invalid pilot campaign');
+ await networkAdmin(req);
+ const docs=await network().limit(100).get();
+ const allocations=allocatePreview({sites:docs.docs.map(safeInventory),
+  budgetKes:req.data.budgetKes,category:req.data.category,maxLocations:req.data.maxLocations});
+ if(!allocations.length)fail('failed-precondition','No eligible approved locations');
+ const ref=db().collection('hotspotAdvertisingPilots').doc(randomUUID());
+ await ref.create({title:req.data.title.trim(),category:req.data.category,
+  proposedBudgetKes:req.data.budgetKes,operatorShareBps:req.data.operatorShareBps,
+  allocations,proposalOnly:true,advertiserCharged:false,operatorPaid:false,
+  settledKes:0,liveDeliveryEnabled:false,state:'draft',
+  createdBy:req.auth.uid,createdAt:FieldValue.serverTimestamp(),
+  evidence:'Reviewer-attested capacity, not verified ad inventory'});
+ return {pilotId:ref.id,locations:allocations.length,status:'draft',
+  paymentsEnabled:false,adServingEnabled:false};
+});
+export const hotspotNetworkPilotDashboard=callable(async req=>{
+ if(!shape(req.data,['pilotId'])||!id(req.data?.pilotId))
+ fail('invalid-argument','Invalid pilot');
+ await networkAdmin(req);
+ const ref=db().collection('hotspotAdvertisingPilots').doc(req.data.pilotId);
+ const snap=await ref.get();if(!snap.exists)fail('not-found','Pilot unavailable');
+ const p=snap.data();
+ const rows=p.allocations.map(a=>({
+  registryId:a.registryId,orgId:a.orgId,siteId:a.siteId,
+  sessionsIssued:0,gatewayAccepts:0,verifiedRedemptions:0
+ }));
+ return {pilotId:snap.id,state:p.state,locations:p.allocations.length,
+  budgetProposalKes:p.proposedBudgetKes,
+  allocations:p.allocations,
+  measurements:measurePilot(rows),riskFlags:riskFlags(),
+  liveCampaign:false,verifiedImpressions:0,operatorPayoutsKes:0,
+  sponsorSettledKes:0,conversionLift:null,
+  explanation:'No verified cross-operator ad events or payment ledger connected to this proposal'};
+});
+export const hotspotNetworkPortfolio=callable(async req=>{
+ if(!shape(req.data,[]))fail('invalid-argument','Unexpected request');
+ await networkAdmin(req);
+ const [sites,pilots]=await Promise.all([network().limit(100).get(),
+  db().collection('hotspotAdvertisingPilots').limit(50).get()]);
+ const all=sites.docs.map(safeInventory);
+ return {locations:all.length,approvedLocations:all.filter(s=>s.approved&&s.ownerOptIn).length,
+  proposals:pilots.size,productionCampaigns:0,verifiedImpressions:0,
+  advertiserRevenueKes:0,payableOperatorRevenueKes:0,
+  warning:'Network inventory is a lab pilot; no real advertiser funds or verified impression billing'};
+});
