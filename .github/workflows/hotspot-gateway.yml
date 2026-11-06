@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'functions/src/hotspot_*'
+      - 'infrastructure/hotspot-radius/**'
       - 'functions/test/hotspot_*'
       - '.github/workflows/hotspot-gateway.yml'
   pull_request:
@@ -37,4 +38,10 @@ jobs:
       - run: node --check functions/src/hotspot_v2_operations.js
       - run: node --check functions/src/hotspot_v2_mpesa.js
       - run: node --check functions/src/hotspot_v2_health.js
-      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js functions/test/hotspot_payment_domain.test.js functions/test/hotspot_v2_domain.test.js functions/test/hotspot_lifecycle_domain.test.js
+      - run: node --check functions/src/hotspot_settlement_domain.js
+      - run: node --check functions/src/hotspot_radius_authorization_domain.js
+      - run: node --check functions/src/hotspot_v2_mpesa_callback.js
+      - run: node --check functions/src/hotspot_v2_radius_endpoint.js
+      - run: node --check functions/src/hotspot_gateway_approvals.js
+      - run: node --check infrastructure/hotspot-radius/bridge.mjs
+      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js functions/test/hotspot_payment_domain.test.js functions/test/hotspot_v2_domain.test.js functions/test/hotspot_lifecycle_domain.test.js functions/test/hotspot_settlement_domain.test.js functions/test/hotspot_radius_authorization_domain.test.js
