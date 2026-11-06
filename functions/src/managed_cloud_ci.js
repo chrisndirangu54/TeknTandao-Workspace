@@ -128,3 +128,30 @@ export const managedCloudCiReport=onRequest({
  res.status(202).json({accepted:true,providerVerified:false});
  }catch(_){res.status(409).send('Conflicting or invalid run report');}
 });
+
+export const managedCloudAuthorizeDeploy=onRequest({
+ region,cors:false,timeoutSeconds:20,maxInstances:10
+},async(req,res)=>{
+ res.set('cache-control','no-store');
+ if(req.method!=='POST'){res.status(405).end();return;}
+ const token=String(req.headers.authorization||'').replace(/^Bearer /,'');
+ const orgId=String(req.body?.orgId||''),projectId=String(req.body?.projectId||'');
+ if(!/^[A-Za-z0-9_-]{10,128}$/.test(orgId)||!z.string().uuid().safeParse(projectId).success){
+  res.status(400).end();return;
+ }
+ const ref=db.doc('organizations/'+orgId+'/managedCloudProjects/'+projectId);
+ const project=await ref.get();
+ if(!project.exists||!verifyIngestionToken(token,project.data().ingestionTokenHash)){
+  res.status(401).end();return;
+ }
+ if(req.body?.branch!==project.data().branch||
+   req.body?.cloudProvider!==project.data().cloudProvider){
+  res.status(403).json({authorized:false,reason:'source_or_provider_mismatch'});return;
+ }
+ const bill=(await db.doc('organizations/'+orgId+'/managedCloudBilling/'+projectId).get()).data();
+ if(!isCloudServicePaid(bill)){
+  res.status(402).json({authorized:false,reason:'subscription_not_paid_or_expired'});return;
+ }
+ res.status(200).json({authorized:true,provider:project.data().cloudProvider,
+  paidUntilMs:bill.paidUntilMs,notice:'Deployment authorization only; cloud provider expenses billed separately'});
+});
