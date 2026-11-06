@@ -69,3 +69,17 @@ export const hotspotSessionSummary=call(async req=>{
  source:'radius_collector',limit:100,uniqueSessionCount:new Set(events.map(x=>x.sessionId)).size,
  caveat:'These are cumulative accounting event counters and must not be summed as actual traffic usage; router verification is not implied.'};
 });
+
+export const hotspotSetPortalVisibility=call(async req=>{
+ const uid=admin(req);strict(req.data,['siteId','published']);
+ const siteId=id(req.data.siteId);
+ if(typeof req.data.published!=='boolean')fail('invalid-argument','Boolean published flag required');
+ const siteRef=db().collection('hotspotSites').doc(siteId),auditRef=db().collection('hotspotAudit').doc(randomUUID());
+ await db().runTransaction(async tx=>{
+  const site=await tx.get(siteRef);
+  if(!site.exists||site.data().status!=='active')fail('failed-precondition','Commission the site before publishing');
+  tx.update(siteRef,{portalPublished:req.data.published,updatedAt:FieldValue.serverTimestamp()});
+  tx.create(auditRef,{actor:uid,action:req.data.published?'portal_publish':'portal_hide',resource:'sites',resourceId:siteId,at:FieldValue.serverTimestamp()});
+ });
+ return {ok:true,siteId,portalPublished:req.data.published,routerConnected:false};
+});
