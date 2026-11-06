@@ -120,3 +120,6 @@ export * from './hotspot_v2_lab_activation.js';
 
 // Paystack TEST-mode M-Pesa with provider-verification and atomic voucher issuance.
 export * from './hotspot_v2_paystack_mpesa.js';
+
+// Signed Paystack TEST payment webhook; server-side re-verification and atomic issuance.
+export * from './hotspot_v2_paystack_webhook.js';
