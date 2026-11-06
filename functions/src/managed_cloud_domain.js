@@ -1,7 +1,22 @@
 import {createHash,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 const githubRepo=/^https:\/\/github\.com\/([a-zA-Z0-9-]{1,39})\/([a-zA-Z0-9_.-]{1,100})(?:\.git)?\/?$/;
+export const managedCloudProviders={
+  gcp_cloud_run:{name:'Google Cloud Run',deployment:'github_oidc',supported:true},
+  aws_apprunner:{name:'AWS App Runner',deployment:'github_oidc_ecr',supported:true},
+  azure_container_apps:{name:'Azure Container Apps',deployment:'github_oidc',supported:true},
+  digitalocean_app_platform:{name:'DigitalOcean App Platform',deployment:'token_scoped',supported:true},
+  cloudflare_pages:{name:'Cloudflare Pages',deployment:'token_scoped',supported:true},
+  railway:{name:'Railway',deployment:'token_scoped',supported:true},
+  render:{name:'Render',deployment:'deploy_hook_or_api',supported:true}
+};
+export const cloudPlanCatalog=Object.freeze({
+  starter:{priceKes:1500,periodDays:30,description:'Managed deployment control plane Starter'},
+  growth:{priceKes:5000,periodDays:30,description:'Managed deployment control plane Growth'},
+  business:{priceKes:15000,periodDays:30,description:'Managed deployment control plane Business'}
+});
 export const serviceSchema=z.object({
+ cloudProvider:z.enum(Object.keys(managedCloudProviders)),
  name:z.string().trim().min(3).max(70).regex(/^[A-Za-z0-9][a-zA-Z0-9 -]*$/),
  repository:z.string().max(260).refine(v=>githubRepo.test(v),'Provide a GitHub repository HTTPS URL'),
  branch:z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/)
