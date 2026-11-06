@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import '../suite.dart';
 import 'managed_cloud_billing_screen.dart';
+import 'namecheap_reseller_screen.dart';
 
 class ManagedCloudDeploymentScreen extends StatefulWidget {
   final SuiteStore store;
@@ -137,6 +138,13 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
     appBar:AppBar(title:const Text('Managed Cloud Deployments'),actions:[
       IconButton(onPressed:refresh,icon:const Icon(Icons.refresh),tooltip:'Refresh')]),
     body:ListView(padding:const EdgeInsets.all(20),children:[
+      Card(child:ListTile(leading:const Icon(Icons.language_outlined),
+        title:const Text('Namecheap domains & reseller hosting'),
+        subtitle:const Text('Domain lookup and quote requests, cPanel/WHM reseller onboarding'),
+        trailing:const Icon(Icons.chevron_right),
+        onTap:()=>Navigator.of(context).push(MaterialPageRoute<void>(
+          builder:(_)=>NamecheapResellerScreen(store:widget.store))))),
+      const SizedBox(height:16),
       Text('Connect a repository',style:Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height:8),
       const Text('Deploy code through customer-owned GitHub Actions and your selected cloud provider. Each cloud project requires verified workload identity permissions. Workspace does not execute uploaded source code, and CI outcomes are reported rather than independently verified.'),
