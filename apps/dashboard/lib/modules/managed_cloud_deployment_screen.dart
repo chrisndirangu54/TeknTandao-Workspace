@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import '../suite.dart';
+import 'managed_cloud_billing_screen.dart';
 
 class ManagedCloudDeploymentScreen extends StatefulWidget {
   final SuiteStore store;
@@ -183,8 +184,12 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
         title:Text(project['name']?.toString()??'Service'),
         subtitle:Text((project['repository']?.toString()??'')+' · '+
           (project['status']?.toString()??'not configured')),
-        trailing:TextButton(onPressed:()=>inspect(project['id'].toString()),
-          child:const Text('Insights')))),
+        trailing:Wrap(spacing:6,children:[
+          TextButton(onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(
+            builder:(_)=>ManagedCloudBillingScreen(store:widget.store,
+              projectId:project['id'].toString()))),child:const Text('Pay / Renew')),
+          TextButton(onPressed:()=>inspect(project['id'].toString()),
+            child:const Text('Insights'))]))),
       const SizedBox(height:16),
       const Text('Production deployment must be authorised in the customer cloud account. Never paste cloud keys or service account credentials into Workspace. Configure per-repository workload identity federation, budget alerts and protected GitHub environments.'),
     ]));
