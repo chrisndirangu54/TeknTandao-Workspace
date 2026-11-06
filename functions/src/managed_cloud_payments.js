@@ -2,11 +2,11 @@
 import './index.js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
-import {onCall,HttpsError} from 'firebase-functions/v2/https';
+import {onCall,onRequest,HttpsError} from 'firebase-functions/v2/https';
 import {defineSecret} from 'firebase-functions/params';
 import {z} from 'zod';
 import {identifier} from './domain.js';
-import {initializePaystack,verifyTransaction} from './providers.js';
+import {initializePaystack,verifyTransaction,verifyPaystack} from './providers.js';
 import {cloudPlanCatalog} from './managed_cloud_domain.js';
 import {cloudPaymentDecision,isCloudServicePaid} from './managed_cloud_billing_domain.js';
 const secret=defineSecret('CLOUD_PAYSTACK_SECRET_KEY'),db=getFirestore(),region='europe-west1';
@@ -19,7 +19,7 @@ async function context(req) {
 }
 const key=()=>{
  const v=secret.value();
- if(typeof v!=='string'||(!v.startsWith('sk_test_')&&!v.startsWith('sk_live_')))
+ if(typeof v!=='string'||(!v.startsWith('sk_test_')&&!(v.startsWith('sk_live_')&&process.env.CLOUD_BILLING_LIVE_ENABLED==='true')))
   throw new HttpsError('failed-precondition','Cloud Paystack merchant credentials not configured');
  return v;
 };
@@ -70,14 +70,11 @@ export const cloudStartSubscriptionCheckout=onCall({
   throw new HttpsError('unavailable','Payment initiation state unknown. Verify the reference before trying again.');
  }
 });
-export const cloudVerifySubscriptionCheckout=onCall({
- region,enforceAppCheck:true,secrets:[secret],timeoutSeconds:45
-},async req=>{
- const {org}=await context(req);
- const reference=z.string().regex(/^TC[a-f0-9]{28}$/).parse(req.data?.reference);
+export async function reconcileManagedCloudPayment(reference, expectedOrgId=null) {
  const payment=db.collection('managedCloudCheckoutOrders').doc(reference);
  const order=await payment.get();
- if(!order.exists||order.data().orgId!==org.id)throw new HttpsError('not-found','Checkout not found');
+ if(!order.exists|| (expectedOrgId!==null && order.data().orgId!==expectedOrgId))throw new HttpsError('not-found','Checkout not found');
+ const org=db.doc('organizations/'+order.data().orgId);
  if(order.data().status==='paid'){
   const bill=(await billingRef(org,order.data().projectId).get()).data();
   return {status:'paid',paidUntilMs:bill?.paidUntilMs||null,verified:true};
@@ -110,6 +107,13 @@ export const cloudVerifySubscriptionCheckout=onCall({
     providerTransactionId:decision.providerTransactionId});
  });
  return {status:'paid',verified:true,paidUntilMs};
+}
+export const cloudVerifySubscriptionCheckout=onCall({
+ region,enforceAppCheck:true,secrets:[secret],timeoutSeconds:45
+},async req=>{
+ const {org}=await context(req);
+ const reference=z.string().regex(/^TC[a-f0-9]{28}$/).parse(req.data?.reference);
+ return reconcileManagedCloudPayment(reference,org.id);
 });
 export const cloudGetSubscriptionStatus=onCall({region,enforceAppCheck:true},async req=>{
  const {org}=await context(req),project=projectRef(org,req.data?.projectId);
@@ -119,4 +123,26 @@ export const cloudGetSubscriptionStatus=onCall({region,enforceAppCheck:true},asy
   plan:bill?.plan||null,status:bill?.status||'unpaid',
   currency:'KES',plans:cloudPlanCatalog,cloudProviderFeesIncluded:false,
   note:'Service charge only; provider usage is separately billed. M-Pesa renewals require manual payment.'};
+});
+
+export const managedCloudPaystackWebhook=onRequest({
+ region,invoker:'public',timeoutSeconds:60,maxInstances:6,secrets:[secret]
+},async(req,res)=>{
+ res.set('cache-control','no-store');
+ if(req.method!=='POST'){res.status(405).end();return;}
+ const raw=req.rawBody;
+ if(!Buffer.isBuffer(raw)||raw.length>32768||
+  !verifyPaystack(raw,req.get('x-paystack-signature')||'',key())){
+  res.status(401).end();return;
+ }
+ let body;try{body=JSON.parse(raw.toString('utf8'));}catch(_){res.status(400).end();return;}
+ if(body.event!=='charge.success'){res.status(200).json({ignored:true});return;}
+ const reference=body?.data?.reference;
+ if(typeof reference!=='string'||!/^TC[a-f0-9]{28}$/.test(reference)){
+  res.status(200).json({ignored:true});return;
+ }
+ try{
+  const result=await reconcileManagedCloudPayment(reference);
+  res.status(result.verified===true?200:202).json({received:true,verified:result.verified===true});
+ }catch(_){res.status(503).end();}
 });
