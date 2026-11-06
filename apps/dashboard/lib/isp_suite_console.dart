@@ -1,4 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'hotspot_console.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -554,6 +555,8 @@ class _IspSuiteConsoleState extends State<IspSuiteConsole> {
       appBar: AppBar(
         title: const Text('TeknTandao ISP Suite'),
         actions: [
+          IconButton(tooltip: 'Wi-Fi hotspot management', icon: const Icon(Icons.wifi_tethering),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HotspotConsole()))),
           IconButton(tooltip: 'Customer request portal', icon: const Icon(Icons.contact_support_outlined),
             onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const IspCustomerPortal()))),
