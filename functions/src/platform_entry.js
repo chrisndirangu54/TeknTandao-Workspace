@@ -178,3 +178,6 @@ export * from './hospital_clinical_ai.js';
 // Verified sponsored advertising and Google rewarded bundle orchestration.
 export * from './hotspot_local_sponsors.js';
 export * from './hotspot_google_rewards.js';
+
+// Multi-operator ad inventory, independently reviewed sites and campaign pilot planning.
+export * from './hotspot_network_marketplace.js';
