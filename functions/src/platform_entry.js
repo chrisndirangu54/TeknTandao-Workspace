@@ -109,3 +109,8 @@ export * from './hotspot_v2_mpesa.js';
 
 // Tenant-scoped readiness and operational backlog (not live network telemetry).
 export * from './hotspot_v2_health.js';
+
+// Private RADIUS bridge authorization and untrusted Safaricom callback evidence.
+export * from './hotspot_v2_radius_endpoint.js';
+export * from './hotspot_v2_mpesa_callback.js';
+export * from './hotspot_gateway_approvals.js';
