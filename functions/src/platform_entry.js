@@ -184,3 +184,6 @@ export * from './hotspot_network_marketplace.js';
 
 // GitHub CI/CD managed cloud onboarding and deployment telemetry.
 export * from './managed_cloud_ci.js';
+
+// Optional privacy-limited AI narrative about bounded cloud deployment observations.
+export * from './managed_cloud_ai.js';
