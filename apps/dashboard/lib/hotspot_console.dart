@@ -50,6 +50,30 @@ class _HotspotConsoleState extends State<HotspotConsole> {
     }catch(e){if(mounted)setState(()=>message='Save failed: $e');}
     finally {for(final c in controllers.values)c.dispose();}
   }
+  Future<void> pilotAction(Map<String,dynamic> item) async {
+    final siteMode=resource=='sites';
+    final input=TextEditingController();
+    try {
+      final approved=await showDialog<bool>(context:context,builder:(dialogContext)=>AlertDialog(
+        title:Text(siteMode?'Commission pilot site':'Publish tariff'),
+        content:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text(siteMode?'Confirm guest VLAN isolation, RADIUS NAS registration, accounting testing and a privacy notice. These confirmations are operator attestations, not live connectivity measurements.':'Enter an already commissioned site ID. This publishes pricing only and does not provision Wi-Fi.'),
+          const SizedBox(height:14),
+          TextField(controller:input,decoration:InputDecoration(labelText:siteMode?'Registered NAS ID':'Commissioned site ID',border:const OutlineInputBorder())),
+        ]),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext,false),child:const Text('Cancel')),
+          FilledButton(onPressed:()=>Navigator.pop(dialogContext,true),child:const Text('Confirm'))],
+      ));
+      if(approved!=true)return;
+      final response=await invoke(siteMode?'hotspotCommissionSite':'hotspotPublishPlan',
+        siteMode?{'siteId':item['id'],'nasId':input.text.trim(),
+          'checklist':{'guestNetworkIsolated':true,'radiusNasRegistered':true,'radiusAccountingTested':true,'privacyNoticeReady':true},
+          'publishPortal':false}:{'planId':item['id'],'siteId':input.text.trim()});
+      if(mounted)setState(()=>message='Recorded: ${response['ok']}. This does not activate a router.');
+      await refresh();
+    }catch(e){if(mounted)setState(()=>message='Pilot action failed: $e');}
+    finally{input.dispose();}
+  }
   Future<void> revoke(String id) async {
     try {await invoke('hotspotRevokeVoucher',{'id':id});if(mounted)setState(()=>message='Voucher marked revoked; router enforcement NOT executed.');await refresh();}
     catch(e){if(mounted)setState(()=>message='Revoke failed: $e');}
@@ -68,7 +92,7 @@ class _HotspotConsoleState extends State<HotspotConsole> {
         final item=rows[index];
         return Card(child:ListTile(title:Text((item['name']??item['codeLast4']??item['id']).toString()),
           subtitle:Text(item.entries.where((e)=>!['codeHash','createdBy'].contains(e.key)).map((e)=>'${e.key}: ${e.value}').join('  •  '),maxLines:3,overflow:TextOverflow.ellipsis),
-          trailing:resource=='vouchers'&&item['status']!='revoked'?TextButton(onPressed:()=>revoke(item['id'].toString()),child:const Text('Revoke')):null));
+          trailing:resource=='vouchers'&&item['status']!='revoked'?TextButton(onPressed:()=>revoke(item['id'].toString()),child:const Text('Revoke')):resource=='sites'&&item['status']=='planned'?TextButton(onPressed:()=>pilotAction(item),child:const Text('Commission')):resource=='plans'&&item['status']=='draft'?TextButton(onPressed:()=>pilotAction(item),child:const Text('Publish')):null));
       })),
     ])),
   );
