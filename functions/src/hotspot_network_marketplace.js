@@ -119,7 +119,8 @@ export const hotspotNetworkCampaignPreview=callable(async req=>{
  const docs=await network().limit(100).get();
  const sites=docs.docs.map(safeInventory);
  const allocation=allocatePreview({sites,budgetKes:req.data.budgetKes,
-  maxLocations:req.data.maxLocations,category:req.data.category});
+  maxLocations:req.data.maxLocations,category:req.data.category})
+  .map(a=>({...a,proposedSplit:splitTestBudget(a.proposedKes,req.data.operatorShareBps)}));
  return {placements:allocation,split:splitTestBudget(req.data.budgetKes,req.data.operatorShareBps),
   sourceSitesScanned:sites.length,requiresIndependentEvidence:true,
   executable:false,advertiserCharged:false,operatorPaid:false,
@@ -138,7 +139,8 @@ export const hotspotNetworkCreatePilot=callable(async req=>{
  await networkAdmin(req);
  const docs=await network().limit(100).get();
  const allocations=allocatePreview({sites:docs.docs.map(safeInventory),
-  budgetKes:req.data.budgetKes,category:req.data.category,maxLocations:req.data.maxLocations});
+  budgetKes:req.data.budgetKes,category:req.data.category,maxLocations:req.data.maxLocations})
+  .map(a=>({...a,proposedSplit:splitTestBudget(a.proposedKes,req.data.operatorShareBps)}));
  if(!allocations.length)fail('failed-precondition','No eligible approved locations');
  const ref=db().collection('hotspotAdvertisingPilots').doc(randomUUID());
  await ref.create({title:req.data.title.trim(),category:req.data.category,
