@@ -59,7 +59,7 @@ class _ManagedCloudBillingScreenState extends State<ManagedCloudBillingScreen> {
       final result=await widget.store.call('cloudVerifySubscriptionCheckout',
         {'reference':reference});
       if(mounted)setState(()=>message=result['verified']==true?
-        'Payment verified. Managed deployment service is active.':
+        (result['deploymentEntitled']==true ? 'Live payment verified. Deployment subscription active.' : 'Test payment verified. Production deployment remains locked.'):
         'Payment is not yet confirmed. Complete authorisation and retry.');
       await refresh();
     }catch(_){if(mounted)setState(()=>message='Verification unavailable. No deployment unlocked.');}
@@ -71,7 +71,8 @@ class _ManagedCloudBillingScreenState extends State<ManagedCloudBillingScreen> {
     body:ListView(padding:const EdgeInsets.all(20),children:[
       Text('Prepaid deployment subscription',style:Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height:8),
-      Text('Status: '+(status['status']?.toString()??'unpaid')),
+      Text('Status: '+(status['status']?.toString()??'unpaid')+' · '+(status['paymentEnvironment']?.toString()??'no environment')),
+      if(status['paid']==false)const Text('Production deployments require verified LIVE settlement; test-mode payments cannot unlock cloud resources.'),
       if(status['paidUntilMs'] is int)
         Text('Paid until: '+DateTime.fromMillisecondsSinceEpoch(status['paidUntilMs'] as int).toLocal().toString()),
       const Text('Service charges below are provisional and exclude cloud provider consumption. M-Pesa renewals require a new payment.'),
