@@ -85,3 +85,6 @@ export * from './microsoft_marketplace.js';
 
 // Tenant-scoped transport management and carrier integration endpoints.
 export * from './logistics.js';
+
+// Secure hotspot site, tariff and voucher management.
+export * from './hotspot_management.js';
