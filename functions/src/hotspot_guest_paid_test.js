@@ -118,3 +118,34 @@ export const hotspotV2ClaimGuestPaidTest=run(async req=>{
  return {voucherId:id,oneTimeCode,expiresAtMs,labOnly:true,
    networkConnected:false,paymentMode:'paystack_test'};
 });
+
+export const hotspotV2PublicGuestPlans=run(async req=>{
+ check(req.data,['orgId','siteId']);
+ if(!req.auth||!valid(req.data.orgId)||!valid(req.data.siteId))
+  fail('unauthenticated','Sign-in and site required');
+ const root=space(req.data.orgId),site=await root.collection('sites').doc(req.data.siteId).get();
+ if(!site.exists||site.data().state!=='commissioned'||site.data().labOnly!==true||
+  site.data().gatewayVerified!==true||site.data().radiusEnabled!==true)
+  fail('not-found','No verified pilot hotspot');
+ const plans=await root.collection('plans').where('siteId','==',site.id).limit(50).get();
+ return {site:{id:site.id,name:site.data().name,ssid:site.data().ssid},
+  plans:plans.docs.filter(p=>p.data().state==='published'&&
+    Number.isSafeInteger(p.data().priceKes)&&p.data().priceKes>0&&p.data().priceKes<=1000&&
+    Number.isSafeInteger(p.data().durationMinutes)&&p.data().durationMinutes<=60)
+   .map(p=>({id:p.id,name:p.data().name,priceKes:p.data().priceKes,
+     durationMinutes:p.data().durationMinutes,downloadMbps:p.data().downloadMbps,
+     uploadMbps:p.data().uploadMbps})),environment:'paystack_test_only',productionCheckoutEnabled:false};
+});
+export const hotspotV2GuestPaymentStatusTest=run(async req=>{
+ check(req.data,['orgId','voucherId']);
+ if(!req.auth||!valid(req.data.orgId)||!valid(req.data.voucherId))
+  fail('unauthenticated','Sign-in and voucher required');
+ const root=space(req.data.orgId),v=await root.collection('vouchers').doc(req.data.voucherId).get();
+ if(!v.exists||v.data().guestUidHash!==uidHash(req.auth.uid))
+  fail('permission-denied','Voucher owner mismatch');
+ const payment=await root.collection('paymentIntents').doc(v.id).get();
+ return {voucherId:v.id,voucherState:v.data().state,
+  providerState:payment.exists?payment.data().state:'unavailable',
+  paymentVerified:payment.exists&&payment.data().receiptVerified===true,
+  networkActivated:false,environment:'paystack_test'};
+});
