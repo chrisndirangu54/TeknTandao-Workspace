@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cost_aware_store.dart';
+import 'connected_services_page.dart';
 import 'dashboard.dart';
 import 'modules/talent_marketplace.dart';
 import 'workspace_memberships.dart';
@@ -160,6 +161,13 @@ class _WorkspaceHubState extends State<WorkspaceHub> {
       appBar: AppBar(
         title: const Text('Your workspaces'),
         actions: [
+          IconButton(
+            tooltip: 'My internet and TV',
+            icon: const Icon(Icons.connected_tv),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => ConnectedServicesPage(user: widget.user)),
+            ),
+          ),
           if (_isSuperAdmin)
             IconButton(
               tooltip: 'Super admin console',
