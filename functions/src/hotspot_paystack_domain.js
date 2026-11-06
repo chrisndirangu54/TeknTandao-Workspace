@@ -7,8 +7,8 @@ export function validatePaystackMpesaResult({order,result}){
  if(typeof order.reference!=='string'||result.reference!==order.reference)return deny('reference_mismatch');
  if(!Number.isSafeInteger(order.amountKes)||order.amountKes<1||!Number.isSafeInteger(result.amount)||
    result.amount!==order.amountKes*100||result.currency!=='KES')return deny('amount_or_currency_mismatch');
- const paymentId=String(result.id??'');
- if(!/^[0-9]{1,25}$/.test(paymentId))return deny('invalid_payment_id');
+ // Use Paystack's unique transaction reference rather than a JavaScript-parsed uint64 ID.
+ const paymentId=String(result.reference);
  if(typeof result.paid_at!=='string'||!Number.isFinite(Date.parse(result.paid_at)))return deny('invalid_payment_time');
  if(typeof order.customerEmailHash!=='string'||!/^[a-f0-9]{64}$/.test(order.customerEmailHash)||
     typeof result.customer?.email!=='string')return deny('missing_customer_identity');
