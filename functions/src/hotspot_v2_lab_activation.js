@@ -104,3 +104,67 @@ export const hotspotV2ApproveFreePass=call(async req=>{
  return {ok:true,labOnly:true,backendCredentialValidatedOnlyOnAccess:true,
    routerCommandExecuted:false};
 });
+
+export const hotspotV2RequestPaidLabPass=call(async req=>{
+ shape(req.data,['orgId','voucherId']);
+ const {uid,root}=await admin(req),voucherId=req.data.voucherId;
+ if(!id(voucherId))fail('invalid-argument','Invalid voucher');
+ const voucher=root.collection('vouchers').doc(voucherId);
+ const review=root.collection('labVoucherReviews').doc(voucherId);
+ await getFirestore().runTransaction(async tx=>{
+  const [v,existing]=await Promise.all([tx.get(voucher),tx.get(review)]);
+  if(!v.exists||v.data().state!=='issued'||existing.exists)fail('failed-precondition','Issued voucher and no existing review required');
+  const [site,plan,payment]=await Promise.all([
+    tx.get(root.collection('sites').doc(v.data().siteId)),
+    tx.get(root.collection('plans').doc(v.data().planId)),
+    tx.get(root.collection('paymentIntents').doc(voucherId))
+  ]);
+  if(!site.exists||!plan.exists||!payment.exists||
+    site.data().gatewayVerified!==true||site.data().radiusEnabled!==true||site.data().labOnly!==true||
+    plan.data().siteId!==site.id||plan.data().state!=='published'||plan.data().priceKes<=0||
+    payment.data().provider!=='paystack_mpesa_test'||payment.data().state!=='verified'||
+    payment.data().receiptVerified!==true||!payment.data().providerVerifiedAt||
+    payment.data().siteId!==site.id||payment.data().planId!==plan.id||
+    payment.data().voucherId!==voucherId||payment.data().amountKes!==plan.data().priceKes)
+    fail('failed-precondition','Independently verified Paystack test payment and lab gateway required');
+  tx.create(review,{voucherId,requestedBy:uid,state:'awaiting_second_admin',
+   requestedAt:FieldValue.serverTimestamp(),labOnly:true,paymentMode:'paystack_mpesa_test'});
+  audit(tx,root,uid,'paid_lab_voucher_review_requested','vouchers:'+voucherId);
+ });
+ return {ok:true,approved:false,networkActivated:false};
+});
+export const hotspotV2ApprovePaidLabPass=call(async req=>{
+ shape(req.data,['orgId','voucherId']);
+ const {uid,root}=await admin(req),voucherId=req.data.voucherId;
+ if(!id(voucherId))fail('invalid-argument','Invalid voucher');
+ const voucher=root.collection('vouchers').doc(voucherId),review=root.collection('labVoucherReviews').doc(voucherId);
+ await getFirestore().runTransaction(async tx=>{
+  const [v,r]=await Promise.all([tx.get(voucher),tx.get(review)]);
+  if(!v.exists||v.data().state!=='issued'||!r.exists||r.data().state!=='awaiting_second_admin'||
+    r.data().paymentMode!=='paystack_mpesa_test')
+    fail('failed-precondition','Pending paid lab review required');
+  if(r.data().requestedBy===uid)fail('permission-denied','Independent approver required');
+  const [site,plan,payment]=await Promise.all([
+    tx.get(root.collection('sites').doc(v.data().siteId)),
+    tx.get(root.collection('plans').doc(v.data().planId)),
+    tx.get(root.collection('paymentIntents').doc(voucherId))
+  ]);
+  if(!site.exists||!plan.exists||!payment.exists||
+    site.data().radiusEnabled!==true||site.data().gatewayVerified!==true||site.data().labOnly!==true||
+    plan.data().state!=='published'||plan.data().siteId!==site.id||
+    !Number.isSafeInteger(plan.data().priceKes)||plan.data().priceKes<1||
+    payment.data().provider!=='paystack_mpesa_test'||payment.data().state!=='verified'||
+    payment.data().receiptVerified!==true||!payment.data().providerVerifiedAt||
+    payment.data().siteId!==site.id||payment.data().planId!==plan.id||
+    payment.data().voucherId!==voucherId||payment.data().amountKes!==plan.data().priceKes||
+    !Number.isSafeInteger(plan.data().durationMinutes)||plan.data().durationMinutes<1||
+    plan.data().durationMinutes>1440)
+    fail('failed-precondition','Verified paid sandbox plan and approved site required');
+  tx.update(voucher,{state:'provisioned',gatewayProvisioned:true,labOnly:true,
+    expiresAtMs:Date.now()+plan.data().durationMinutes*60000,
+    authorizedBy:uid,authorizedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  tx.update(review,{state:'approved_lab',approvedBy:uid,approvedAt:FieldValue.serverTimestamp()});
+  audit(tx,root,uid,'paid_lab_voucher_prepared_for_radius','vouchers:'+voucherId);
+ });
+ return {ok:true,labOnly:true,radiusAdmissionEligible:true,routerCommandExecuted:false};
+});
