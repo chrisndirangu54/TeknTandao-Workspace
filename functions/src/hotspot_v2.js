@@ -4,6 +4,7 @@
 import {randomUUID,randomBytes,createHmac} from 'node:crypto';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
+import {canManageHotspot,validateHotspotPlanScope} from './hotspot_v2_domain.js';
 
 const error=(code,message)=>{throw new HttpsError(code,message);};
 const ident=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{5,100}$/.test(x);
@@ -17,7 +18,10 @@ async function operator(req,allowed=['owner','admin','operator']){
  if(!req.auth)error('unauthenticated','Sign-in required');
  const org=checkId(req.data?.orgId,'organization');
  const member=await tenant(org).collection('members').doc(req.auth.uid).get();
- if(!member.exists||!allowed.includes(member.data()?.role))error('permission-denied','Insufficient workspace role');
+ const scope=canManageHotspot({actorUid:req.auth.uid,requestedOrgId:org,
+  membership:member.exists?{uid:member.id,workspaceId:org,role:member.data()?.role}:null,
+  action:allowed.includes('operator')?'read':'create'});
+ if(!scope.allowed||!member.exists||!allowed.includes(member.data()?.role))error('permission-denied','Insufficient workspace role');
  return {org,uid:req.auth.uid,root:tenant(org).collection('hotspotV2').doc('control')};
 }
 const collections={sites:'sites',plans:'plans',vouchers:'vouchers',audit:'audit'};
@@ -74,7 +78,7 @@ export const hotspotV2Create=call(async req=>{
     if(!site.exists)error('failed-precondition','Site does not exist in workspace');
     if(resource==='vouchers'){
      const plan=await tx.get(path(root,'plans').doc(entry.planId));
-     if(!plan.exists||plan.data().siteId!==entry.siteId)error('failed-precondition','Plan does not belong to the site');
+     if(!plan.exists||!validateHotspotPlanScope({siteId:entry.siteId,planSiteId:plan.data().siteId,voucherSiteId:entry.siteId}).valid)error('failed-precondition','Plan does not belong to the site');
     }
    }
    tx.create(destination,{...entry,createdBy:uid,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
