@@ -51,6 +51,8 @@ def load_samples(path:Path,site_id:str)->pd.DataFrame:
             upper={"latency_ms":600000,"packet_loss":100,"battery_percent":100,"signal_dbm":20}[name])
     df["wan_up"]=df["wan_up"].map({True:1,False:0})
     for name in ["latency_ms","packet_loss","battery_percent","signal_dbm","wan_up"]:
+        if df[name].notna().mean()<0.7:
+            raise ValueError(f"not enough real observations for {name}")
         df[name]=df[name].ffill(limit=3).fillna(df[name].median())
     hour=df["time"].dt.hour+df["time"].dt.minute/60
     weekday=df["time"].dt.dayofweek
