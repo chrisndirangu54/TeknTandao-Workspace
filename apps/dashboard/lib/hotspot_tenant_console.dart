@@ -18,6 +18,7 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
   List<Map<String,dynamic>> records=[];
   String? cursor;
   Map<String,dynamic>? health;
+  List<Map<String,dynamic>> disconnectApprovals=[];
   @override void initState(){super.initState();_resolveActiveWorkspace();}
   Future<void> _resolveActiveWorkspace() async {
     final user=FirebaseAuth.instance.currentUser;
@@ -62,6 +63,20 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
       final snapshot=await call('hotspotV2Health',{'orgId':org.text.trim()});
       if(mounted)setState(()=>health=snapshot);
     }catch(e){if(mounted)setState(()=>message='Readiness report unavailable: $e');}
+  }
+  Future<void> reviewGatewayApprovals() async {
+    try {
+      final out=await call('hotspotV2ListDisconnectApprovals',{'orgId':org.text.trim()});
+      if(mounted)setState(()=>disconnectApprovals=(out['records'] as List)
+        .map((e)=>Map<String,dynamic>.from(e as Map)).toList());
+    }catch(e){if(mounted)setState(()=>message='Gateway queue unavailable: $e');}
+  }
+  Future<void> approveGatewayDisconnect(String voucherId) async {
+    try {
+      await call('hotspotV2ApproveDisconnect',{'orgId':org.text.trim(),'voucherId':voucherId});
+      if(mounted)setState(()=>message='Approval recorded; physical disconnect is not yet executed.');
+      await reviewGatewayApprovals();
+    }catch(e){if(mounted)setState(()=>message='Gateway approval failed: $e');}
   }
   Future<void> create() async {
     final fields=resource=='sites'?['name','ssid','location']:
@@ -219,6 +234,13 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
               Chip(label:Text('Disconnect backlog: ${health!['unexecutedDisconnectRequests']??0}')),
             ],
           ]),
+          OutlinedButton.icon(onPressed:busy?null:reviewGatewayApprovals,
+            icon:const Icon(Icons.verified_user_outlined),label:const Text('Review gateway approvals')),
+          for(final item in disconnectApprovals.where((i)=>i['state']=='awaiting_independent_approval'))
+            ListTile(dense:true,title:Text('Disconnect ${item['voucherId']}'),
+              subtitle:Text('Site ${item['siteId']} · second administrator required'),
+              trailing:TextButton(onPressed:()=>approveGatewayDisconnect(item['voucherId'].toString()),
+                child:const Text('Approve'))),
           if(health!=null)const Padding(padding:EdgeInsets.only(top:6),
             child:Text('Management records only; live network and payment health are not connected.',
               style:TextStyle(fontSize:12))),
