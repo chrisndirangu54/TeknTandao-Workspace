@@ -13,7 +13,7 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
  final org=TextEditingController(),site=TextEditingController(),plan=TextEditingController();
  final title=TextEditingController(),advertiser=TextEditingController();
  final creative=TextEditingController(),destination=TextEditingController();
- final latitude=TextEditingController(),longitude=TextEditingController(),iotLabel=TextEditingController();
+ final latitude=TextEditingController(),longitude=TextEditingController(),iotLabel=TextEditingController(),deviceId=TextEditingController();
  List<Map<String,dynamic>> campaigns=[];
  Map<String,dynamic>? intelligence,environment;
  String status='Select a site for sponsored passes, signed IoT devices and geospatial analytics.';
@@ -27,7 +27,7 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
   }catch(_){}
  }
  @override void dispose(){
-  for(final c in [org,site,plan,title,advertiser,creative,destination,latitude,longitude,iotLabel])c.dispose();
+  for(final c in [org,site,plan,title,advertiser,creative,destination,latitude,longitude,iotLabel,deviceId])c.dispose();
   super.dispose();
  }
  Future<Map<String,dynamic>> invoke(String method,Map<String,dynamic> data)async{
@@ -51,6 +51,14 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
       const Text('Store this secret securely on the device. It cannot be fetched again.'),
       SelectableText('Device ID: ${out['deviceId']}\nSecret: ${out['oneTimeSecret']}')]),
      actions:[FilledButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Saved'))]));
+   }
+   if(name=='hotspotV2RotateBridgeKey'&&out['oneTimeBridgeSecret']!=null&&mounted){
+    await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(
+      title:const Text('Private site RADIUS bridge secret'),
+      content:Column(mainAxisSize:MainAxisSize.min,children:[
+        const Text('Copy this secret only to the private gateway. Rotation revokes the previous signing key.'),
+        SelectableText(out['oneTimeBridgeSecret'].toString())]),
+      actions:[FilledButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Saved securely'))]));
    }
    if(mounted)setState(()=>status=success??'Operation completed. Results are sourced from backend records.');
   }catch(e){if(mounted)setState(()=>status='Operation unavailable: $e');}
@@ -97,16 +105,28 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
         trailing:c['status']=='draft'?TextButton(onPressed:busy?null:
           ()=>execute('hotspotV2ApproveSponsorCampaign',{'campaignId':c['id']},
             success:'Campaign approved for approved laboratory sites only.'),
-          child:const Text('Approve')):null),
+          child:const Text('Approve')):
+          c['status']=='active'?TextButton(onPressed:busy?null:
+           ()=>execute('hotspotV2PauseSponsorCampaign',{'campaignId':c['id']},
+            success:'New sponsored rewards paused; already-issued passes remain valid.'),
+           child:const Text('Pause')):null),
       const Text('Ad impressions and sponsor billing are not verified by the time gate.',
         style:TextStyle(fontSize:12)),
     ]),
-    section('IoT gateway telemetry and operational AI',[
-      field('Device label',iotLabel),
+    section('Gateway credentials and IoT telemetry',[
+      OutlinedButton.icon(
+        onPressed:busy?null:()=>execute('hotspotV2RotateBridgeKey',{'siteId':site.text.trim()},
+          success:'New per-site bridge key generated. Install it on the isolated gateway host.'),
+        icon:const Icon(Icons.key),label:const Text('Rotate private gateway key')),
+      const SizedBox(height:12),
+      field('Device label',iotLabel),field('Device ID for revocation',deviceId),
       Wrap(spacing:10,runSpacing:8,children:[
         FilledButton.icon(onPressed:busy?null:()=>execute('hotspotV2RegisterIoTDevice',{
           'siteId':site.text.trim(),'label':iotLabel.text.trim()}),
           icon:const Icon(Icons.sensors),label:const Text('Register IoT device')),
+        OutlinedButton.icon(onPressed:busy?null:()=>execute('hotspotV2DisableIoTDevice',{
+          'deviceId':deviceId.text.trim()},success:'Device signing credential revoked.'),
+          icon:const Icon(Icons.block),label:const Text('Revoke IoT device')),
         OutlinedButton.icon(onPressed:busy?null:()=>execute('hotspotV2OperationsIntelligence',{
           'siteId':site.text.trim()}),icon:const Icon(Icons.analytics_outlined),
           label:const Text('Refresh intelligence')),
@@ -115,6 +135,11 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
         Text('Registered devices: ${intelligence!['registeredDevices']??0} · telemetry samples: ${intelligence!['telemetrySampleCount']??0}'),
         Text('Sponsored rewards: ${intelligence!['sponsoredRewardCount']??0} · risk score: ${intelligence!['anomaly']?['score']??'unavailable'}'),
         Text('Model: ${intelligence!['aiAssist']?['model']??'none'} (not trained ML)'),
+        if(intelligence!['statistics']?['available']==true)
+          Text('Median clients: ${intelligence!['statistics']?['medianClients']} · '
+            '95th percentile latency: ${intelligence!['statistics']?['latencyP95Ms']} ms'),
+        if(intelligence!['planningForecast']?['available']==true)
+          Text('Next-hour planning estimate: ${intelligence!['planningForecast']?['forecastClients']} clients (uncalibrated)'),
         for(final tip in (intelligence!['aiAssist']?['suggestions'] as List? ??[]))
           ListTile(dense:true,leading:const Icon(Icons.lightbulb_outline),title:Text(tip.toString())),
       ],
