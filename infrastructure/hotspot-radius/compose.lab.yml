@@ -1,0 +1,20 @@
+# FreeRADIUS single-site lab deployment
+# NOT INTERNET-EXPOSED. Bind UDP ports to local loopback; connect MikroTik through VPN.
+services:
+  radius:
+    image: freeradius/freeradius-server:3.2.10
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1812:1812/udp"
+      - "127.0.0.1:1813:1813/udp"
+    # Do not enable public RADIUS UDP listeners.
+    # The stock image is for controlled laboratory validation only.
+    # Configure clients, virtual servers, the SQL module and persistent certificates
+    # through a separately reviewed, private FreeRADIUS configuration bundle.
+    networks:
+      - radius_lab
+    security_opt:
+      - no-new-privileges:true
+networks:
+  radius_lab:
+    internal: true
