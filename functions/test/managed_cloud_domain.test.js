@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {serviceSchema,normalizedRepository,hashIngestionToken,verifyIngestionToken,runSignalSchema,computeCloudInsights} from '../src/managed_cloud_domain.js';
 test('accepts scoped GitHub repository, branch, provider and consent',()=>{
- const input={name:'My service',repository:'https://github.com/acme/site',branch:'main',
+ const input={cloudProvider:'gcp_cloud_run',name:'My service',repository:'https://github.com/acme/site',branch:'main',
   cloudRegion:'europe-west1',serviceName:'acme-service',monthlyBudgetUsd:30,
   autoDeploy:true,customerConsent:true};
  assert.equal(serviceSchema.parse(input).autoDeploy,true);
