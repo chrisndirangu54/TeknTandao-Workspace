@@ -1,0 +1,32 @@
+name: Hotspot Gateway Policy Tests
+on:
+  push:
+    paths:
+      - 'functions/src/hotspot_*'
+      - 'functions/test/hotspot_*'
+      - '.github/workflows/hotspot-gateway.yml'
+  pull_request:
+    paths:
+      - 'functions/src/hotspot_*'
+      - 'functions/test/hotspot_*'
+      - '.github/workflows/hotspot-gateway.yml'
+  workflow_dispatch:
+jobs:
+  hotspot-policy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci --prefix functions
+      - run: node --check functions/src/hotspot_gateway_policy.js
+      - run: node --check functions/src/hotspot_management.js
+      - run: node --check functions/src/hotspot_pilot.js
+      - run: node --check functions/src/hotspot_accounting.js
+      - run: node --check functions/src/hotspot_domain.js
+      - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js
