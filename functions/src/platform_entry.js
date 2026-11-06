@@ -123,3 +123,8 @@ export * from './hotspot_v2_paystack_mpesa.js';
 
 // Signed Paystack TEST payment webhook; server-side re-verification and atomic issuance.
 export * from './hotspot_v2_paystack_webhook.js';
+
+// Sponsored access, signed IoT telemetry, rule-based analytics and NASA POWER environment.
+export * from './hotspot_sponsored_access.js';
+export * from './hotspot_iot_analytics.js';
+export * from './hotspot_geospatial.js';
