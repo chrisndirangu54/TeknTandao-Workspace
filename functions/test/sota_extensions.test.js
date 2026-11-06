@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {catalog} from '../src/domain.js';
-import {createBlankWebsiteDocument} from '../src/website_builder_domain.js';
 import {
   processTemplates,
   safeAgentExecutionActions,
@@ -44,26 +43,12 @@ test('AI FinOps validates provider usage and summarizes spend', () => {
   assert.throws(() => validateAiUsage({requestId: 'bad', provider: '!', model: 'x', appId: 'analytics'}, catalog));
 });
 
-test('safe agent runtime includes governed website and product-capable record updates while blocking regulated rails', () => {
-  assert.deepEqual(safeAgentExecutionActions, [
-    'record.create', 'record.update', 'task.create', 'event.publish', 'graph.upsert',
-    'website.document.apply', 'website.publish'
-  ]);
+test('safe agent runtime exposes only non-regulated execution actions', () => {
+  assert.deepEqual(safeAgentExecutionActions, ['record.create', 'task.create', 'event.publish', 'graph.upsert']);
   const create = validateAgentExecution({
-    action: 'record.create', payload: {recordId: 'coffee', record: {name: 'Coffee', price: 125000, stock: 40}}
-  }, 'inventory');
+    action: 'record.create', payload: {record: {title: 'Follow up', status: 'OPEN'}}
+  }, 'crm');
   assert.equal(create.action, 'record.create');
-  assert.equal(create.payload.record.price, 125000);
-  const update = validateAgentExecution({
-    action: 'record.update', payload: {recordId: 'coffee', record: {stock: 35, featured: true}}
-  }, 'inventory');
-  assert.equal(update.payload.recordId, 'coffee');
-  assert.equal(update.payload.record.featured, true);
-  const website = validateAgentExecution({
-    action: 'website.document.apply',
-    payload: {projectId: 'site_one', expectedRevision: 4, document: createBlankWebsiteDocument('Store')}
-  }, 'mc14_website_builder');
-  assert.equal(website.payload.projectId, 'site_one');
   const event = validateAgentExecution({
     action: 'event.publish', payload: {type: 'crm.followup_requested', payload: {customerId: 'c_1'}}
   }, 'crm');

@@ -1,17 +1,11 @@
-import {compileWebsiteContent} from './website_components.js';
 import {identifier, money, optionalText, sanitizeRecord, textValue} from './domain.js';
 import {scalarMap, validateAutomationRule, validateBusinessEvent, validateGraphNode} from './sota_domain.js';
-import {validateWebsiteDocument} from './website_builder_domain.js';
-import {normalizeProductRecord, websiteBuilderAppId} from './website_business_ai_domain.js';
 
 export const safeAgentExecutionActions = Object.freeze([
   'record.create',
-  'record.update',
   'task.create',
   'event.publish',
-  'graph.upsert',
-  'website.document.apply',
-  'website.publish'
+  'graph.upsert'
 ]);
 
 export const processTemplates = Object.freeze({
@@ -201,27 +195,7 @@ export function validateAgentExecution(input, appId) {
   const action = String(input.action || '');
   if (!safeAgentExecutionActions.includes(action)) throw new Error('Agent action is not executable by the safe runtime');
   if (action === 'record.create') {
-    const record = appId === 'inventory'
-      ? normalizeProductRecord(input.payload?.record, {partial: false})
-      : sanitizeRecord(input.payload?.record);
-    return {
-      action,
-      payload: {
-        record,
-        recordId: input.payload?.recordId ? identifier(input.payload.recordId) : null,
-      },
-    };
-  }
-  if (action === 'record.update') {
-    const recordId = identifier(input.payload?.recordId);
-    const record = appId === 'inventory'
-      ? normalizeProductRecord(input.payload?.record, {partial: true})
-      : sanitizeRecord(input.payload?.record);
-    const expectedRecordDigest = input.payload?.expectedRecordDigest == null
-      ? null
-      : String(input.payload.expectedRecordDigest).toLowerCase();
-    if (expectedRecordDigest && !/^[a-f0-9]{64}$/.test(expectedRecordDigest)) throw new Error('Invalid expected record digest');
-    return {action, payload: {recordId, record, expectedRecordDigest}};
+    return {action, payload: {record: sanitizeRecord(input.payload?.record)}};
   }
   if (action === 'task.create') {
     return {action, payload: {title: textValue(input.payload?.title || 'Agent task', 240)}};
@@ -235,36 +209,8 @@ export function validateAgentExecution(input, appId) {
     });
     return {action, payload: {event}};
   }
-  if (action === 'website.document.apply') {
-    if (appId !== websiteBuilderAppId) throw new Error('Website document changes require a Website Builder permit');
-    const expectedRevision = Number(input.payload?.expectedRevision);
-    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) throw new Error('Website document change requires expectedRevision');
-    return {
-      action,
-      payload: {
-        projectId: identifier(input.payload?.projectId),
-        expectedRevision,
-        document: input.payload?.contentBlueprint ? compileWebsiteContent(input.payload.contentBlueprint).document : validateWebsiteDocument(input.payload?.document),
-        contentBlueprint: input.payload?.contentBlueprint ? compileWebsiteContent(input.payload.contentBlueprint).blueprint : null,
-        planId: input.payload?.planId ? identifier(input.payload.planId) : null,
-      },
-    };
-  }
-  if (action === 'website.publish') {
-    if (appId !== websiteBuilderAppId) throw new Error('Website publishing requires a Website Builder permit');
-    return {
-      action,
-      payload: {
-        projectId: identifier(input.payload?.projectId),
-        planId: input.payload?.planId ? identifier(input.payload.planId) : null,
-      },
-    };
-  }
-  if (action === 'graph.upsert') {
-    const node = validateGraphNode({...input.payload?.node, sourceApp: appId});
-    return {action, payload: {node}};
-  }
-  throw new Error('Unsupported safe agent action');
+  const node = validateGraphNode({...input.payload?.node, sourceApp: appId});
+  return {action, payload: {node}};
 }
 
 export function validateConflictResolution(input) {
