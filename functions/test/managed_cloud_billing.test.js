@@ -30,8 +30,9 @@ test('provider success requires exact matching reference, KES amount, receipt an
 });
 test('paid state expires and fail-closes on unverified money',()=>{
  const now=Date.now();
- assert.equal(isCloudServicePaid({status:'paid',receiptVerified:true,paidUntilMs:now+5000},now),true);
- assert.equal(isCloudServicePaid({status:'paid',receiptVerified:false,paidUntilMs:now+5000},now),false);
- assert.equal(isCloudServicePaid({status:'paid',receiptVerified:true,paidUntilMs:now-1},now),false);
- assert.equal(isCloudServicePaid({status:'initiating',receiptVerified:true,paidUntilMs:now+5000},now),false);
+ assert.equal(isCloudServicePaid({status:'paid',paymentEnvironment:'live',receiptVerified:true,paidUntilMs:now+5000},now),true);
+ assert.equal(isCloudServicePaid({status:'paid',paymentEnvironment:'live',receiptVerified:false,paidUntilMs:now+5000},now),false);
+ assert.equal(isCloudServicePaid({status:'paid',paymentEnvironment:'live',receiptVerified:true,paidUntilMs:now-1},now),false);
+ assert.equal(isCloudServicePaid({status:'initiating',paymentEnvironment:'live',receiptVerified:true,paidUntilMs:now+5000},now),false);
+ assert.equal(isCloudServicePaid({status:'paid',paymentEnvironment:'test',receiptVerified:true,paidUntilMs:now+5000},now),false);
 });
