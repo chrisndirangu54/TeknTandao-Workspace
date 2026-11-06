@@ -94,3 +94,6 @@ export * from './hotspot_accounting.js';
 
 // Pilot site commissioning and public read-only tariff catalog.
 export * from './hotspot_pilot.js';
+
+// Payment records and reconciliation policy. No M-Pesa side effects.
+export * from './hotspot_payment_intents.js';
