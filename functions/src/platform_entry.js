@@ -97,3 +97,6 @@ export * from './hotspot_pilot.js';
 
 // Payment records and reconciliation policy. No M-Pesa side effects.
 export * from './hotspot_payment_intents.js';
+
+// Tenant-scoped next-generation hotspot inventory; legacy pilot stays separate.
+export * from './hotspot_v2.js';
