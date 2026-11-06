@@ -17,6 +17,7 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
   final branch=TextEditingController(text:'main');
   final budget=TextEditingController(text:'25');
   String region='europe-west1';
+  String cloudProvider='gcp_cloud_run';
   bool autoDeploy=true, busy=false;
   String? error;
   List<Map<String,dynamic>> projects=[];
@@ -44,7 +45,7 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
         .replaceAll(RegExp(r'-+'),'-').replaceAll(RegExp(r'^-|-$'),'');
       final result=await widget.store.call('cloudRegisterGithubService',{'service':{
         'name':name.text.trim(),'repository':repository.text.trim(),'branch':branch.text.trim(),
-        'cloudRegion':region,'serviceName':slug,
+        'cloudProvider':cloudProvider,'cloudRegion':region,'serviceName':slug,
         'monthlyBudgetUsd':double.parse(budget.text.trim()),
         'autoDeploy':autoDeploy,'customerConsent':true}});
       if(!mounted)return;
@@ -58,7 +59,7 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
           SelectableText('Project ID: '+(result['id']?.toString()??'')),
           SelectableText('Organisation ID: '+widget.store.orgId),
           const SizedBox(height:12),
-          const Text('Install templates/cloud/tekntandao-cloud-run.yml in your GitHub repository. Configure GCP workload identity, deployment secrets and variables described in the guide. No deployment has occurred.')
+          const Text('Install templates/cloud/tekntandao-multicloud.yml in your GitHub repository. Configure the provider, GitHub actions secrets and paid deployment preflight. No deployment has occurred.')
           ]))),
         actions:[FilledButton(onPressed:()=>Navigator.pop(context),child:const Text('I saved the token'))]));
       await refresh();
@@ -128,9 +129,18 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
     body:ListView(padding:const EdgeInsets.all(20),children:[
       Text('Connect a repository',style:Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height:8),
-      const Text('Deploy code through customer-owned GitHub Actions and Google Cloud Run. Each cloud project requires verified workload identity permissions. Workspace does not execute uploaded source code, and CI outcomes are reported rather than independently verified.'),
+      const Text('Deploy code through customer-owned GitHub Actions and your selected cloud provider. Each cloud project requires verified workload identity permissions. Workspace does not execute uploaded source code, and CI outcomes are reported rather than independently verified.'),
       const SizedBox(height:20),
       Wrap(spacing:12,runSpacing:12,children:[
+        DropdownButton<String>(value:cloudProvider,items:const [
+          DropdownMenuItem(value:'gcp_cloud_run',child:Text('Google Cloud Run')),
+          DropdownMenuItem(value:'aws_apprunner',child:Text('AWS App Runner')),
+          DropdownMenuItem(value:'azure_container_apps',child:Text('Azure Container Apps')),
+          DropdownMenuItem(value:'digitalocean_app_platform',child:Text('DigitalOcean')),
+          DropdownMenuItem(value:'cloudflare_pages',child:Text('Cloudflare Pages')),
+          DropdownMenuItem(value:'railway',child:Text('Railway')),
+          DropdownMenuItem(value:'render',child:Text('Render')),
+        ],onChanged:(v)=>setState(()=>cloudProvider=v??cloudProvider)),
         SizedBox(width:220,child:TextField(controller:name,
           decoration:const InputDecoration(labelText:'Application name',border:OutlineInputBorder()))),
         SizedBox(width:340,child:TextField(controller:repository,
