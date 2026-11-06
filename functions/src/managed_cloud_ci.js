@@ -8,6 +8,7 @@ import {onCall,onRequest,HttpsError} from 'firebase-functions/v2/https';
 import {z} from 'zod';
 import {identifier} from './domain.js';
 import {serviceSchema,runSignalSchema,normalizedRepository,hashIngestionToken,verifyIngestionToken,computeCloudInsights} from './managed_cloud_domain.js';
+import {isCloudServicePaid} from './managed_cloud_billing_domain.js';
 
 const db=getFirestore(),region='europe-west1';
 async function owner(req){
@@ -40,18 +41,17 @@ export const cloudRegisterGithubService=onCall({region,enforceAppCheck:true},asy
  if(count.data().count>=50)throw new HttpsError('resource-exhausted','Workspace project limit reached');
  const id=randomUUID(),token=newToken(),ref=projects(org).doc(id);
  await ref.create({id,...input,repository:match.canonical,
-  cloudProvider:'gcp_cloud_run',status:'awaiting_ci_configuration',
+  cloudProvider:input.cloudProvider,status:'awaiting_ci_configuration',
   ingestionTokenHash:hashIngestionToken(token),
   deploymentConfigured:false,liveDeploymentVerified:false,
   createdBy:uid,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
  await org.collection('cloudAutomationAudit').add({action:'github_project.registered',projectId:id,
   actor:uid,at:FieldValue.serverTimestamp(),cloudChangesMade:false});
- return {id,ingestionToken:token,showOnce:true,provider:'gcp_cloud_run',
-  workflowPath:'.github/workflows/tekntandao-cloud-run.yml',
+ return {id,ingestionToken:token,showOnce:true,provider:input.cloudProvider,
+  workflowPath:'.github/workflows/tekntandao-multicloud.yml',
   requiredGithubSecrets:['TEKNTANDAO_INGEST_TOKEN'],
-  requiredGithubVariables:['GCP_WIF_PROVIDER','GCP_DEPLOY_SERVICE_ACCOUNT',
-   'GCP_CLOUD_RUN_SERVICE','GCP_CLOUD_RUN_REGION','TEKNTANDAO_PROJECT_ID',
-   'TEKNTANDAO_ORG_ID','TEKNTANDAO_INGEST_URL'],
+  requiredGithubVariables:['TEKNTANDAO_PROJECT_ID','TEKNTANDAO_ORG_ID',
+   'TEKNTANDAO_INGEST_URL','TEKNTANDAO_AUTH_URL','CLOUD_PROVIDER'],
   notice:'Store the token as a GitHub Actions secret now. Workspace will not display it again. No cloud resources were deployed.'};
 });
 export const cloudRotateIngestionToken=onCall({region,enforceAppCheck:true},async req=>{
@@ -106,6 +106,10 @@ export const managedCloudCiReport=onRequest({
  catch(_){res.status(400).send('Invalid metrics');return;}
  if(run.branch!==doc.data().branch){res.status(403).send('Branch not authorised');return;}
  const runRef=ref.collection('runs').doc(run.runId);
+ if(run.status==='success'){
+  const bill=(await db.doc('organizations/'+orgId+'/managedCloudBilling/'+projectId).get()).data();
+  if(!isCloudServicePaid(bill)){res.status(402).send('Subscription payment required');return;}
+ }
  try {
  await db.runTransaction(async tx=>{
   const existing=await tx.get(runRef);
