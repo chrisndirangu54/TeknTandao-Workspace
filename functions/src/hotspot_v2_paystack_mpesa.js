@@ -72,10 +72,9 @@ export const hotspotV2StartPaystackMpesaTest=fn(async req=>{
   fail('unavailable','Charge initiation state unknown; check provider by reference before retrying');
  }
 });
-export const hotspotV2VerifyPaystackMpesaTest=fn(async req=>{
- only(req.data,['orgId','voucherId']);
- const {uid,root:space}=await actor(req);
- const voucherId=req.data.voucherId;if(!valid(voucherId))fail('invalid-argument','Invalid voucher');
+export async function reconcilePaystackTestOrder({orgId,voucherId,actorLabel='system'}){
+ if(!valid(orgId)||!valid(voucherId))fail('invalid-argument','Invalid reference');
+ const space=root(orgId);
  const payment=space.collection('paymentIntents').doc(voucherId);
  const snapshot=await payment.get();
  if(!snapshot.exists||snapshot.data().provider!=='paystack_mpesa_test')
@@ -106,13 +105,19 @@ export const hotspotV2VerifyPaystackMpesaTest=fn(async req=>{
     fail('failed-precondition','Payment plan mismatch');
   if(prior.exists)fail('already-exists','Provider transaction already claimed');
   tx.create(receipt,{provider:'paystack',test:true,reference:decision.reference,
-    orgId:req.data.orgId,voucherId,createdAt:FieldValue.serverTimestamp()});
+    orgId:orgId,voucherId,createdAt:FieldValue.serverTimestamp()});
   tx.update(payment,{state:'verified',receiptVerified:true,providerVerifiedAt:FieldValue.serverTimestamp(),
     paidAt:decision.paidAt,paymentId:decision.paymentId,updatedAt:FieldValue.serverTimestamp()});
   tx.update(voucher,{state:'issued',paymentVerified:true,paymentProvider:'paystack_mpesa_test',
     paidAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
-  tx.create(audit,{actor:uid,action:'provider_verified_test_payment',resource:voucherId,
+  tx.create(audit,{actor:actorLabel,action:'provider_verified_test_payment',resource:voucherId,
     createdAt:FieldValue.serverTimestamp()});
  });
  return {verified:true,voucherState:'issued',environment:'paystack_test',networkActivated:false};
+
+}
+export const hotspotV2VerifyPaystackMpesaTest=fn(async req=>{
+ only(req.data,['orgId','voucherId']);
+ const {uid}=await actor(req);
+ return reconcilePaystackTestOrder({orgId:req.data.orgId,voucherId:req.data.voucherId,actorLabel:uid});
 });
