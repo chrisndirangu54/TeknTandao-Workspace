@@ -103,3 +103,6 @@ export * from './hotspot_v2.js';
 
 // V2 scoped site, plan, voucher and disconnect workflows; gateway side effects disabled.
 export * from './hotspot_v2_operations.js';
+
+// M-Pesa sandbox-only initiation and read-only status query; no access activation.
+export * from './hotspot_v2_mpesa.js';
