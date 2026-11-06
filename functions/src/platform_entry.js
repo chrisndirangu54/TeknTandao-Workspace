@@ -47,7 +47,6 @@ export * from './decision_intelligence_domain.js';
 export * from './digital_twin_domain.js';
 
 export * from './super_admin.js';
-<<<<<<< HEAD
 export * from './isp_operations.js';
 export * from './isp_suite.js';
 
@@ -81,7 +80,6 @@ export * from './reseller_onboarding.js';
 
 export * from './cloud_automation_workspace.js';
 
-<<<<<<< HEAD
 // Tenant-isolated, quote-first Microsoft commerce SaaS for approved resellers.
 export * from './microsoft_marketplace.js';
 
@@ -173,13 +171,9 @@ export * from './isp_admin.js';
 // Read-only, source-attributed Kenya Open Data with tenant auth.
 export * from './kenya_open_data.js';
 export * from './kenya_open_data_federation.js';
-=======
 
 export * from './platform_security.js';
->>>>>>> origin/feat/agentic-business-os-sota
-=======
 export * from './hospital_clinical_ai.js';
->>>>>>> origin/feature/hospital-clinical-ai-governance
 
 // Verified sponsored advertising and Google rewarded bundle orchestration.
 export * from './hotspot_local_sponsors.js';
