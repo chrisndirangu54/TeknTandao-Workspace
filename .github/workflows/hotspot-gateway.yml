@@ -48,6 +48,7 @@ jobs:
       - run: node --check functions/src/hotspot_v2_paystack_mpesa.js
       - run: node --check functions/src/hotspot_v2_paystack_webhook.js
       - run: node --check functions/src/hotspot_sponsored_domain.js
+      - run: node --check functions/src/hotspot_guest_paid_test.js
       - run: node --check functions/src/hotspot_sponsored_access.js
       - run: node --check functions/src/hotspot_iot_analytics.js
       - run: node --check functions/src/hotspot_geospatial.js
