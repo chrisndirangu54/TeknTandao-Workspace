@@ -11,6 +11,7 @@ const exact=(obj,keys)=>{if(!obj||typeof obj!=='object'||Array.isArray(obj)||Obj
 const db=()=>getFirestore(),org=orgId=>db().collection('organizations').doc(orgId);
 const root=orgId=>org(orgId).collection('hotspotV2').doc('control');
 const callable=fn=>onCall({region:'europe-west1',timeoutSeconds:50},fn);
+const publicCallable=fn=>onCall({region:'europe-west1',timeoutSeconds:50,enforceAppCheck:true},fn);
 async function admin(req){
  if(!req.auth)fail('unauthenticated','Sign in required');
  if(!valid(req.data?.orgId))fail('invalid-argument','Invalid organization');
@@ -69,7 +70,7 @@ export const hotspotV2ApproveSponsorCampaign=callable(async req=>{
  return {active:true,labOnly:true,sponsorBillingEnabled:false};
 });
 
-export const hotspotV2PublicSponsors=callable(async req=>{
+export const hotspotV2PublicSponsors=publicCallable(async req=>{
  exact(req.data,['orgId','siteId']);auth(req);
  if(!valid(req.data.orgId)||!valid(req.data.siteId))fail('invalid-argument','Invalid IDs');
  const space=root(req.data.orgId);
@@ -90,7 +91,7 @@ export const hotspotV2PublicSponsors=callable(async req=>{
  return {campaigns:available,labOnly:true,sponsorBillingEnabled:false,consentRequired:true};
 });
 
-export const hotspotV2BeginSponsoredAccess=callable(async req=>{
+export const hotspotV2BeginSponsoredAccess=publicCallable(async req=>{
  exact(req.data,['orgId','campaignId','consent']);auth(req);
  if(!valid(req.data.orgId)||!valid(req.data.campaignId)||req.data.consent!==true)
   fail('invalid-argument','Explicit opt-in required');
@@ -112,7 +113,7 @@ export const hotspotV2BeginSponsoredAccess=callable(async req=>{
   tracking:'No ad network identifier is generated or transmitted by this endpoint.'};
 });
 
-export const hotspotV2ClaimSponsoredAccess=callable(async req=>{
+export const hotspotV2ClaimSponsoredAccess=publicCallable(async req=>{
  exact(req.data,['orgId','challengeId']);auth(req);
  if(!valid(req.data.orgId)||!valid(req.data.challengeId))fail('invalid-argument','Invalid IDs');
  const space=root(req.data.orgId),challengeRef=space.collection('sponsorChallenges').doc(req.data.challengeId);
