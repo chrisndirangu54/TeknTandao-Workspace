@@ -12,7 +12,7 @@ export function evaluateRadiusAccess({site,plan,voucher,payment,providedCode,now
  if(site.state!=='commissioned'||site.gatewayVerified!==true||site.radiusEnabled!==true)return denied('gateway_unverified');
  if(plan.state!=='published'||plan.siteId!==site.id||voucher.planId!==plan.id||voucher.siteId!==site.id)return denied('mismatched_scope');
  if(!['provisioned','active'].includes(voucher.state)||voucher.redeemed===true||voucher.gatewayProvisioned!==true)return denied('voucher_not_provisioned');
- if(!Number.isSafeInteger(voucher.expiresAtMs)||voucher.expiresAtMs<=now)return denied('expired_or_missing_expiry');
+ if(!Number.isSafeInteger(voucher.expiresAtMs)||voucher.expiresAtMs-now<1000)return denied('expired_or_missing_expiry');
  if(typeof providedCode!=='string'||!/^[A-Fa-f0-9]{32}$/.test(providedCode)||typeof voucher.secretSalt!=='string'||!/^[a-f0-9]{32}$/.test(voucher.secretSalt)||typeof voucher.secretHash!=='string'||!/^[a-f0-9]{64}$/.test(voucher.secretHash))return denied('invalid_credentials');
  const actual=createHmac('sha256',Buffer.from(voucher.secretSalt,'hex')).update(providedCode.toUpperCase()).digest();
  if(!timingSafeEqual(actual,Buffer.from(voucher.secretHash,'hex')))return denied('incorrect_credentials');
@@ -23,6 +23,6 @@ export function evaluateRadiusAccess({site,plan,voucher,payment,providedCode,now
  !Number.isSafeInteger(plan.uploadMbps)||plan.uploadMbps<1||plan.uploadMbps>10000||
  !Number.isSafeInteger(plan.downloadMbps)||plan.downloadMbps<1||plan.downloadMbps>10000)
  return denied('invalid_limits');
- return {authorized:true,reason:'policy_passed',attributes:{'Session-Timeout':Math.min(plan.durationMinutes*60,Math.floor((voucher.expiresAtMs-now)/1000)),
+ return {authorized:true,reason:'policy_passed',attributes:{'Session-Timeout':Math.max(1,Math.min(plan.durationMinutes*60,Math.floor((voucher.expiresAtMs-now)/1000))),
  'Mikrotik-Rate-Limit':plan.uploadMbps+'M/'+plan.downloadMbps+'M'}};
 }
