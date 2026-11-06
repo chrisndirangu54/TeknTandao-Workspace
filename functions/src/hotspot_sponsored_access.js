@@ -118,6 +118,7 @@ export const hotspotV2ClaimSponsoredAccess=callable(async req=>{
  const space=root(req.data.orgId),challengeRef=space.collection('sponsorChallenges').doc(req.data.challengeId);
  const pass=space.collection('vouchers').doc(randomUUID()),auditRef=space.collection('audit').doc(randomUUID());
  const code=randomBytes(16).toString('hex').toUpperCase(),salt=randomBytes(16).toString('hex');
+ let rewardExpiryMs=null;
  const today=new Date().toISOString().slice(0,10);
  const uidDigest=createHash('sha256').update(req.auth.uid).digest('hex');
  const counter=space.collection('sponsorDailyCaps').doc(today+'_'+uidDigest);
@@ -136,6 +137,7 @@ export const hotspotV2ClaimSponsoredAccess=callable(async req=>{
    site:{id:site.id,...site.data()},plan:{id:plan.id,...plan.data()}}).allowed)
    fail('failed-precondition','Campaign no longer eligible');
   const expiresAtMs=Date.now()+plan.data().durationMinutes*60000;
+  rewardExpiryMs=expiresAtMs;
   tx.create(pass,{siteId:site.id,planId:plan.id,state:'provisioned',gatewayProvisioned:true,
    labOnly:true,accessMethod:'sponsored',sponsorCampaignId:camp.id,secretSalt:salt,
    secretHash:createHmac('sha256',Buffer.from(salt,'hex')).update(code).digest('hex'),
@@ -147,6 +149,6 @@ export const hotspotV2ClaimSponsoredAccess=callable(async req=>{
   tx.create(auditRef,{actor:'authenticated_guest',action:'sponsor_reward_issued',
    target:pass.id,at:timestamp(),adMeasurement:'unverified_time_gate'});
  });
- return {voucherId:pass.id,oneTimeCode:code,expiresAtMs:Date.now()+60000*60,
+ return {voucherId:pass.id,oneTimeCode:code,expiresAtMs:rewardExpiryMs,
   labOnly:true,networkConnected:false,sponsorBilled:false};
 });
