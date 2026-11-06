@@ -191,6 +191,31 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
         endpoint='hotspotV2PublishPlan';payload['planId']=item['id'];
       }else if(action=='prepare'){
         endpoint='hotspotV2PrepareVoucher';payload['voucherId']=item['id'];
+      }else if(action=='paystack_test'){
+        final email=TextEditingController(),phone=TextEditingController();
+        try{
+          final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+            title:const Text('Paystack M-Pesa TEST checkout'),
+            content:SizedBox(width:420,child:Column(mainAxisSize:MainAxisSize.min,children:[
+              const Text('Test key only. No production money or internet access.'),
+              TextField(controller:email,keyboardType:TextInputType.emailAddress,
+                decoration:const InputDecoration(labelText:'Test customer email')),
+              const SizedBox(height:10),
+              TextField(controller:phone,keyboardType:TextInputType.phone,
+                decoration:const InputDecoration(labelText:'Test phone starting 254')),
+            ])),
+            actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),
+              FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Start test charge'))]));
+          if(ok!=true)return;
+          endpoint='hotspotV2StartPaystackMpesaTest';
+          payload.addAll({'voucherId':item['id'],'email':email.text.trim(),'phone':phone.text.trim()});
+        }finally{email.dispose();phone.dispose();}
+      }else if(action=='paystack_verify'){
+        endpoint='hotspotV2VerifyPaystackMpesaTest';payload['voucherId']=item['id'];
+      }else if(action=='lab_paid_request'){
+        endpoint='hotspotV2RequestPaidLabPass';payload['voucherId']=item['id'];
+      }else if(action=='lab_paid_approve'){
+        endpoint='hotspotV2ApprovePaidLabPass';payload['voucherId']=item['id'];
       }else if(action=='sandbox_mpesa'){
         final phone=TextEditingController();
         try{
@@ -223,7 +248,11 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
       }else{return;}
       setState(()=>busy=true);
       final res=await call(endpoint,payload);
-      if(mounted)setState(()=>message=action=='sandbox_mpesa'
+      if(mounted)setState(()=>message=action=='paystack_test'
+        ?'Paystack TEST request recorded. Complete test authorization before verification.'
+        :action=='paystack_verify'
+          ?'Paystack provider verification: ${res['verified']}. RADIUS authorization requires independent approval.'
+        :action=='sandbox_mpesa'
         ?'Sandbox checkout requested. No access granted.'
         :action=='query_mpesa'
           ?'Provider query: ${res['providerQueryCode']}. Receipt unverified; no access granted.'
@@ -317,6 +346,14 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
                           const PopupMenuItem(value:'publish',child:Text('Publish plan')),
                         if(resource=='vouchers'&&row['state']=='draft')
                           const PopupMenuItem(value:'prepare',child:Text('Prepare voucher')),
+                        if(resource=='vouchers'&&row['state']=='pending_payment')
+                          const PopupMenuItem(value:'paystack_test',child:Text('Paystack M-Pesa test')),
+                        if(resource=='vouchers'&&row['state']=='pending_payment')
+                          const PopupMenuItem(value:'paystack_verify',child:Text('Verify Paystack payment')),
+                        if(resource=='vouchers'&&row['state']=='issued')
+                          const PopupMenuItem(value:'lab_paid_request',child:Text('Request paid lab pass')),
+                        if(resource=='vouchers'&&row['state']=='issued')
+                          const PopupMenuItem(value:'lab_paid_approve',child:Text('Approve paid lab pass')),
                         if(resource=='vouchers'&&row['state']=='pending_payment')
                           const PopupMenuItem(value:'sandbox_mpesa',child:Text('Sandbox STK request')),
                         if(resource=='vouchers'&&row['state']=='pending_payment')
