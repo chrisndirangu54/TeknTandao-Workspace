@@ -1,0 +1,36 @@
+# RADIUS + outbound-only authorization bridge laboratory scaffold.
+# Private .env file is required for bridge; NEVER commit or mount it on radius.
+# This does not create clients.conf, virtual server policies, credentials or a working router.
+services:
+  radius:
+    image: freeradius/freeradius-server:3.2.10
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1812:1812/udp"
+      - "127.0.0.1:1813:1813/udp"
+    networks:
+      - nas_private
+    security_opt:
+      - no-new-privileges:true
+  hotspot-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile.bridge
+    restart: unless-stopped
+    env_file:
+      - .env.hotspot
+    networks:
+      - nas_private
+      - https_outbound
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+networks:
+  nas_private:
+    internal: true
+  https_outbound:
+    driver: bridge
