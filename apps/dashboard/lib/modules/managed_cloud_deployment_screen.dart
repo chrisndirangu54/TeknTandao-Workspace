@@ -86,8 +86,26 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
         title:const Text('Deployment and operational insights'),
         content:SizedBox(width:640,child:SingleChildScrollView(child:SelectableText(
           const JsonEncoder.withIndent('  ').convert(info)))),
-        actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
+        actions:[
+          TextButton.icon(icon:const Icon(Icons.auto_awesome_outlined),
+            onPressed:()async{
+              Navigator.pop(context);
+              await showAiInsights(projectId);
+            },label:const Text('AI analysis')),
+          TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))
+        ]));
     }catch(_){if(mounted)setState(()=>error='Could not load deployment insights.');}
+  }
+  Future<void> showAiInsights(String projectId)async{
+    try{
+      final result=await widget.store.call('cloudExplainDeploymentInsights',{'projectId':projectId});
+      if(!mounted)return;
+      await showDialog<void>(context:context,builder:(context)=>AlertDialog(
+        title:const Text('AI-assisted cloud recommendations'),
+        content:SizedBox(width:640,child:SingleChildScrollView(child:SelectableText(
+          const JsonEncoder.withIndent('  ').convert(result)))),
+        actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
+    }catch(_){if(mounted)setState(()=>error='AI analysis unavailable; verify permissions and API configuration.');}
   }
   @override
   Widget build(BuildContext context)=>Scaffold(
