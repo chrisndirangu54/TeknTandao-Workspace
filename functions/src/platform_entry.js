@@ -47,6 +47,7 @@ export * from './decision_intelligence_domain.js';
 export * from './digital_twin_domain.js';
 
 export * from './super_admin.js';
+<<<<<<< HEAD
 export * from './isp_operations.js';
 export * from './isp_suite.js';
 
@@ -171,3 +172,7 @@ export * from './isp_admin.js';
 // Read-only, source-attributed Kenya Open Data with tenant auth.
 export * from './kenya_open_data.js';
 export * from './kenya_open_data_federation.js';
+=======
+
+export * from './platform_security.js';
+>>>>>>> origin/feat/agentic-business-os-sota
