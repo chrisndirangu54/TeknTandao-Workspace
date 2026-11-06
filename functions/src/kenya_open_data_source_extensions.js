@@ -1,0 +1,19 @@
+// Additional curated providers for the shared source directory.
+// Catalog only: this file adds NO active proxy, credential bypass or rights grant.
+export const KENYA_SOURCE_EXTENSIONS = Object.freeze([
+  {id:'copernicus',name:'Copernicus Data Space STAC',homepage:'https://stac.opensearch.dataspace.copernicus.eu/v1/',api:'https://stac.opensearch.dataspace.copernicus.eu/v1/',licensing:'Copernicus and third-party collection terms; source-dependent',commercialUse:'review',access:'catalog_only'},
+  {id:'chirps',name:'CHIRPS v3 Precipitation',homepage:'https://www.chc.ucsb.edu/data/chirps3',api:'https://data.chc.ucsb.edu/products/CHIRPS/v3.0/',licensing:'CHIRPS v3 CC BY 4.0 attribution',commercialUse:'attribution',access:'catalog_only'},
+  {id:'gbif',name:'Global Biodiversity Information Facility',homepage:'https://www.gbif.org/',api:'https://api.gbif.org/v1/',licensing:'Mixed CC0/CC BY/CC BY-NC record-level terms',commercialUse:'review',access:'catalog_only'},
+  {id:'usgs_spectral',name:'USGS Spectral Library v7',homepage:'https://www.usgs.gov/data/usgs-spectral-library-version-7-data',api:'https://www.sciencebase.gov/catalog/',licensing:'USGS CC0 / public domain',commercialUse:'attribution',access:'catalog_only'},
+  {id:'esa_worldcover',name:'ESA WorldCover 2021',homepage:'https://esa-worldcover.org/en/data-access',api:'https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/',licensing:'CC BY 4.0',commercialUse:'attribution',access:'catalog_only'},
+  {id:'overture',name:'Overture Maps',homepage:'https://docs.overturemaps.org/getting-data/',api:'https://docs.overturemaps.org/getting-data/',licensing:'Contributor/theme-specific CDLA or ODbL',commercialUse:'review',access:'catalog_only'},
+  {id:'worldpop',name:'WorldPop population modelling',homepage:'https://www.worldpop.org/',api:'https://api.worldpop.org/v2/',licensing:'Product-specific reuse terms',commercialUse:'review',access:'catalog_only'},
+  {id:'faostat',name:'FAOSTAT',homepage:'https://www.fao.org/faostat/',api:'https://www.fao.org/faostat/',licensing:'FAO product-specific',commercialUse:'review',access:'catalog_only'},
+  {id:'kmhfr',name:'Kenya Master Health Facility Registry',homepage:'https://kmhfr.health.go.ke/',api:'https://kmhfr.health.go.ke/',licensing:'Government facility-data access terms',commercialUse:'restricted',access:'approval_required'},
+  {id:'national_geodata_bank',name:'Kenya National Geodata Bank',homepage:'https://www.mining.go.ke/geological-survey-services',api:'https://www.mining.go.ke/geological-survey-services',licensing:'Request government authorization',commercialUse:'restricted',access:'approval_required'},
+  {id:'mining_cadastre',name:'Kenya Mining Cadastre',homepage:'https://portal.miningcadastre.go.ke/',api:'https://portal.miningcadastre.go.ke/',licensing:'Authorized licensed access',commercialUse:'restricted',access:'approval_required'},
+  {id:'ardhisasa',name:'Kenya Ardhisasa',homepage:'https://ardhisasa.lands.go.ke/',api:'https://ardhisasa.lands.go.ke/',licensing:'Authorized parcel-specific access',commercialUse:'restricted',access:'approval_required'},
+  {id:'ndma',name:'Kenya NDMA drought data',homepage:'https://knowledgeweb.ndma.go.ke/Public/Default.aspx',api:'https://knowledgeweb.ndma.go.ke/Public/Default.aspx',licensing:'Report-specific terms',commercialUse:'review',access:'catalog_only'},
+  {id:'nasa_firms',name:'NASA FIRMS',homepage:'https://firms.modaps.eosdis.nasa.gov/api/',api:'https://firms.modaps.eosdis.nasa.gov/api/',licensing:'NASA attribution and MAP_KEY',commercialUse:'review',access:'api_key_required'},
+  {id:'cema',name:'CEMA Health Data Warehouse',homepage:'https://warehouse.cema.africa/',api:'https://warehouse.cema.africa/',licensing:'Dataset permissions and health privacy checks required',commercialUse:'restricted',access:'approval_required'},
+]);

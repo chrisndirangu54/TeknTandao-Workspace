@@ -31,6 +31,7 @@ import 'modules/restaurant_module.dart';
 import 'modules/ngo_module.dart';
 import 'modules/documents_module.dart';
 import 'modules/generic_module_screen.dart';
+import 'modules/kenya_open_data_module.dart';
 import 'modules/automation_studio.dart';
 import 'modules/reseller_studio.dart';
 import 'modules/reseller_onboarding_dashboard.dart';
@@ -218,6 +219,24 @@ class _DashboardState extends State<Dashboard> {
         break;
       case 'helpdesk':
         targetScreen = HelpdeskModuleScreen(store: store);
+        break;
+      case 'analytics':
+        targetScreen = DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Analytics & Intelligence'),
+              bottom: const TabBar(tabs: [
+                Tab(text: 'Business Analytics'),
+                Tab(text: 'Kenya Open Data'),
+              ]),
+            ),
+            body: TabBarView(children: [
+              GenericEnterpriseModuleScreen(module: module, store: store),
+              KenyaOpenDataModuleScreen(store: store),
+            ]),
+          ),
+        );
         break;
       case 'hospital':
         targetScreen = HospitalModuleScreen(store: store);
