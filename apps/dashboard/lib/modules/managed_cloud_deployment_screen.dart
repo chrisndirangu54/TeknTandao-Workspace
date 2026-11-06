@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
 import '../suite.dart';
 
 class ManagedCloudDeploymentScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
   bool autoDeploy=true, busy=false;
   String? error;
   List<Map<String,dynamic>> projects=[];
+  List<Map<String,dynamic>> archives=[];
   @override
   void initState(){super.initState();refresh();}
   @override
@@ -26,8 +29,11 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
     if(widget.store.demo){setState(()=>error='Connect to a real Workspace before registering deployments.');return;}
     try{
       final r=await widget.store.call('cloudListGithubServices');
-      if(mounted)setState(()=>projects=(r['projects'] as List? ?? [])
-        .map((x)=>Map<String,dynamic>.from(x as Map)).toList());
+      final a=await widget.store.call('cloudListArchiveSubmissions');
+      if(mounted)setState((){
+        projects=(r['projects'] as List? ?? []).map((x)=>Map<String,dynamic>.from(x as Map)).toList();
+        archives=(a['submissions'] as List? ?? []).map((x)=>Map<String,dynamic>.from(x as Map)).toList();
+      });
     }catch(_){if(mounted)setState(()=>error='Could not load cloud deployments.');}
   }
   Future<void> register()async{
@@ -58,6 +64,103 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
       await refresh();
     }catch(_){if(mounted)setState(()=>error='Invalid details or unavailable backend. Check the GitHub URL, budget, permission and deployed functions.');}
     finally{if(mounted)setState(()=>busy=false);}
+  }
+
+  Future<void> uploadArchive()async{
+    if(busy)return;
+    setState((){busy=true;error=null;});
+    try{
+      if(widget.store.demo)throw StateError('Sign in to a live workspace');
+      final picked=await FilePicker.platform.pickFiles(
+        type:FileType.custom,allowedExtensions:['zip'],withData:true);
+      if(picked==null||picked.files.isEmpty)return;
+      final file=picked.files.single;
+      if(file.bytes==null||file.size<1||file.size>10*1024*1024)
+        throw StateError('Select a ZIP archive smaller than 10 MB');
+      final created=await widget.store.call('cloudCreateArchiveSubmission',{'archive':{
+        'projectName':file.name.replaceAll(RegExp(r'\.zip
+    try{
+      final info=await widget.store.call('cloudGetGithubServiceInsights',{'projectId':projectId});
+      if(!mounted)return;
+      await showDialog<void>(context:context,builder:(context)=>AlertDialog(
+        title:const Text('Deployment and operational insights'),
+        content:SizedBox(width:640,child:SingleChildScrollView(child:SelectableText(
+          const JsonEncoder.withIndent('  ').convert(info)))),
+        actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
+    }catch(_){if(mounted)setState(()=>error='Could not load deployment insights.');}
+  }
+  @override
+  Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Managed Cloud Deployments'),actions:[
+      IconButton(onPressed:refresh,icon:const Icon(Icons.refresh),tooltip:'Refresh')]),
+    body:ListView(padding:const EdgeInsets.all(20),children:[
+      Text('Connect a repository',style:Theme.of(context).textTheme.headlineSmall),
+      const SizedBox(height:8),
+      const Text('Deploy code through customer-owned GitHub Actions and Google Cloud Run. Each cloud project requires verified workload identity permissions. Workspace does not execute uploaded source code, and CI outcomes are reported rather than independently verified.'),
+      const SizedBox(height:20),
+      Wrap(spacing:12,runSpacing:12,children:[
+        SizedBox(width:220,child:TextField(controller:name,
+          decoration:const InputDecoration(labelText:'Application name',border:OutlineInputBorder()))),
+        SizedBox(width:340,child:TextField(controller:repository,
+          decoration:const InputDecoration(labelText:'GitHub repository HTTPS URL',border:OutlineInputBorder()))),
+        SizedBox(width:160,child:TextField(controller:branch,
+          decoration:const InputDecoration(labelText:'Deploy branch',border:OutlineInputBorder()))),
+        SizedBox(width:150,child:TextField(controller:budget,
+          keyboardType:TextInputType.number,
+          decoration:const InputDecoration(labelText:'Monthly budget (USD)',border:OutlineInputBorder()))),
+        DropdownButton<String>(value:region,items:const [
+          DropdownMenuItem(value:'europe-west1',child:Text('Belgium')),
+          DropdownMenuItem(value:'europe-west4',child:Text('Netherlands')),
+          DropdownMenuItem(value:'us-central1',child:Text('Iowa')),
+          DropdownMenuItem(value:'asia-south1',child:Text('Mumbai')),
+        ],onChanged:(v)=>setState(()=>region=v??region)),
+      ]),
+      SwitchListTile(title:const Text('Automatic GitHub push deployments'),
+        subtitle:const Text('Effective once the approved workflow and cloud identity are configured.'),
+        value:autoDeploy,onChanged:(v)=>setState(()=>autoDeploy=v)),
+      Align(alignment:Alignment.centerLeft,child:FilledButton.icon(
+        onPressed:busy?null:register,icon:const Icon(Icons.cloud_upload_outlined),
+        label:const Text('Register cloud deployment'))),
+      if(error!=null)Padding(padding:const EdgeInsets.all(12),child:Text(error!,
+        style:const TextStyle(color:Colors.red))),
+      const Divider(height:32),
+      Text('Submit source code as ZIP',style:Theme.of(context).textTheme.titleLarge),
+      const Text('Upload up to 10 MB. Archives are quarantined and cannot run until a separate secure builder, malware scanner and approval workflow are configured.'),
+      Align(alignment:Alignment.centerLeft,child:OutlinedButton.icon(
+        onPressed:busy?null:uploadArchive,icon:const Icon(Icons.folder_zip_outlined),
+        label:const Text('Select and upload ZIP archive'))),
+      for(final archive in archives)ListTile(
+        leading:const Icon(Icons.inventory_2_outlined),
+        title:Text(archive['filename']?.toString()??'Archive'),
+        subtitle:Text(archive['status']?.toString()??'Pending')),
+      const Divider(height:32),
+      Text('Cloud services',style:Theme.of(context).textTheme.titleLarge),
+      if(projects.isEmpty)const ListTile(title:Text('No GitHub deployments registered')),
+      for(final project in projects)Card(child:ListTile(
+        leading:const Icon(Icons.cloud_outlined),
+        title:Text(project['name']?.toString()??'Service'),
+        subtitle:Text((project['repository']?.toString()??'')+' · '+
+          (project['status']?.toString()??'not configured')),
+        trailing:TextButton(onPressed:()=>inspect(project['id'].toString()),
+          child:const Text('Insights')))),
+      const SizedBox(height:16),
+      const Text('Production deployment must be authorised in the customer cloud account. Never paste cloud keys or service account credentials into Workspace. Configure per-repository workload identity federation, budget alerts and protected GitHub environments.'),
+    ]));
+},caseSensitive:false),''),
+        'filename':file.name,'expectedBytes':file.size,'customerConsent':true
+      }});
+      final response=await http.put(Uri.parse(created['uploadUrl'].toString()),
+        headers:{'Content-Type':'application/zip'},body:file.bytes);
+      if(response.statusCode!=200&&response.statusCode!=201)
+        throw StateError('Cloud source upload failed');
+      await widget.store.call('cloudFinalizeArchiveSubmission',{
+        'submissionId':created['id']});
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:Text('ZIP accepted into quarantine; security review required before deployment.')));
+      await refresh();
+    }catch(_){if(mounted)setState(()=>error=
+      'Source upload failed. Check ZIP size, Google Storage CORS, app permissions and deployment.'));
+    }finally{if(mounted)setState(()=>busy=false);}
   }
   Future<void> inspect(String projectId)async{
     try{
