@@ -2,19 +2,15 @@
 // Expose only to a trusted RADIUS bridge protected with HMAC and replay detection.
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onRequest} from 'firebase-functions/v2/https';
-import {defineSecret} from 'firebase-functions/params';
 import {verifySignedRadiusRequest,evaluateRadiusAccess} from './hotspot_radius_authorization_domain.js';
-const key=defineSecret('HOTSPOT_RADIUS_BRIDGE_HMAC_KEY');
 const id=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{5,100}$/.test(x);
 const allowedFields=['orgId','siteId','nasId','voucherId','code','nonce'];
 export const hotspotV2RadiusAuthorize=onRequest({
- region:'europe-west1',secrets:[key],timeoutSeconds:10,maxInstances:10,invoker:'public'
+ region:'europe-west1',timeoutSeconds:10,maxInstances:10,invoker:'public'
 },async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST'){res.status(405).send('Method not allowed');return;}
  const raw=req.rawBody;
- if(!verifySignedRadiusRequest({raw,timestamp:req.get('x-hotspot-timestamp'),
-   signature:req.get('x-hotspot-signature'),secret:key.value()})){res.status(401).json({accepted:false});return;}
  let input;
  try{input=JSON.parse(raw.toString('utf8'));}
  catch{res.status(400).json({accepted:false});return;}
@@ -26,6 +22,12 @@ export const hotspotV2RadiusAuthorize=onRequest({
  }
  const store=getFirestore();
  const base=store.collection('organizations').doc(input.orgId).collection('hotspotV2').doc('control');
+ const credential=await base.collection('gatewaySecrets').doc(input.siteId).get();
+ if(!credential.exists||credential.data().enabled!==true||
+ !verifySignedRadiusRequest({raw,timestamp:req.get('x-hotspot-timestamp'),
+  signature:req.get('x-hotspot-signature'),secret:credential.data().secret})){
+  res.status(401).json({accepted:false});return;
+ }
  // Atomic replay prevention: never allow the same signed request nonce twice.
  const nonceRef=base.collection('radiusNonces').doc(input.nonce);
  try{await nonceRef.create({at:FieldValue.serverTimestamp(),
