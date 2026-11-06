@@ -137,3 +137,9 @@ export * from './hotspot_gateway_credentials.js';
 
 // App-checked guest M-Pesa test checkout and one-time verified Wi-Fi pass claims.
 export * from './hotspot_guest_paid_test.js';
+
+// Verified sponsored advertising and Google rewarded bundle orchestration.
+export * from './hotspot_local_sponsors.js';
+
+// Verified sponsored advertising and Google rewarded bundle orchestration.
+export * from './hotspot_google_rewards.js';
