@@ -10,6 +10,15 @@ export const managedCloudProviders={
   railway:{name:'Railway',deployment:'token_scoped',supported:true},
   render:{name:'Render',deployment:'deploy_hook_or_api',supported:true}
 };
+export const cloudProviderRegions=Object.freeze({
+ gcp_cloud_run:['europe-west1','europe-west4','us-central1','asia-south1'],
+ aws_apprunner:['eu-west-1','eu-central-1','us-east-1','ap-south-1'],
+ azure_container_apps:['westeurope','northeurope','eastus','centralindia'],
+ digitalocean_app_platform:['ams','fra','nyc','sgp'],
+ cloudflare_pages:['global'],
+ railway:['us-west1','europe-west4','asia-southeast1'],
+ render:['oregon','frankfurt','singapore']
+});
 export const cloudPlanCatalog=Object.freeze({
   starter:{priceKes:1500,periodDays:30,description:'Managed deployment control plane Starter'},
   growth:{priceKes:5000,periodDays:30,description:'Managed deployment control plane Growth'},
@@ -21,12 +30,14 @@ export const serviceSchema=z.object({
  repository:z.string().max(260).refine(v=>githubRepo.test(v),'Provide a GitHub repository HTTPS URL'),
  branch:z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/)
    .refine(v=>!v.includes('..')&&!v.endsWith('/')&&!v.endsWith('.lock')&&!v.includes('//')),
- cloudRegion:z.enum(['europe-west1','europe-west4','us-central1','asia-south1']),
+ cloudRegion:z.string().min(2).max(32),
  serviceName:z.string().regex(/^[a-z][a-z0-9-]{2,48}$/),
  monthlyBudgetUsd:z.number().positive().max(100000),
  autoDeploy:z.boolean().default(false),
  customerConsent:z.literal(true),
-}).strict();
+}).strict().superRefine((v,ctx)=>{
+ if(!cloudProviderRegions[v.cloudProvider]?.includes(v.cloudRegion))ctx.addIssue({code:'custom',path:['cloudRegion'],message:'Unsupported region for selected cloud provider'});
+});
 export function normalizedRepository(value) {
  const match=githubRepo.exec(value);
  if(!match)throw new Error('Invalid GitHub repository URL');
