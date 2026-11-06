@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'hotspot_growth_console.dart';
 
 /// Tenant-scoped hotspot inventory. All writes use Workspace member authorization.
 class HotspotTenantConsole extends StatefulWidget {
@@ -266,6 +267,9 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
       r.toString().toLowerCase().contains(search.text.toLowerCase())).toList();
     return Scaffold(
       appBar:AppBar(title:const Text('Hotspot Control Center'),actions:[
+        IconButton(tooltip:'Sponsored access and intelligence',icon:const Icon(Icons.auto_graph_outlined),
+          onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(
+            builder:(_)=>const HotspotGrowthConsole()))),
         IconButton(onPressed:busy?null:()=>load(),tooltip:'Refresh records',icon:const Icon(Icons.refresh))
       ]),
       body:Center(child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:1160),
