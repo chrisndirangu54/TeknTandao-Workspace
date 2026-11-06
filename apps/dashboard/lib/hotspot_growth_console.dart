@@ -13,8 +13,10 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
  final org=TextEditingController(),site=TextEditingController(),plan=TextEditingController();
  final title=TextEditingController(),advertiser=TextEditingController();
  final creative=TextEditingController(),destination=TextEditingController();
+ final googleAdUnit=TextEditingController(),ssvTestReference=TextEditingController();
  final latitude=TextEditingController(),longitude=TextEditingController(),iotLabel=TextEditingController(),deviceId=TextEditingController();
  List<Map<String,dynamic>> campaigns=[];
+ List<Map<String,dynamic>> sponsorApplicants=[];
  Map<String,dynamic>? intelligence,environment;
  String status='Select a site for sponsored passes, signed IoT devices and geospatial analytics.';
  bool busy=false;
@@ -27,7 +29,7 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
   }catch(_){}
  }
  @override void dispose(){
-  for(final c in [org,site,plan,title,advertiser,creative,destination,latitude,longitude,iotLabel,deviceId])c.dispose();
+  for(final c in [org,site,plan,title,advertiser,creative,destination,googleAdUnit,ssvTestReference,latitude,longitude,iotLabel,deviceId])c.dispose();
   super.dispose();
  }
  Future<Map<String,dynamic>> invoke(String method,Map<String,dynamic> data)async{
@@ -42,6 +44,10 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
    if(name=='hotspotV2SponsorAdminList'){
     setState(()=>campaigns=(out['campaigns'] as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList());
    }
+   if(name=='hotspotV2SponsorAdminCampaigns')setState(()=>campaigns=(out['campaigns'] as List)
+     .map((e)=>Map<String,dynamic>.from(e as Map)).toList());
+   if(name=='hotspotV2SponsorListApplicants')setState(()=>sponsorApplicants=(out['applicants'] as List)
+     .map((e)=>Map<String,dynamic>.from(e as Map)).toList());
    if(name=='hotspotV2OperationsIntelligence')setState(()=>intelligence=out);
    if(name=='hotspotV2RefreshNasaPower')setState(()=>environment=out);
    if(name=='hotspotV2RegisterIoTDevice'&&out['oneTimeSecret']!=null){
@@ -83,6 +89,19 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
     field('Active Workspace ID',org),field('Site ID',site),field('Free Plan ID',plan),
     if(busy)const LinearProgressIndicator(),
     Padding(padding:const EdgeInsets.symmetric(vertical:12),child:Text(status)),
+    section('Local sponsor onboarding and approvals',[
+      const Text('Local businesses apply through the advertiser website. An operator independently approves them. Funded campaigns need a separate activation review.'),
+      OutlinedButton.icon(onPressed:busy?null:()=>execute('hotspotV2SponsorListApplicants',{}),
+        icon:const Icon(Icons.business_outlined),label:const Text('Review sponsor applications')),
+      for(final applicant in sponsorApplicants)
+        ListTile(title:Text(applicant['businessName']?.toString()??'Advertiser'),
+          subtitle:Text('Status: ${applicant['status']} · ${applicant['contactEmail']??''}'),
+          trailing:applicant['status']=='pending_review'?TextButton(
+            onPressed:busy?null:()=>execute('hotspotV2SponsorApprove',{'sponsorUid':applicant['uid']},
+              success:'Advertiser approved. Refresh applicants to confirm status.'),
+            child:const Text('Approve')):null),
+      const Text('Advertiser portal: hotspot-advertisers.html · Google rewarded portal: hotspot-google-rewards.html'),
+    ]),
     section('Sponsored access instead of payment',[
       field('Sponsor campaign title',title),field('Advertiser',advertiser),
       field('Creative image HTTPS URL',creative),field('Sponsor destination HTTPS URL',destination),
@@ -99,10 +118,15 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
         OutlinedButton(onPressed:busy?null:()=>execute('hotspotV2SponsorAdminList',{}),
           child:const Text('Load campaigns')),
       ]),
+      OutlinedButton.icon(onPressed:busy?null:()=>execute('hotspotV2SponsorAdminCampaigns',{}),
+        icon:const Icon(Icons.receipt_long_outlined),label:const Text('Review funded campaigns')),
       for(final c in campaigns)ListTile(
         title:Text(c['title']?.toString()??'Campaign'),
         subtitle:Text('${c['advertiser']} · ${c['status']} · rewards ${c['rewardedCount']}/${c['rewardLimit']}'),
-        trailing:c['status']=='draft'?TextButton(onPressed:busy?null:
+        trailing:c['status']=='awaiting_review'?TextButton(onPressed:busy?null:
+          ()=>execute('hotspotV2SponsorActivateCampaign',{'campaignId':c['id']},
+            success:'Verified test-funded sponsor campaign approved.'),child:const Text('Activate')):
+          c['status']=='draft'?TextButton(onPressed:busy?null:
           ()=>execute('hotspotV2ApproveSponsorCampaign',{'campaignId':c['id']},
             success:'Campaign approved for approved laboratory sites only.'),
           child:const Text('Approve')):
@@ -112,6 +136,24 @@ class _HotspotGrowthConsoleState extends State<HotspotGrowthConsole>{
            child:const Text('Pause')):null),
       const Text('Ad impressions and sponsor billing are not verified by the time gate.',
         style:TextStyle(fontSize:12)),
+    ]),
+    section('Google rewarded Wi-Fi: 3–5 ads for 30 minutes',[
+      const Text('Configure an Ad Manager rewarded WEB ad unit. Enabling requires independently verified SSV and a second administrator. No ad is presented before site approval.'),
+      field('Google rewarded ad unit path',googleAdUnit),
+      field('SSV end-to-end test reference',ssvTestReference),
+      Wrap(spacing:10,runSpacing:8,children:[
+        OutlinedButton.icon(icon:const Icon(Icons.verified_user_outlined),
+          onPressed:busy?null:()=>execute('hotspotV2RequestGoogleSite',{
+            'siteId':site.text.trim(),'adUnit':googleAdUnit.text.trim(),
+            'ssvTestReference':ssvTestReference.text.trim()
+          },success:'Google site review requested. A separate admin must verify SSV.'),
+          label:const Text('Request Google site review')),
+        FilledButton.icon(icon:const Icon(Icons.check_circle_outline),
+          onPressed:busy?null:()=>execute('hotspotV2ApproveGoogleSite',{
+            'siteId':site.text.trim()
+          },success:'Google site approved by second admin. Confirm actual Google SSV verification is running.'),
+          label:const Text('Second-admin approval')),
+      ]),
     ]),
     section('Gateway credentials and IoT telemetry',[
       OutlinedButton.icon(

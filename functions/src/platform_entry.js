@@ -180,3 +180,7 @@ export * from './platform_security.js';
 =======
 export * from './hospital_clinical_ai.js';
 >>>>>>> origin/feature/hospital-clinical-ai-governance
+
+// Verified sponsored advertising and Google rewarded bundle orchestration.
+export * from './hotspot_local_sponsors.js';
+export * from './hotspot_google_rewards.js';
