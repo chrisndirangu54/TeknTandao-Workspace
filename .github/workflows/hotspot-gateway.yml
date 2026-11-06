@@ -36,4 +36,5 @@ jobs:
       - run: node --check functions/src/hotspot_lifecycle_domain.js
       - run: node --check functions/src/hotspot_v2_operations.js
       - run: node --check functions/src/hotspot_v2_mpesa.js
+      - run: node --check functions/src/hotspot_v2_health.js
       - run: node --test functions/test/hotspot_domain.test.js functions/test/hotspot_gateway_policy.test.js functions/test/hotspot_payment_domain.test.js functions/test/hotspot_v2_domain.test.js functions/test/hotspot_lifecycle_domain.test.js
