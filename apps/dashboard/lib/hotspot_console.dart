@@ -82,6 +82,12 @@ class _HotspotConsoleState extends State<HotspotConsole> {
       await refresh();
     }catch(e){if(mounted)setState(()=>message='Portal visibility change failed: $e');}
   }
+  Future<void> draftPaymentIntent(String voucherId) async {
+    try {
+      final result=await invoke('hotspotCreatePaymentIntent',{'voucherId':voucherId});
+      if(mounted)setState(()=>message='Payment intent ${result['id']} saved as draft; no M-Pesa request was sent.');
+    }catch(e){if(mounted)setState(()=>message='Payment intent not created: $e');}
+  }
   Future<void> revoke(String id) async {
     try {await invoke('hotspotRevokeVoucher',{'id':id});if(mounted)setState(()=>message='Voucher marked revoked; router enforcement NOT executed.');await refresh();}
     catch(e){if(mounted)setState(()=>message='Revoke failed: $e');}
@@ -100,7 +106,9 @@ class _HotspotConsoleState extends State<HotspotConsole> {
         final item=rows[index];
         return Card(child:ListTile(title:Text((item['name']??item['codeLast4']??item['id']).toString()),
           subtitle:Text(item.entries.where((e)=>!['codeHash','createdBy'].contains(e.key)).map((e)=>'${e.key}: ${e.value}').join('  •  '),maxLines:3,overflow:TextOverflow.ellipsis),
-          trailing:resource=='vouchers'&&item['status']!='revoked'?TextButton(onPressed:()=>revoke(item['id'].toString()),child:const Text('Revoke')):resource=='sites'&&item['status']=='planned'?TextButton(onPressed:()=>pilotAction(item),child:const Text('Commission')):resource=='sites'&&item['status']=='active'?TextButton(onPressed:()=>togglePortal(item),child:Text(item['portalPublished']==true?'Hide portal':'Publish portal')):resource=='plans'&&item['status']=='draft'?TextButton(onPressed:()=>pilotAction(item),child:const Text('Publish')):null));
+          trailing:resource=='vouchers'&&item['status']!='revoked'?Wrap(spacing:4,children:[
+            TextButton(onPressed:()=>draftPaymentIntent(item['id'].toString()),child:const Text('Draft payment')),
+            TextButton(onPressed:()=>revoke(item['id'].toString()),child:const Text('Revoke'))]):resource=='sites'&&item['status']=='planned'?TextButton(onPressed:()=>pilotAction(item),child:const Text('Commission')):resource=='sites'&&item['status']=='active'?TextButton(onPressed:()=>togglePortal(item),child:Text(item['portalPublished']==true?'Hide portal':'Publish portal')):resource=='plans'&&item['status']=='draft'?TextButton(onPressed:()=>pilotAction(item),child:const Text('Publish')):null));
       })),
     ])),
   );
