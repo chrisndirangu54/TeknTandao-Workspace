@@ -1,0 +1,37 @@
+# Optional lab-only NAS Disconnect-Request worker.
+# Requires local service account and NAS secret files, with permissions readable
+# only by the worker identity. NEVER commit these files.
+services:
+  disconnect-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.disconnect
+    env_file:
+      - .env.disconnect
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+      HOTSPOT_NAS_SECRET_FILE: /run/secrets/nas_disconnect_secret
+      HOTSPOT_DISCONNECT_ENABLED: "${HOTSPOT_DISCONNECT_ENABLED:-false}"
+    volumes:
+      - type: bind
+        source: ${HOTSPOT_FIREBASE_SA_FILE:-./secrets/firebase-service-account.json}
+        target: /run/secrets/firebase-service-account.json
+        read_only: true
+      - type: bind
+        source: ${HOTSPOT_NAS_SECRET_FILE:-./secrets/nas_disconnect_secret}
+        target: /run/secrets/nas_disconnect_secret
+        read_only: true
+    networks:
+      - nas_private
+      - https_outbound
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+networks:
+  nas_private:
+    internal: true
+  https_outbound:
+    driver: bridge
