@@ -29,7 +29,7 @@ export const hotspotV2RadiusAuthorize=onRequest({
  // Atomic replay prevention: never allow the same signed request nonce twice.
  const nonceRef=base.collection('radiusNonces').doc(input.nonce);
  try{await nonceRef.create({at:FieldValue.serverTimestamp(),
-   expiresAt:FieldValue.serverTimestamp()});}
+   expiresAt:new Date(Date.now()+5*60*1000)});}
  catch{res.status(409).json({accepted:false,reason:'replay'});return;}
  try{
   const [site,voucher]=await Promise.all([
