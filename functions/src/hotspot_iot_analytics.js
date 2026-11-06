@@ -85,8 +85,7 @@ export const hotspotV2OperationsIntelligence=onCall({region:'europe-west1'},asyn
  const latest=values.sort((a,b)=>b.observedAtMs-a.observedAtMs)[0]||null;
  const statistics=analyzeHotspotTelemetry(values);
  const planningForecast=forecastNextHourClients(values);
- const failedAdmissions=0,replayedNonces=0; // not measured: omit from model interpretation
- const anomalies=scoreHotspotAnomaly({failedAdmissions,replayedNonces,
+ const anomalies=scoreHotspotAnomaly({failedAdmissions:null,replayedNonces:null,
    disconnectBacklog:requests.docs.filter(d=>d.data().executed!==true).length,
    missingHeartbeatMinutes:latest?Math.max(0,(Date.now()-latest.observedAtMs)/60000):null});
  const suggestions=[];
@@ -105,7 +104,8 @@ export const hotspotV2OperationsIntelligence=onCall({region:'europe-west1'},asyn
   anomaly:anomalies,statistics,planningForecast,
   aiAssist:{model:'deterministic_rules_v1',trained:false,suggestions},
   dataQuality:{truncated:[readings,ads,vouchers,requests].some(x=>x.size===100),
-    telemetryVerifiedBy:'device_hmac',independentSensorCalibration:false},
+    telemetryVerifiedBy:'device_hmac',independentSensorCalibration:false,
+    missingSignals:['failedAdmissions','replayedNonces']},
   commercialRevenueVerified:false};
 });
 
