@@ -190,3 +190,6 @@ export * from './managed_cloud_ai.js';
 
 // Archive submissions are quarantined; no source compilation in Firebase Functions.
 export * from './cloud_source_uploads.js';
+
+// Verified prepaid cloud billing: Paystack checkout and Kenya M-Pesa through Paystack.
+export * from './managed_cloud_payments.js';
