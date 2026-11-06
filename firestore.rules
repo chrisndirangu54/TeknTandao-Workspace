@@ -362,6 +362,8 @@ service cloud.firestore {
       match /hotspotV2/{control}/plans/{id} { allow read, write: if false; }
       match /hotspotV2/{control}/vouchers/{id} { allow read, write: if false; }
       match /hotspotV2/{control}/audit/{id} { allow read, write: if false; }
+      // Include payment evidence, gateway approvals and replay-nonce records.
+      match /hotspotV2/{control}/{privateCollection}/{id} { allow read, write: if false; }
       match /apps/{app} { allow read: if member(org); }
       match /modules/{app}/records/{id} { allow read: if access(org, app); }
       match /contacts/{id} { allow read: if access(org, 'crm') || access(org, 'pos'); }
