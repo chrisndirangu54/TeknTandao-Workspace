@@ -91,3 +91,6 @@ export * from './hotspot_management.js';
 
 // Server-side signed RADIUS accounting collector (no automatic network access).
 export * from './hotspot_accounting.js';
+
+// Pilot site commissioning and public read-only tariff catalog.
+export * from './hotspot_pilot.js';
