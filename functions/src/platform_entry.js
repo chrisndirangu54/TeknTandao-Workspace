@@ -134,3 +134,6 @@ export * from './hotspot_v2_accounting.js';
 
 // Per-site signed gateway accounting and private bridge credential rotation.
 export * from './hotspot_gateway_credentials.js';
+
+// App-checked guest M-Pesa test checkout and one-time verified Wi-Fi pass claims.
+export * from './hotspot_guest_paid_test.js';
