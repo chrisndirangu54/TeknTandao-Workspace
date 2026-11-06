@@ -10,6 +10,12 @@ rest hotspot_rest {
     body = "json"
     force_to = "json"
   }
+  accounting {
+    uri = "\${..connect_uri}/accounting"
+    method = "post"
+    body = "json"
+    force_to = "json"
+  }
   pool {
     start = 2
     min = 2
