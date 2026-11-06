@@ -117,3 +117,6 @@ export * from './hotspot_gateway_approvals.js';
 
 // Independent lab-only RADIUS verification and free-voucher authorization.
 export * from './hotspot_v2_lab_activation.js';
+
+// Paystack TEST-mode M-Pesa with provider-verification and atomic voucher issuance.
+export * from './hotspot_v2_paystack_mpesa.js';
