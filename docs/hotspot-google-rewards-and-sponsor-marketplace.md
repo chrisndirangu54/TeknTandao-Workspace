@@ -5,10 +5,10 @@
 
 ## Three–five ads for 30 minutes
 - `chrisndirangu54/HTML/hotspot-google-rewards.html`: sequential Google Publisher Tag rewarded slots, with voluntary consent before each ad. The page listens for `rewardedSlotReady`, `rewardedSlotGranted` and `rewardedSlotClosed` and explicitly destroys each slot when closed.
-- `hotspotV2StartGoogleBundle`: authenticated/App-Checked guest, 30-minute zero-price plan, capped at 2 Mbps download and 1 device in the plan metadata, 3/4/5 ad target, and a 20-minute collection window.
+- `hotspotV2RequestGoogleSite` and `hotspotV2ApproveGoogleSite`: independently approve a specific rewarded web ad unit and traceable SSV test reference before any customer bundle can start. The second approval is an operator attestation, not cryptographic proof of a provider integration.\n- `hotspotV2StartGoogleBundle`: authenticated/App-Checked guest, 30-minute zero-price plan, capped at 2 Mbps download and 1 device in the plan metadata, 3/4/5 ad target, and a 20-minute collection window.
 - `hotspotV2GoogleBundleStatus`: only reports the **verified backend** reward count, never client events.
 - `hotspotV2VerifiedRewardIntake`: accepts authenticated HMAC-SHA256 assertions **only** from a separately deployed and independently validated Google web SSV verifier. Distinct transaction IDs are atomically deduplicated in a global ledger, and duplicate/late rewards cannot increment a bundle.
-- `hotspotV2ClaimGoogleBundle`: if the required number of trusted verifications is reached, creates a single-use 30-minute lab voucher. It never calls an ad SDK from Firebase Functions.
+- `hotspotV2ClaimGoogleBundle`: if the required number of trusted verifications is reached, creates a single-use 30-minute lab voucher, with a maximum of three Google-funded passes per Firebase account per UTC day. It never calls an ad SDK from Firebase Functions.
 
 ### Critical SSV dependency (not yet implemented)
 Google's **web** rewarded inventory provides SSV callback support, but publisher-specific callback field mappings and cryptographic validation must be validated against Google's official web SSV contract for the approved Ad Manager network. The AdMob mobile ECDSA SSV guide must **not** be assumed equivalent to the Ad Manager rewarded **web** callback protocol.
