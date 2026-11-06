@@ -11,7 +11,7 @@ const checkId=(x,label)=>{if(!ident(x))error('invalid-argument','Invalid '+label
 const input=(o,fields)=>{if(!o||typeof o!=='object'||Array.isArray(o)||Object.keys(o).some(x=>!fields.includes(x)))error('invalid-argument','Invalid input');};
 const string=(o,key,max=100)=>{const v=o?.[key];if(typeof v!=='string'||v.trim().length<1||v.trim().length>max)error('invalid-argument','Invalid '+key);return v.trim();};
 const integer=(o,key,min,max)=>{const v=o?.[key];if(!Number.isSafeInteger(v)||v<min||v>max)error('invalid-argument','Invalid '+key);return v;};
-const call=fn=>onCall({region:'europe-west1',timeoutSeconds:45,enforceAppCheck:false},fn);
+const call=fn=>onCall({region:'europe-west1',timeoutSeconds:45},fn);
 const tenant=org=>getFirestore().collection('organizations').doc(org);
 async function operator(req,allowed=['owner','admin','operator']){
  if(!req.auth)error('unauthenticated','Sign-in required');
