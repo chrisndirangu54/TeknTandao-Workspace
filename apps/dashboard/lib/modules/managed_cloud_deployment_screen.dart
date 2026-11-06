@@ -19,6 +19,15 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
   final budget=TextEditingController(text:'25');
   String region='europe-west1';
   String cloudProvider='gcp_cloud_run';
+  static const providerRegions=<String,List<String>>{
+    'gcp_cloud_run':['europe-west1','europe-west4','us-central1','asia-south1'],
+    'aws_apprunner':['eu-west-1','eu-central-1','us-east-1','ap-south-1'],
+    'azure_container_apps':['westeurope','northeurope','eastus','centralindia'],
+    'digitalocean_app_platform':['ams','fra','nyc','sgp'],
+    'cloudflare_pages':['global'],
+    'railway':['us-west1','europe-west4','asia-southeast1'],
+    'render':['oregon','frankfurt','singapore']
+  };
   bool autoDeploy=true, busy=false;
   String? error;
   List<Map<String,dynamic>> projects=[];
@@ -141,7 +150,10 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
           DropdownMenuItem(value:'cloudflare_pages',child:Text('Cloudflare Pages')),
           DropdownMenuItem(value:'railway',child:Text('Railway')),
           DropdownMenuItem(value:'render',child:Text('Render')),
-        ],onChanged:(v)=>setState(()=>cloudProvider=v??cloudProvider)),
+        ],onChanged:(v)=>setState((){
+          cloudProvider=v??cloudProvider;
+          region=providerRegions[cloudProvider]!.first;
+        })),
         SizedBox(width:220,child:TextField(controller:name,
           decoration:const InputDecoration(labelText:'Application name',border:OutlineInputBorder()))),
         SizedBox(width:340,child:TextField(controller:repository,
@@ -151,11 +163,9 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
         SizedBox(width:150,child:TextField(controller:budget,
           keyboardType:TextInputType.number,
           decoration:const InputDecoration(labelText:'Monthly budget (USD)',border:OutlineInputBorder()))),
-        DropdownButton<String>(value:region,items:const [
-          DropdownMenuItem(value:'europe-west1',child:Text('Belgium')),
-          DropdownMenuItem(value:'europe-west4',child:Text('Netherlands')),
-          DropdownMenuItem(value:'us-central1',child:Text('Iowa')),
-          DropdownMenuItem(value:'asia-south1',child:Text('Mumbai')),
+        DropdownButton<String>(value:region,items:[
+          for(final value in providerRegions[cloudProvider]!)
+            DropdownMenuItem(value:value,child:Text(value)),
         ],onChanged:(v)=>setState(()=>region=v??region)),
       ]),
       SwitchListTile(title:const Text('Automatic GitHub push deployments'),
