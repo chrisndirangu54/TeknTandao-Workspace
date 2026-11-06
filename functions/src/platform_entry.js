@@ -137,3 +137,37 @@ export * from './hotspot_gateway_credentials.js';
 
 // App-checked guest M-Pesa test checkout and one-time verified Wi-Fi pass claims.
 export * from './hotspot_guest_paid_test.js';
+
+// Tenant-scoped fleet telematics and Yangu connector integration.
+export * from './fleet_yangu_connector.js';
+export * from './bima_guardian_fleet.js';
+
+// Private route optimization, safe geocoding and consent-gated GPS snapshots.
+export * from './logistics_intelligence.js';
+
+// Phase 1: tenant-safe enterprise party foundation.
+export * from './foundation.js';
+
+// Phase 1: branch directory and recoverable Firestore event relay.
+export * from './foundation_branches.js';
+export * from './foundation_outbox.js';
+
+// Phase 1: approval gates and read-only migration assessment.
+export * from './foundation_governance.js';
+
+// Phase 1: tenant-scoped operational health snapshot.
+export * from './foundation_readiness.js';
+
+// Cloud automation migration workspace and operations.
+export * from './cloud_automation.js';
+export * from './cloud_operations.js';
+
+// Hospital clinical AI governance and audit trails.
+export * from './hospital_clinical_ai.js';
+
+// Owner-guarded ISP operations: incident reports, field work orders and provisioning review.
+export * from './isp_admin.js';
+
+// Read-only, source-attributed Kenya Open Data with tenant auth.
+export * from './kenya_open_data.js';
+export * from './kenya_open_data_federation.js';
