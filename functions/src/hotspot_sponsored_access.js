@@ -152,3 +152,14 @@ export const hotspotV2ClaimSponsoredAccess=callable(async req=>{
  return {voucherId:pass.id,oneTimeCode:code,expiresAtMs:rewardExpiryMs,
   labOnly:true,networkConnected:false,sponsorBilled:false};
 });
+
+export const hotspotV2SponsorAdminList=callable(async req=>{
+ exact(req.data,['orgId']);const {root:space}=await admin(req);
+ const ads=await space.collection('sponsorCampaigns').limit(100).get();
+ return {campaigns:ads.docs.map(d=>({id:d.id,title:d.data().title,
+  advertiser:d.data().advertiser,siteId:d.data().siteId,planId:d.data().planId,
+  status:d.data().status,operatorApproved:d.data().operatorApproved===true,
+  rewardedCount:d.data().rewardedCount,rewardLimit:d.data().rewardLimit,
+  startsAtMs:d.data().startsAtMs,endsAtMs:d.data().endsAtMs,
+  sponsorBilled:false})),limit:100};
+});
