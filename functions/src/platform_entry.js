@@ -187,3 +187,6 @@ export * from './eset_workspace.js';
 
 // Tenant-scoped ESET Connect read-only inventory, detections, and binding approvals.
 export * from './eset_security_sync.js';
+
+// ESET customer change requests, explicit manual review only.
+export * from './eset_operations.js';
