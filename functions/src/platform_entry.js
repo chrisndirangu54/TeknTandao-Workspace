@@ -106,3 +106,6 @@ export * from './hotspot_v2_operations.js';
 
 // M-Pesa sandbox-only initiation and read-only status query; no access activation.
 export * from './hotspot_v2_mpesa.js';
+
+// Tenant-scoped readiness and operational backlog (not live network telemetry).
+export * from './hotspot_v2_health.js';
