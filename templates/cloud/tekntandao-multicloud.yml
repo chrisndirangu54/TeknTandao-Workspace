@@ -105,7 +105,7 @@ jobs:
         run: |
           curl -fsSL https://github.com/digitalocean/doctl/releases/download/v1.125.0/doctl-1.125.0-linux-amd64.tar.gz | tar xz
           ./doctl auth init -t "${DO_TOKEN}"
-          ./doctl apps create-deployment "${DO_APP_ID}"
+          ./doctl apps create-deployment "${DO_APP_ID}" --update-sources
 
       - name: Cloudflare Pages build and deploy
         if: env.CLOUD_PROVIDER == 'cloudflare_pages'
@@ -125,7 +125,7 @@ jobs:
           RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
         run: |
           npm install --global @railway/cli
-          railway up --service "${RAILWAY_SERVICE}" --detach
+          railway up --service "${RAILWAY_SERVICE}" --ci
 
       - name: Render deployment (preconfigured Git-linked service)
         if: env.CLOUD_PROVIDER == 'render'
