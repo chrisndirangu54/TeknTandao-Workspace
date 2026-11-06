@@ -66,46 +66,60 @@ class _ManagedCloudDeploymentScreenState extends State<ManagedCloudDeploymentScr
     finally{if(mounted)setState(()=>busy=false);}
   }
 
-  Future<void> uploadArchive()async{
-    if(busy)return;
-    setState((){busy=true;error=null;});
-    try{
-      if(widget.store.demo)throw StateError('Sign in to a live workspace');
-      final picked=await FilePicker.platform.pickFiles(
+  Future<void> uploadArchive() async {
+    if (busy) return;
+    setState(() {busy=true;error=null;});
+    try {
+      if (widget.store.demo) throw StateError('Sign in to a real workspace');
+      final selected=await FilePicker.platform.pickFiles(
         type:FileType.custom,allowedExtensions:['zip'],withData:true);
-      if(picked==null||picked.files.isEmpty)return;
-      final file=picked.files.single;
-      if(file.bytes==null||file.size<1||file.size>10*1024*1024)
-        throw StateError('Select a ZIP archive smaller than 10 MB');
+      if (selected==null || selected.files.isEmpty) return;
+      final file=selected.files.single;
+      if (file.bytes==null || file.size<1 || file.size>10*1024*1024)
+        throw StateError('Select a ZIP under 10 MB');
+      final project=file.name.length>4 ? file.name.substring(0,file.name.length-4) : file.name;
       final created=await widget.store.call('cloudCreateArchiveSubmission',{'archive':{
-        'projectName':file.name.replaceAll(RegExp(r'\.zip
-    try{
+        'projectName':project,'filename':file.name,
+        'expectedBytes':file.size,'customerConsent':true}});
+      final response=await http.put(Uri.parse(created['uploadUrl'].toString()),
+        headers:{'Content-Type':'application/zip'},body:file.bytes);
+      if (response.statusCode!=200 && response.statusCode!=201)
+        throw StateError('Upload failed');
+      await widget.store.call('cloudFinalizeArchiveSubmission',{'submissionId':created['id']});
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:Text('Archive quarantined; deployment requires security review.')));
+      await refresh();
+    } catch (_) {
+      if(mounted)setState(()=>error='ZIP upload unsuccessful. Check your storage CORS and permissions.');
+    } finally {if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> inspect(String projectId) async {
+    try {
       final info=await widget.store.call('cloudGetGithubServiceInsights',{'projectId':projectId});
       if(!mounted)return;
       await showDialog<void>(context:context,builder:(context)=>AlertDialog(
-        title:const Text('Deployment and operational insights'),
+        title:const Text('Deployment insights'),
         content:SizedBox(width:640,child:SingleChildScrollView(child:SelectableText(
           const JsonEncoder.withIndent('  ').convert(info)))),
         actions:[
-          TextButton.icon(icon:const Icon(Icons.auto_awesome_outlined),
-            onPressed:()async{
-              Navigator.pop(context);
-              await showAiInsights(projectId);
-            },label:const Text('AI analysis')),
+          TextButton.icon(onPressed:()async{
+            Navigator.pop(context);
+            await showAiInsights(projectId);
+          },icon:const Icon(Icons.auto_awesome_outlined),label:const Text('AI analysis')),
           TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))
         ]));
-    }catch(_){if(mounted)setState(()=>error='Could not load deployment insights.');}
+    } catch (_) {if(mounted)setState(()=>error='Unable to load deployment insights.');}
   }
-  Future<void> showAiInsights(String projectId)async{
-    try{
-      final result=await widget.store.call('cloudExplainDeploymentInsights',{'projectId':projectId});
+  Future<void> showAiInsights(String projectId) async {
+    try {
+      final r=await widget.store.call('cloudExplainDeploymentInsights',{'projectId':projectId});
       if(!mounted)return;
       await showDialog<void>(context:context,builder:(context)=>AlertDialog(
-        title:const Text('AI-assisted cloud recommendations'),
+        title:const Text('AI-assisted analysis'),
         content:SizedBox(width:640,child:SingleChildScrollView(child:SelectableText(
-          const JsonEncoder.withIndent('  ').convert(result)))),
+          const JsonEncoder.withIndent('  ').convert(r)))),
         actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
-    }catch(_){if(mounted)setState(()=>error='AI analysis unavailable; verify permissions and API configuration.');}
+    } catch (_) {if(mounted)setState(()=>error='AI analysis unavailable.');}
   }
   @override
   Widget build(BuildContext context)=>Scaffold(
