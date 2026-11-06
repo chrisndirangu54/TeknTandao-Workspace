@@ -131,10 +131,12 @@ export const hotspotV2ClaimGoogleBundle=auth(async req=>{
  ![req.data.orgId,req.data.bundleId].every(id))fail('invalid-argument','Invalid bundle');
  const space=root(req.data.orgId),bundle=space.collection('googleRewardBundles').doc(req.data.bundleId);
  const voucher=space.collection('vouchers').doc(randomUUID());
+ const dailyCap=space.collection('googleDailyCaps').doc(new Date().toISOString().slice(0,10)+'_'+hash(req.auth.uid));
  const code=randomBytes(16).toString('hex').toUpperCase();
  const salt=randomBytes(16).toString('hex');let expiresAtMs;
  await getFirestore().runTransaction(async tx=>{
-  const b=await tx.get(bundle);
+  const [b,cap]=await Promise.all([tx.get(bundle),tx.get(dailyCap)]);
+  if(cap.exists&&cap.data().count>=3)fail('resource-exhausted','Daily rewarded Google passes reached');
   if(!b.exists||b.data().uidHash!==hash(req.auth.uid)||b.data().claimed||
    b.data().status!=='ready'||b.data().verifiedRewards!==b.data().requiredAds||
    b.data().expiresAtMs<Date.now())fail('failed-precondition','Verified Google reward bundle not complete');
@@ -152,6 +154,7 @@ export const hotspotV2ClaimGoogleBundle=auth(async req=>{
     secretSalt:salt,secretHash:createHmac('sha256',Buffer.from(salt,'hex')).update(code).digest('hex'),
     codeLast4:code.slice(-4),expiresAtMs,createdAt:FieldValue.serverTimestamp()});
   tx.update(bundle,{claimed:true,status:'claimed',voucherId:voucher.id,claimedAt:FieldValue.serverTimestamp()});
+  tx.set(dailyCap,{count:FieldValue.increment(1),lastClaimAt:FieldValue.serverTimestamp()},{merge:true});
  });
  return {voucherId:voucher.id,oneTimeCode:code,expiresAtMs,labOnly:true,routerConnected:false};
 });
