@@ -215,3 +215,10 @@ export const hotspotV2SponsorMyCampaigns=call(async req=>{
  const docs=await space.collection('sponsorCampaigns').where('sponsorUid','==',req.auth.uid).limit(50).get();
  return {campaigns:docs.docs.map(safeCampaign),limit:50};
 });
+
+export const hotspotV2SponsorAdminCampaigns=call(async req=>{
+ shape(req.data,['orgId']);const space=await admin(req);
+ const campaigns=await space.collection('sponsorCampaigns').limit(100).get();
+ return {campaigns:campaigns.docs.map(safeCampaign),limit:100,
+  note:'Test-funded sponsorship is not live revenue.'};
+});
