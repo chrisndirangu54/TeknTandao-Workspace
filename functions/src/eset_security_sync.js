@@ -4,6 +4,7 @@ import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {defineSecret} from 'firebase-functions/params';
 import {z} from 'zod';
+import {randomUUID} from 'node:crypto';
 import {identifier} from './domain.js';
 import {isBootstrapSuperAdminToken} from './super_admin_domain.js';
 import {esetConnectToken,collectEsetPages,projectDevice,projectDetection} from './eset_connect_client.js';
@@ -38,6 +39,10 @@ export const approveEsetCustomerBinding=onCall({region,enforceAppCheck:true},asy
   const global=db.doc('esetTenantBindings/'+input.region+'_'+input.ownerUuid);
   await db.runTransaction(async tx=>{
     const existing=await tx.get(global);
+    const previous=await tx.get(tenantRef(orgId));
+    if(previous.exists && previous.data()?.ownerUuid &&
+      (previous.data().ownerUuid!==input.ownerUuid || previous.data().region!==input.region))
+      throw new HttpsError('failed-precondition','Rebinding requires a separate audited migration and data purge');
     if(existing.exists&&existing.data()?.orgId!==orgId)
       throw new HttpsError('already-exists','This ESET tenant is bound to another workspace');
     tx.set(global,{orgId,createdBy:uid,createdAt:FieldValue.serverTimestamp()},{merge:true});
@@ -52,14 +57,15 @@ export const getEsetSecurityOverview=onCall({region,enforceAppCheck:true},async 
   const {orgId}=await context(req);
   const config=(await tenantRef(orgId).get()).data()||{};
   const org=db.collection('organizations').doc(orgId);
-  const [devices,detections]=await Promise.all([
-    org.collection('esetDevices').orderBy('updatedAt','desc').limit(100).get(),
-    org.collection('esetDetections').orderBy('updatedAt','desc').limit(100).get()
-  ]);
+  const currentRun=config.lastSyncRunId;
+  const [devices,detections]=currentRun?await Promise.all([
+    org.collection('esetDevices').where('syncRunId','==',currentRun).limit(100).get(),
+    org.collection('esetDetections').where('syncRunId','==',currentRun).limit(100).get()
+  ]):[{docs:[],size:0},{docs:[],size:0}];
   return {status:config.connectApproved===true?'approved':'awaiting_entitlement',
     region:config.region||null,ownerUuid:config.ownerUuid||null,
     lastSyncAt:config.lastSyncAt?.toDate?.()?.toISOString?.()??null,
-    syncStatus:config.syncStatus||'not_started',partial:config.partial===true,
+    syncStatus:config.syncStatus||'not_started',partial:config.partial===true||devices.size===100||detections.size===100,
     devices:devices.docs.map(x=>x.data()),detections:detections.docs.map(x=>x.data()),
     permissions:{readOnly:true,licenseOrders:false,endpointActions:false,
       remotePolicyChanges:false,incidentResolution:false}};
@@ -82,30 +88,21 @@ export const syncEsetSecuritySnapshot=onCall({
     if(!detections.complete)throw new Error('Detection collection exceeds safe pagination boundary');
     const scoped=detections.entries.map(x=>projectDetection(x,allowed)).filter(Boolean);
     const root=db.doc('organizations/'+orgId);
-    let batch=db.batch(),writes=0;
-    function enqueue(ref,value) {
-      batch.set(ref,{...value,updatedAt:FieldValue.serverTimestamp()},{merge:true});
-      writes++;
+    const syncRunId=randomUUID();
+    const values=[
+      ...selected.map(d=>[root.collection('esetDevices').doc(d.id),{...d,syncRunId}]),
+      ...scoped.map(d=>[root.collection('esetDetections').doc(d.id),{...d,syncRunId}])
+    ];
+    // Store a new snapshot identifier. Old snapshots are excluded from overview.
+    // Config advances only after every bounded chunk is successfully committed.
+    for(let i=0;i<values.length;i+=400) {
+      const chunk=db.batch();
+      for(const [ref,d] of values.slice(i,i+400))
+        chunk.set(ref,{...d,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+      await chunk.commit();
     }
-    for(const d of selected)enqueue(root.collection('esetDevices').doc(d.id),d);
-    for(const d of scoped)enqueue(root.collection('esetDetections').doc(d.id),d);
-    // <= 1000 documents fetched per type, writes split under Firestore's 500 limit.
-    // Write data only AFTER both collections passed complete pagination checks.
-    // Splitting commits is not globally atomic; syncStatus is updated only on success.
-    // Firestore write batching is bounded at 400.
-    // Rebuild batches for chunked commits.
-    if(writes>400){
-      const values=[...selected.map(d=>[root.collection('esetDevices').doc(d.id),d]),
-        ...scoped.map(d=>[root.collection('esetDetections').doc(d.id),d])];
-      for(let i=0;i<values.length;i+=400){
-        const chunk=db.batch();
-        for(const [ref,d] of values.slice(i,i+400))
-          chunk.set(ref,{...d,updatedAt:FieldValue.serverTimestamp()},{merge:true});
-        await chunk.commit();
-      }
-    } else if(writes)await batch.commit();
     await tenantRef(orgId).set({syncStatus:'ok',partial:false,
-      lastSyncAt:FieldValue.serverTimestamp(),lastSyncBy:uid,
+      lastSyncAt:FieldValue.serverTimestamp(),lastSyncBy:uid,lastSyncRunId:syncRunId,
       deviceCount:selected.length,detectionCount:scoped.length},{merge:true});
     return {success:true,devices:selected.length,detections:scoped.length,
       readOnly:true,externalActionsTaken:false};
