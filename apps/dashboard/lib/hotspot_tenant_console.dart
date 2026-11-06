@@ -141,6 +141,23 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
         endpoint='hotspotV2PublishPlan';payload['planId']=item['id'];
       }else if(action=='prepare'){
         endpoint='hotspotV2PrepareVoucher';payload['voucherId']=item['id'];
+      }else if(action=='sandbox_mpesa'){
+        final phone=TextEditingController();
+        try{
+          final ok=await showDialog<bool>(context:context,builder:(dialogContext)=>AlertDialog(
+            title:const Text('Sandbox M-Pesa test'),
+            content:Column(mainAxisSize:MainAxisSize.min,children:[
+              const Text('Test environment only. This does not verify a receipt or activate internet.'),
+              TextField(controller:phone,keyboardType:TextInputType.phone,
+                decoration:const InputDecoration(labelText:'Sandbox test phone (2547… / 2541…)')),
+            ]),
+            actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext,false),child:const Text('Cancel')),
+              FilledButton(onPressed:()=>Navigator.pop(dialogContext,true),child:const Text('Test STK request'))]));
+          if(ok!=true)return;
+          endpoint='hotspotV2StartSandboxMpesa';payload.addAll({'voucherId':item['id'],'phone':phone.text.trim()});
+        }finally{phone.dispose();}
+      }else if(action=='query_mpesa'){
+        endpoint='hotspotV2QuerySandboxMpesa';payload['voucherId']=item['id'];
       }else if(action=='disconnect'){
         final reason=TextEditingController();
         try{
@@ -156,7 +173,11 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
       }else{return;}
       setState(()=>busy=true);
       final res=await call(endpoint,payload);
-      if(mounted)setState(()=>message='Recorded: ${res['ok']}. No router commands or customer charges executed.');
+      if(mounted)setState(()=>message=action=='sandbox_mpesa'
+        ?'Sandbox checkout requested. No access granted.'
+        :action=='query_mpesa'
+          ?'Provider query: ${res['providerQueryCode']}. Receipt unverified; no access granted.'
+          :'Recorded: ${res['ok']}. No router commands executed.');
       await load();
     }catch(e){if(mounted)setState(()=>message='Action failed: $e');}
     finally{if(mounted)setState(()=>busy=false);}
@@ -217,6 +238,10 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
                           const PopupMenuItem(value:'publish',child:Text('Publish plan')),
                         if(resource=='vouchers'&&row['state']=='draft')
                           const PopupMenuItem(value:'prepare',child:Text('Prepare voucher')),
+                        if(resource=='vouchers'&&row['state']=='pending_payment')
+                          const PopupMenuItem(value:'sandbox_mpesa',child:Text('Sandbox STK request')),
+                        if(resource=='vouchers'&&row['state']=='pending_payment')
+                          const PopupMenuItem(value:'query_mpesa',child:Text('Query sandbox payment')),
                         if(resource=='vouchers'&&row['state']!='revoked')
                           const PopupMenuItem(value:'revoke',child:Text('Revoke voucher')),
                         if(resource=='vouchers'&&row['state']=='revoked')
