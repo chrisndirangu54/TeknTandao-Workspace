@@ -3,7 +3,7 @@ import {createHmac,timingSafeEqual} from 'node:crypto';
 const validId=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{5,100}$/.test(x);
 export function hotspotVoucherEligibility({voucher,site,plan,paid=false,now=Date.now()}){
  if(!voucher||!site||!plan||!validId(voucher.siteId)||!validId(voucher.planId))return {eligible:false,reason:'missing_reference'};
- if(voucher.status==='revoked'||voucher.redeemed===true)return {eligible:false,reason:'inactive_voucher'};
+ if(voucher.status!=='unissued'||voucher.redeemed===true)return {eligible:false,reason:'inactive_voucher'};
  if(voucher.siteId!==site.id||voucher.planId!==plan.id)return {eligible:false,reason:'reference_mismatch'};
  if(site.status!=='active'||plan.status!=='active')return {eligible:false,reason:'unpublished_site_or_plan'};
  if(plan.priceKes>0&&!paid)return {eligible:false,reason:'unverified_payment'};
