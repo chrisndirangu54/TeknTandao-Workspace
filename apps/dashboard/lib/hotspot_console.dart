@@ -53,23 +53,52 @@ class _HotspotConsoleState extends State<HotspotConsole> {
   Future<void> pilotAction(Map<String,dynamic> item) async {
     final siteMode=resource=='sites';
     final input=TextEditingController();
+    final checks={
+      'guestNetworkIsolated':false,
+      'radiusNasRegistered':false,
+      'radiusAccountingTested':false,
+      'privacyNoticeReady':false,
+    };
     try {
-      final approved=await showDialog<bool>(context:context,builder:(dialogContext)=>AlertDialog(
-        title:Text(siteMode?'Commission pilot site':'Publish tariff'),
-        content:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text(siteMode?'Confirm guest VLAN isolation, RADIUS NAS registration, accounting testing and a privacy notice. These confirmations are operator attestations, not live connectivity measurements.':'Enter an already commissioned site ID. This publishes pricing only and does not provision Wi-Fi.'),
-          const SizedBox(height:14),
-          TextField(controller:input,decoration:InputDecoration(labelText:siteMode?'Registered NAS ID':'Commissioned site ID',border:const OutlineInputBorder())),
-        ]),
-        actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext,false),child:const Text('Cancel')),
-          FilledButton(onPressed:()=>Navigator.pop(dialogContext,true),child:const Text('Confirm'))],
-      ));
+      final approved=await showDialog<bool>(context:context,builder:(dialogContext)=>
+        StatefulBuilder(builder:(context,update)=>AlertDialog(
+          title:Text(siteMode?'Commission pilot site':'Publish tariff'),
+          content:SizedBox(width:480,child:SingleChildScrollView(child:Column(
+            mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text(siteMode?'Only confirm controls you have personally tested. These are operator attestations, NOT evidence of a live gateway connection.':'Enter an already commissioned site ID. This publishes pricing only.'),
+              const SizedBox(height:14),
+              TextField(controller:input,decoration:InputDecoration(
+                labelText:siteMode?'Registered NAS ID':'Commissioned site ID',
+                border:const OutlineInputBorder())),
+              if(siteMode)...[
+                const SizedBox(height:12),
+                CheckboxListTile(dense:true,value:checks['guestNetworkIsolated']!,
+                  onChanged:(v)=>update(()=>checks['guestNetworkIsolated']=v??false),
+                  title:const Text('Verified guest VLAN / LAN isolation')),
+                CheckboxListTile(dense:true,value:checks['radiusNasRegistered']!,
+                  onChanged:(v)=>update(()=>checks['radiusNasRegistered']=v??false),
+                  title:const Text('Verified NAS registration')),
+                CheckboxListTile(dense:true,value:checks['radiusAccountingTested']!,
+                  onChanged:(v)=>update(()=>checks['radiusAccountingTested']=v??false),
+                  title:const Text('Tested RADIUS accounting')),
+                CheckboxListTile(dense:true,value:checks['privacyNoticeReady']!,
+                  onChanged:(v)=>update(()=>checks['privacyNoticeReady']=v??false),
+                  title:const Text('Published privacy notice')),
+              ],
+            ]))),
+          actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext,false),
+             child:const Text('Cancel')),
+            FilledButton(
+              onPressed:siteMode&&!checks.values.every((v)=>v)
+                ? null:()=>Navigator.pop(dialogContext,true),
+              child:const Text('Confirm checks'))],
+        )));
       if(approved!=true)return;
       final response=await invoke(siteMode?'hotspotCommissionSite':'hotspotPublishPlan',
         siteMode?{'siteId':item['id'],'nasId':input.text.trim(),
-          'checklist':{'guestNetworkIsolated':true,'radiusNasRegistered':true,'radiusAccountingTested':true,'privacyNoticeReady':true},
-          'publishPortal':false}:{'planId':item['id'],'siteId':input.text.trim()});
-      if(mounted)setState(()=>message='Recorded: ${response['ok']}. This does not activate a router.');
+          'checklist':checks,'publishPortal':false}
+          :{'planId':item['id'],'siteId':input.text.trim()});
+      if(mounted)setState(()=>message='Recorded: ${response['ok']}. Router state remains unverified.');
       await refresh();
     }catch(e){if(mounted)setState(()=>message='Pilot action failed: $e');}
     finally{input.dispose();}
