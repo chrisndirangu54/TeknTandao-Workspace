@@ -187,3 +187,6 @@ export * from './managed_cloud_ci.js';
 
 // Optional privacy-limited AI narrative about bounded cloud deployment observations.
 export * from './managed_cloud_ai.js';
+
+// Archive submissions are quarantined; no source compilation in Firebase Functions.
+export * from './cloud_source_uploads.js';
