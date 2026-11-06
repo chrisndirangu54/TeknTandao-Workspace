@@ -5,9 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../suite.dart';
-import '../super_admin_console.dart';
 import 'website_builder_runtime.dart';
-import 'reseller_studio.dart';
 
 class WebsiteBuilderModuleScreen extends StatefulWidget {
   final SuiteStore store;
@@ -141,20 +139,6 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
           ],
         ),
         actions: [
-          FutureBuilder<bool>(
-            future: SuperAdminGate.isBootstrap(),
-            builder: (context, snapshot) => snapshot.data == true
-                ? IconButton(
-                    tooltip: 'Reseller platform',
-                    icon: const Icon(Icons.storefront),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => ResellerStudioScreen(store: store),
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
           if (_busy)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -166,18 +150,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
                 ),
               ),
             ),
-          if (MediaQuery.sizeOf(context).width < 700)
-            PopupMenuButton<int>(
-              tooltip: 'Website Studio sections',
-              initialValue: _tab,
-              onSelected: (value) => setState(() => _tab = value),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 0, child: Text('Builder')),
-                PopupMenuItem(value: 1, child: Text('Templates')),
-                PopupMenuItem(value: 2, child: Text('Creator')),
-              ],
-            )
-          else SegmentedButton<int>(
+          SegmentedButton<int>(
             segments: const [
               ButtonSegment(value: 0, icon: Icon(Icons.design_services_rounded), label: Text('Builder')),
               ButtonSegment(value: 1, icon: Icon(Icons.storefront_rounded), label: Text('Templates')),
@@ -849,7 +822,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
             maxLines: 10,
             decoration: const InputDecoration(
               labelText: 'Prompt',
-              helperText: 'AI fills content fields in tested templates. Layout and components are fixed by the library.',
+              helperText: 'The model can only return validated TeknTandao JSON nodes—no scripts or arbitrary code.',
               border: OutlineInputBorder(),
             ),
           ),
@@ -864,7 +837,6 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
     controller.dispose();
     if (accepted != true || prompt.isEmpty) return;
     if (store.demo) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('AI generation requires the configured production Gemini provider.')),
       );
@@ -876,14 +848,11 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
         'projectId': project['id'],
         'expectedRevision': project['revision'],
         'document': generated['document'],
-        'contentBlueprint': generated['contentBlueprint'],
       });
-      if (mounted) {
-        setState(() {
-          _selectedNodeId = null;
-          _selectedPageId = null;
-        });
-      }
+      if (mounted) setState(() {
+        _selectedNodeId = null;
+        _selectedPageId = null;
+      });
     });
   }
 
@@ -1154,7 +1123,7 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
       final result = await store.call('startWebsiteTemplatePurchase', {
         'templateId': template['templateId'],
         'provider': provider,
-        'phone': ?phone,
+        if (phone != null) 'phone': phone,
       });
       if (result['url'] != null) {
         final uri = Uri.tryParse(result['url'].toString());
@@ -1299,7 +1268,6 @@ class _WebsiteBuilderModuleScreenState extends State<WebsiteBuilderModuleScreen>
     price.dispose();
     if (accepted != true || templateName.isEmpty || creatorName.isEmpty || descriptionText.isEmpty) return;
     if (store.demo) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preview mode: template publication was not sent.')));
       return;
     }

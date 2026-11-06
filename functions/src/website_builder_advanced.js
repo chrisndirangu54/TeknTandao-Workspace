@@ -162,7 +162,7 @@ async function createHostingCustomDomain(domain) {
   });
 }
 
-export function desiredHostingDns(domainState) {
+function desiredHostingDns(domainState) {
   const sets = [
     ...(domainState?.requiredDnsUpdates?.desired || []),
     ...(domainState?.cert?.verification?.dns?.desired || [])
@@ -177,8 +177,6 @@ export function desiredHostingDns(domainState) {
   }
   return [...byKey.values()];
 }
-
-export const resellerHostingDomains = {get: fetchHostingCustomDomain, create: createHostingCustomDomain};
 
 function cloudflareHeaders(secret) {
   if (!secret) throw new Error('Cloudflare DNS automation is not configured');
