@@ -181,3 +181,6 @@ export * from './hotspot_google_rewards.js';
 
 // Multi-operator ad inventory, independently reviewed sites and campaign pilot planning.
 export * from './hotspot_network_marketplace.js';
+
+// GitHub CI/CD managed cloud onboarding and deployment telemetry.
+export * from './managed_cloud_ci.js';
