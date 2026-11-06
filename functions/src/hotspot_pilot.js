@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {isSuperAdminToken} from './super_admin_domain.js';
+import {summarizeRadiusSessions} from './hotspot_gateway_policy.js';
 const db=()=>getFirestore();
 const fail=(code,message)=>{throw new HttpsError(code,message);};
 const id=x=>{if(typeof x!=='string'||!/^[A-Za-z0-9_-]{5,100}$/.test(x))fail('invalid-argument','Invalid reference');return x;};
@@ -64,10 +65,9 @@ export const hotspotSessionSummary=call(async req=>{
  if(!site.exists)fail('not-found','Site not found');
  const entries=await db().collection('hotspotAccountingEvents').where('siteId','==',siteId).limit(100).get();
  const events=entries.docs.map(x=>x.data());
- return {siteId,eventCount:events.length,bytesReceived:events.reduce((n,x)=>n+(x.inputOctets||0),0),
- bytesSent:events.reduce((n,x)=>n+(x.outputOctets||0),0),
- source:'radius_collector',limit:100,uniqueSessionCount:new Set(events.map(x=>x.sessionId)).size,
- caveat:'These are cumulative accounting event counters and must not be summed as actual traffic usage; router verification is not implied.'};
+ return {siteId,eventCount:events.length,...summarizeRadiusSessions(events),
+ source:'radius_collector',limit:100,gatewayVerified:site.data().gatewayVerified===true,
+ caveat:'Uses last cumulative counter per sampled session; not authoritative billing or proof of gateway operation.'};
 });
 
 export const hotspotSetPortalVisibility=call(async req=>{
