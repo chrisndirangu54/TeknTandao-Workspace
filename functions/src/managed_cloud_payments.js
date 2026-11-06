@@ -77,7 +77,8 @@ export async function reconcileManagedCloudPayment(reference, expectedOrgId=null
  const org=db.doc('organizations/'+order.data().orgId);
  if(order.data().status==='paid'){
   const bill=(await billingRef(org,order.data().projectId).get()).data();
-  return {status:'paid',paidUntilMs:bill?.paidUntilMs||null,verified:true};
+  return {status:'paid',paidUntilMs:bill?.paidUntilMs||null,verified:true,
+   deploymentEntitled:isCloudServicePaid(bill)};
  }
  if(!['pending_verification','initiation_unknown'].includes(order.data().status))
   throw new HttpsError('failed-precondition','Checkout is not verifiable');
@@ -107,7 +108,9 @@ export async function reconcileManagedCloudPayment(reference, expectedOrgId=null
   tx.update(payment,{status:'paid',receiptVerified:true,verifiedAt:FieldValue.serverTimestamp(),
     providerTransactionId:decision.providerTransactionId});
  });
- return {status:'paid',verified:true,paidUntilMs};
+ return {status:'paid',verified:true,paidUntilMs,
+  deploymentEntitled:isCloudServicePaid({status:'paid',receiptVerified:true,
+   paidUntilMs,paymentEnvironment:order.data().paymentEnvironment})};
 }
 export const cloudVerifySubscriptionCheckout=onCall({
  region,enforceAppCheck:true,secrets:[secret],timeoutSeconds:45
