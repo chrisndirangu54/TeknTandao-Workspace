@@ -8,11 +8,11 @@ Every operator is represented by a Workspace organization. Sites, plans, voucher
 ### Access choice
 | Path | Customer action | Technical authorization | Commercial readiness |
 |---|---|---|---|
-| M-Pesa test | Operator initiates Paystack **test** M-Pesa charge; Paystack server verification and signed webhook check reference, amount, KES, channel and test status | Atomic voucher issuance; second administrator lab approval; RADIUS validates payment | Sandbox only, no production merchant payouts |
+| M-Pesa test | Operator **or authenticated guest** initiates Paystack **test** M-Pesa charge; signed webhook/server verification check reference, amount, KES, channel and test status | Atomic voucher issuance; operator passes require second-admin approval; guest test vouchers are claimed once and only after an approved lab site and verified payment | Sandbox only, no production merchant payouts |
 | Sponsored | Customer opts in, chooses approved campaign, views creative and waits server-determined dwell; reward claim enforces daily and campaign caps | Generates one-time zero-price short-life lab voucher; signed RADIUS gateway checks code, state, time and site | Reward issuance measured, **not independently verified ad impressions**; **no sponsor invoicing/settlement** |
 | Free lab | Two-person approved short-lived free test plan | Authenticated RADIUS validation | Lab only |
 
-A customer never pays by merely viewing an advertisement. Paystack and advertisements are alternative access paths. The site operator must provide a free plan and approved campaign for sponsored access. Sponsor campaigns require **independent second-admin approval** and can be paused immediately for **new** rewards.
+A customer never pays by merely viewing an advertisement. Paystack and advertisements are alternative access paths. The site operator must provide a free plan and approved campaign for sponsored access. For a paid laboratory test, the public guest page now also exposes a low-priced test-only plan and authenticated one-time claim after Paystack verification. Sponsor campaigns require **independent second-admin approval** and can be paused immediately for **new** rewards.
 
 ### Sponsored access anti-abuse and privacy
 - Public sponsor calls require Firebase App Check, authenticated Firebase user (anonymous sign-in is supported), explicit consent, an active approved campaign and verified lab site.
@@ -25,7 +25,7 @@ A customer never pays by merely viewing an advertisement. Paystack and advertise
 In `chrisndirangu54/HTML/assets/js/site-config.js` set:
 - `hotspotWorkspaceFirebase`: public Firebase Web app configuration for the **Workspace functions project**, not the TeknTandao brochure Firebase project.
 - `hotspotAppCheckSiteKey`: registered reCAPTCHA v3 site key for the website domain and Firebase App Check.
-- Configure Firebase Authentication Anonymous provider in the Workspace Firebase project and authorize the public website domain.
+- Configure Firebase Authentication Anonymous provider in the Workspace Firebase project, authorize the public website domain, and register Firebase App Check for the website. Public guest checkout and sponsored functions enforce App Check.
 - Deploy `hotspot-sponsored.html` and link it from `hotspot-portal.html`; the guest page expects `?org=<workspace-id>&site=<site-id>` or manual IDs.
 Do **not** put Paystack keys, NAS secrets, service-account keys, or IoT secrets in public configuration.
 
@@ -77,3 +77,13 @@ All provider credentials, App Check settings, physical sensors, MikroTik devices
 - Paystack server-side verification: https://paystack.com/docs/payments/verify-payments/
 - FreeRADIUS radclient: https://www.freeradius.org/radiusd/man/radclient.html
 - NASA POWER API: https://power.larc.nasa.gov/docs/tutorials/service-data-request/api/
+
+## Optional trained ML pipeline
+`analytics/hotspot/train_models.py` supports tenant-scoped JSONL exports of signed IoT metrics, robust preprocessing, an unsupervised Isolation Forest anomaly detector and a next-observation occupancy model using histogram-based gradient boosting. Training requires at least 200 observations over seven days and adequate nonmissing network metrics. Its chronological holdout reports MAE against a naive last-observation baseline and selects the baseline if the trained model is worse. A `model_card.json` records sample coverage, sampling cadence, evaluation metrics and unresolved calibration limitations. The model is **offline, not deployed, and cannot issue router commands**.
+
+```bash
+python -m pip install -r analytics/hotspot/requirements.txt
+python analytics/hotspot/train_models.py --input /private/one_site_telemetry.jsonl --site-id site_00001 --output /private/hotspot_model
+python -m unittest discover -s analytics/hotspot -p 'test_*.py' -v
+```
+Do not upload user browsing history, MAC addresses, login codes or payment data to training exports. Verify real-world drift and calibration before promoting any model to advisory production inference.
