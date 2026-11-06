@@ -459,6 +459,8 @@ service cloud.firestore {
     // Provider reference and receipt indexes are server-only across all organizations.
     match /hotspotPaystackReferences/{reference} { allow read, write: if false; }
     match /hotspotPaystackReceipts/{reference} { allow read, write: if false; }
+    match /hotspotSponsorPaymentReferences/{reference} { allow read, write: if false; }
+    match /hotspotGoogleVerifiedTransactions/{transactionId} { allow read, write: if false; }
     match /{document=**} { allow write: if false; }
   }
 }
