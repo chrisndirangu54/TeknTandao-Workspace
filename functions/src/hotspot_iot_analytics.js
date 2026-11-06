@@ -4,6 +4,7 @@ import {randomUUID,randomBytes,createHmac,timingSafeEqual} from 'node:crypto';
 import {getFirestore,FieldValue} from 'firebase-admin/firestore';
 import {onCall,onRequest,HttpsError} from 'firebase-functions/v2/https';
 import {scoreHotspotAnomaly,classifyEnvironmentalRisk} from './hotspot_sponsored_domain.js';
+import {analyzeHotspotTelemetry,forecastNextHourClients} from './hotspot_statistics_domain.js';
 const valid=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{5,100}$/.test(x);
 const fail=(code,msg)=>{throw new HttpsError(code,msg);};
 const base=org=>getFirestore().collection('organizations').doc(org).collection('hotspotV2').doc('control');
@@ -82,6 +83,8 @@ export const hotspotV2OperationsIntelligence=onCall({region:'europe-west1'},asyn
  if(!site.exists)fail('not-found','Site not found');
  const values=readings.docs.map(d=>d.data());
  const latest=values.sort((a,b)=>b.observedAtMs-a.observedAtMs)[0]||null;
+ const statistics=analyzeHotspotTelemetry(values);
+ const planningForecast=forecastNextHourClients(values);
  const failedAdmissions=0,replayedNonces=0; // not measured: omit from model interpretation
  const anomalies=scoreHotspotAnomaly({failedAdmissions,replayedNonces,
    disconnectBacklog:requests.docs.filter(d=>d.data().executed!==true).length,
@@ -99,8 +102,18 @@ export const hotspotV2OperationsIntelligence=onCall({region:'europe-west1'},asyn
   lastTelemetryAtMs:latest?.observedAtMs??null,lastMetrics:latest?.metrics??null,
   sponsoredRewardCount:ads.docs.reduce((s,d)=>s+(d.data().rewardedCount||0),0),
   sponsorCampaigns:ads.size,issuedOrProvisionedVoucherCount:vouchers.docs.filter(d=>['issued','provisioned','active'].includes(d.data().state)).length,
-  anomaly:anomalies,aiAssist:{model:'deterministic_rules_v1',trained:false,suggestions},
+  anomaly:anomalies,statistics,planningForecast,
+  aiAssist:{model:'deterministic_rules_v1',trained:false,suggestions},
   dataQuality:{truncated:[readings,ads,vouchers,requests].some(x=>x.size===100),
     telemetryVerifiedBy:'device_hmac',independentSensorCalibration:false},
   commercialRevenueVerified:false};
+});
+
+export const hotspotV2DisableIoTDevice=onCall({region:'europe-west1'},async req=>{
+ if(!req.data||Object.keys(req.data).some(k=>!['orgId','deviceId'].includes(k))||!valid(req.data.deviceId))
+  fail('invalid-argument','Invalid device');
+ const space=await operator(req),ref=space.collection('iotDevices').doc(req.data.deviceId);
+ const s=await ref.get();if(!s.exists)fail('not-found','Device not found');
+ await ref.update({enabled:false,revokedBy:req.auth.uid,revokedAt:FieldValue.serverTimestamp(),secret:null});
+ return {revoked:true,liveSensorDisconnected:false};
 });
