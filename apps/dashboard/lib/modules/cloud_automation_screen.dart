@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../suite.dart';
+import 'managed_cloud_deployment_screen.dart';
 
 class CloudAutomationScreen extends StatefulWidget {
   final SuiteStore store;
@@ -83,8 +84,18 @@ class _CloudAutomationScreenState extends State<CloudAutomationScreen>{
   }
   @override
   Widget build(BuildContext context)=>Scaffold(
-    appBar:AppBar(title:const Text('Cloud Automation & Migration')),
+    appBar:AppBar(title:const Text('Cloud Automation & Migration'), actions:[
+      IconButton(tooltip:'Managed GitHub deployments',icon:const Icon(Icons.cloud_upload),
+        onPressed:()=>Navigator.push(context,MaterialPageRoute<void>(
+          builder:(_)=>ManagedCloudDeploymentScreen(store:widget.store))))]),
     body:ListView(padding:const EdgeInsets.all(20),children:[
+      Card(child:ListTile(leading:const Icon(Icons.cloud_upload_outlined),
+        title:const Text('Deploy code from GitHub'),
+        subtitle:const Text('Register a repository, configure GitHub Actions, and review cloud deployment insights.'),
+        trailing:const Icon(Icons.chevron_right),
+        onTap:()=>Navigator.push(context,MaterialPageRoute<void>(
+          builder:(_)=>ManagedCloudDeploymentScreen(store:widget.store))))),
+      const SizedBox(height:16),
       const Text('Import an HTML deployment plan',style:TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
       const SizedBox(height:8),
       const Text('Paste the JSON exported from TeknTandao HTML. Plans are scoped to your current workspace and require owner review. This feature does not deploy cloud resources.'),
