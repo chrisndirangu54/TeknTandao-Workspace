@@ -17,6 +17,7 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
   bool busy=false;
   List<Map<String,dynamic>> records=[];
   String? cursor;
+  Map<String,dynamic>? health;
   @override void initState(){super.initState();_resolveActiveWorkspace();}
   Future<void> _resolveActiveWorkspace() async {
     final user=FirebaseAuth.instance.currentUser;
@@ -54,6 +55,13 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
       });
     }catch(e){if(mounted)setState(()=>message='Unable to load: $e');}
     finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> loadHealth() async {
+    if(org.text.trim().isEmpty)return;
+    try {
+      final snapshot=await call('hotspotV2Health',{'orgId':org.text.trim()});
+      if(mounted)setState(()=>health=snapshot);
+    }catch(e){if(mounted)setState(()=>message='Readiness report unavailable: $e');}
   }
   Future<void> create() async {
     final fields=resource=='sites'?['name','ssid','location']:
@@ -99,6 +107,7 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
       }
       if(mounted)setState(()=>message='Record created. No router commands or payments executed.');
       await load();
+      await loadHealth();
     }catch(e){if(mounted)setState(()=>message='Create failed: $e');}
     finally{for(final c in controllers.values)c.dispose();}
   }
@@ -199,6 +208,20 @@ class _HotspotTenantConsoleState extends State<HotspotTenantConsole> {
             labelText:'Workspace organization ID',prefixIcon:const Icon(Icons.apartment_outlined),
             border:const OutlineInputBorder(),suffixIcon:IconButton(onPressed:busy?null:()=>load(),
               icon:const Icon(Icons.arrow_forward)))),
+          const SizedBox(height:12),
+          Wrap(spacing:8,runSpacing:8,children:[
+            OutlinedButton.icon(onPressed:busy?null:loadHealth,
+              icon:const Icon(Icons.monitor_heart_outlined),label:const Text('Readiness report')),
+            if(health!=null)...[
+              Chip(label:Text('Sites: ${health!['recordedSites']??0}')),
+              Chip(label:Text('Published plans: ${health!['publishedPlans']??0}')),
+              Chip(label:Text('Awaiting payment: ${health!['awaitingPayment']??0}')),
+              Chip(label:Text('Disconnect backlog: ${health!['unexecutedDisconnectRequests']??0}')),
+            ],
+          ]),
+          if(health!=null)const Padding(padding:EdgeInsets.only(top:6),
+            child:Text('Management records only; live network and payment health are not connected.',
+              style:TextStyle(fontSize:12))),
           const SizedBox(height:14),
           Wrap(spacing:8,runSpacing:8,children:[
             for(final name in ['sites','plans','vouchers'])ChoiceChip(
