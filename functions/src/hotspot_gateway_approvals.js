@@ -31,3 +31,19 @@ export const hotspotV2ApproveDisconnect=call(async req=>{
  });
  return {approved:true,executed:false,routerConnected:false};
 });
+
+export const hotspotV2ListDisconnectApprovals=call(async req=>{
+ if(!req.auth)fail('unauthenticated','Sign-in required');
+ const data=req.data;
+ if(!data||Object.keys(data).some(k=>k!=='orgId')||!valid(data.orgId))
+   fail('invalid-argument','Invalid organization');
+ const db=getFirestore(),org=db.collection('organizations').doc(data.orgId);
+ const membership=await org.collection('members').doc(req.auth.uid).get();
+ if(!membership.exists||!['owner','admin'].includes(membership.data().role))
+   fail('permission-denied','Administrator required');
+ const requests=await org.collection('hotspotV2').doc('control').collection('gatewayRequests').limit(100).get();
+ return {records:requests.docs.map(d=>({id:d.id,voucherId:d.data().voucherId,
+   siteId:d.data().siteId,operation:d.data().operation,state:d.data().state,
+   requestedBy:d.data().requestedBy,approvedBy:d.data().approvedBy||null,
+   executed:d.data().executed===true})),limit:100,liveCommands:false};
+});
