@@ -75,7 +75,7 @@ class _ManagedCloudBillingScreenState extends State<ManagedCloudBillingScreen> {
       if(status['paid']==false)const Text('Production deployments require verified LIVE settlement; test-mode payments cannot unlock cloud resources.'),
       if(status['paidUntilMs'] is int)
         Text('Paid until: '+DateTime.fromMillisecondsSinceEpoch(status['paidUntilMs'] as int).toLocal().toString()),
-      const Text('Service charges below are provisional and exclude cloud provider consumption. M-Pesa renewals require a new payment.'),
+      const Text('Pay with M-Pesa or Paystack for any supported cloud provider: AWS, Azure, Google Cloud, DigitalOcean, Cloudflare, Railway or Render. These provisional management charges exclude each provider’s infrastructure bill. M-Pesa renewals require a new payment.'),
       DropdownButton<String>(value:plan,items:const [
         DropdownMenuItem(value:'starter',child:Text('Starter · KES 1,500 / 30 days')),
         DropdownMenuItem(value:'growth',child:Text('Growth · KES 5,000 / 30 days')),
