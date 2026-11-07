@@ -111,3 +111,10 @@ The preflight checks the **TeknTandao management subscription**, not the provide
 6. Independently verify provider resource state, budget, logs and performance rather than treating CI notifications as authoritative. Do not claim 100% deployment automation until onboarding and end-to-end validation are complete.
 
 Official references: https://paystack.com/docs/payments/payment-channels/ ; https://docs.aws.amazon.com/cli/latest/reference/apprunner/update-service.html ; https://docs.digitalocean.com/reference/doctl/reference/apps/create-deployment/ ; https://docs.railway.com/cli/up ; https://render.com/docs/deploy-hooks .
+
+
+## Unified seven-provider payment enforcement (November 7 update)
+
+All seven supported providers—Google Cloud Run, AWS App Runner, Azure Container Apps, DigitalOcean App Platform, Cloudflare Pages, Railway and Render—share a common backend preflight, `decideManagedCloudDeployment`. Each uses the **same project-specific, independently verified live Paystack billing entitlement**, regardless of whether the customer paid via Paystack hosted checkout or Paystack's M-Pesa channel. The preflight checks that the provider, branch and project match, and that the payment remains active. Test-mode payments, pending charges, expired subscriptions, mismatched providers and unauthorised branches are denied. A dedicated test suite exercises both checkout types and each provider with positive and negative cases.
+
+This is **TeknTandao's service subscription**, not a direct payment to AWS, Azure, Google Cloud or another provider; upstream provider consumption remains separately payable and must be disclosed to customers. No live checkout, production charge, automatic cloud deployment, domain purchase or reseller hosting order is enabled merely by these code changes.
