@@ -8,7 +8,7 @@ import {onCall,onRequest,HttpsError} from 'firebase-functions/v2/https';
 import {z} from 'zod';
 import {identifier} from './domain.js';
 import {serviceSchema,runSignalSchema,normalizedRepository,hashIngestionToken,verifyIngestionToken,computeCloudInsights} from './managed_cloud_domain.js';
-import {isCloudServicePaid} from './managed_cloud_billing_domain.js';
+import {isCloudServicePaid,decideManagedCloudDeployment} from './managed_cloud_billing_domain.js';
 
 const db=getFirestore(),region='europe-west1';
 async function owner(req){
@@ -144,14 +144,15 @@ export const managedCloudAuthorizeDeploy=onRequest({
  if(!project.exists||!verifyIngestionToken(token,project.data().ingestionTokenHash)){
   res.status(401).end();return;
  }
- if(req.body?.branch!==project.data().branch||
-   req.body?.cloudProvider!==project.data().cloudProvider){
-  res.status(403).json({authorized:false,reason:'source_or_provider_mismatch'});return;
- }
  const bill=(await db.doc('organizations/'+orgId+'/managedCloudBilling/'+projectId).get()).data();
- if(!isCloudServicePaid(bill)){
-  res.status(402).json({authorized:false,reason:'subscription_not_paid_or_expired'});return;
+ const decision=decideManagedCloudDeployment({
+  project:project.data(),billing:bill,
+  branch:req.body?.branch,cloudProvider:req.body?.cloudProvider
+ });
+ if(!decision.authorized){
+  res.status(decision.reason==='subscription_not_paid_or_expired'?402:403)
+   .json({authorized:false,reason:decision.reason});return;
  }
- res.status(200).json({authorized:true,provider:project.data().cloudProvider,
-  paidUntilMs:bill.paidUntilMs,notice:'Deployment authorization only; cloud provider expenses billed separately'});
+ res.status(200).json({...decision,
+  notice:'TeknTandao management subscription only; cloud provider consumption is billed separately'});
 });
