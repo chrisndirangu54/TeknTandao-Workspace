@@ -15,3 +15,22 @@ export function isCloudServicePaid(payment,now=Date.now()){
   payment?.receiptVerified===true&&payment?.status==='paid'&&
   typeof payment.paidUntilMs==='number'&&payment.paidUntilMs>now);
 }
+
+/**
+ * A single payment entitlement works with any registered cloud provider.
+ * A paid subscription does not settle the underlying cloud-provider invoice.
+ */
+export function decideManagedCloudDeployment({project,billing,branch,cloudProvider,now=Date.now()}={}){
+ if(!project||!cloudProvider||typeof project.cloudProvider!=='string')
+  return {authorized:false,reason:'unknown_project_or_provider'};
+ if(!Object.hasOwn(({
+  gcp_cloud_run:true,aws_apprunner:true,azure_container_apps:true,
+  digitalocean_app_platform:true,cloudflare_pages:true,railway:true,render:true
+ }),cloudProvider))
+  return {authorized:false,reason:'provider_not_supported'};
+ if(project.cloudProvider!==cloudProvider||project.branch!==branch)
+  return {authorized:false,reason:'source_or_provider_mismatch'};
+ if(!isCloudServicePaid(billing,now))
+  return {authorized:false,reason:'subscription_not_paid_or_expired'};
+ return {authorized:true,provider:cloudProvider,paidUntilMs:billing.paidUntilMs};
+}
