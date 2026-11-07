@@ -1,4 +1,5 @@
 import 'modules/seo_cloud_launch_page.dart';
+import 'modules/managed_cloud_deployment_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'suite.dart';
@@ -97,6 +98,10 @@ class _DashboardState extends State<Dashboard> {
           _openMicrosoftCommerce(seller: true);
           return;
         }
+        if (moduleId == 'managed-cloud') {
+          _openManagedCloud();
+          return;
+        }
         if (moduleId == 'automation') {
           _openAutomationStudio();
           return;
@@ -146,6 +151,11 @@ class _DashboardState extends State<Dashboard> {
   void _openKnownModule(String id) {
     final module = workspaceModuleById[id];
     if (module != null) _navigateToModule(module);
+  }
+
+  void _openManagedCloud() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ManagedCloudDeploymentScreen(store: store)));
   }
 
   void _openAutomationStudio() {
@@ -440,6 +450,11 @@ class _DashboardState extends State<Dashboard> {
               ],
             ),
             actions: [
+              if (!compact) IconButton(
+                tooltip: 'Managed cloud deployments and CI/CD',
+                onPressed: _openManagedCloud,
+                icon: const Icon(Icons.cloud_upload_outlined),
+              ),
               if (!compact) IconButton(
                 tooltip: 'Workspace WhatsApp Business settings',
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(

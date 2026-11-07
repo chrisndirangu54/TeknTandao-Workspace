@@ -1,7 +1,7 @@
 'use strict';
-const test=require('node:test');
-const assert=require('node:assert/strict');
-const {normalizedSubscription,eventEnvelope,serviceProducts}=require('../src/cross_product_entitlements');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {normalizedSubscription,eventEnvelope,serviceProducts} from '../src/cross_product_entitlements.js';
 test('retains canonical customer identity',()=>{
  const x=normalizedSubscription({customerId:'uid1',product:'TV',status:'active'},'sub1');
  assert.equal(x.customerId,'uid1');assert.equal(x.subscriptionId,'sub1');

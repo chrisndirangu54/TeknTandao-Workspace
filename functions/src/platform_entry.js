@@ -181,3 +181,18 @@ export * from './hotspot_google_rewards.js';
 
 // Multi-operator ad inventory, independently reviewed sites and campaign pilot planning.
 export * from './hotspot_network_marketplace.js';
+
+// GitHub CI/CD managed cloud onboarding and deployment telemetry.
+export * from './managed_cloud_ci.js';
+
+// Optional privacy-limited AI narrative about bounded cloud deployment observations.
+export * from './managed_cloud_ai.js';
+
+// Archive submissions are quarantined; no source compilation in Firebase Functions.
+export * from './cloud_source_uploads.js';
+
+// Verified prepaid cloud billing: Paystack checkout and Kenya M-Pesa through Paystack.
+export * from './managed_cloud_payments.js';
+
+// Namecheap reseller: sandbox domain availability, pricing and review-only hosting/domain orders.
+export * from './namecheap_reseller.js';

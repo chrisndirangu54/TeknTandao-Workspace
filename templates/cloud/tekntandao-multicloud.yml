@@ -1,0 +1,160 @@
+# Copy into the CUSTOMER repository as .github/workflows/tekntandao-multicloud.yml
+# Each customer configures a provider-specific deployment identity and protected production environment.
+name: TeknTandao Multi-cloud Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+concurrency:
+  group: tekntandao-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 35
+    env:
+      CLOUD_PROVIDER: ${{ vars.CLOUD_PROVIDER }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify customer payment and provider choice
+        env:
+          INGEST_TOKEN: ${{ secrets.TEKNTANDAO_INGEST_TOKEN }}
+          AUTH_URL: ${{ vars.TEKNTANDAO_AUTH_URL }}
+          ORG_ID: ${{ vars.TEKNTANDAO_ORG_ID }}
+          PROJECT_ID: ${{ vars.TEKNTANDAO_PROJECT_ID }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          node <<'NODE' > /tmp/deploy-auth.json
+          const e=process.env;
+          process.stdout.write(JSON.stringify({orgId:e.ORG_ID,projectId:e.PROJECT_ID,
+            cloudProvider:e.CLOUD_PROVIDER,branch:e.BRANCH}));
+          NODE
+          curl --fail --max-time 20 -H "Authorization: Bearer ${INGEST_TOKEN}" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/deploy-auth.json \
+            "${AUTH_URL}" >/dev/null
+          rm -f /tmp/deploy-auth.json
+
+      - name: Google Cloud OIDC
+        if: env.CLOUD_PROVIDER == 'gcp_cloud_run'
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - name: Deploy to Google Cloud Run
+        id: gcp_deploy
+        if: env.CLOUD_PROVIDER == 'gcp_cloud_run'
+        uses: google-github-actions/deploy-cloudrun@v3
+        with:
+          service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          region: ${{ vars.GCP_CLOUD_RUN_REGION }}
+          source: .
+          flags: --no-allow-unauthenticated
+
+      - name: AWS OIDC credentials
+        if: env.CLOUD_PROVIDER == 'aws_apprunner'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Build and update AWS App Runner (existing ECR-based service)
+        if: env.CLOUD_PROVIDER == 'aws_apprunner'
+        env:
+          AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ECR_REPO: ${{ vars.AWS_ECR_REPOSITORY }}
+          APP_RUNNER_ARN: ${{ vars.AWS_APP_RUNNER_SERVICE_ARN }}
+        run: |
+          REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          aws ecr get-login-password --region "${AWS_REGION}" |
+            docker login --username AWS --password-stdin "${REGISTRY}"
+          docker build -t "${REGISTRY}/${ECR_REPO}:${GITHUB_SHA}" .
+          docker push "${REGISTRY}/${ECR_REPO}:${GITHUB_SHA}"
+          aws apprunner update-service --service-arn "${APP_RUNNER_ARN}" \
+            --source-configuration "ImageRepository={ImageIdentifier=${REGISTRY}/${ECR_REPO}:${GITHUB_SHA},ImageRepositoryType=ECR},AutoDeploymentsEnabled=false"
+
+      - name: Azure federated login
+        if: env.CLOUD_PROVIDER == 'azure_container_apps'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy Azure Container Apps from source
+        if: env.CLOUD_PROVIDER == 'azure_container_apps'
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_CONTAINER_APP: ${{ vars.AZURE_CONTAINER_APP }}
+          AZURE_CONTAINER_ENV: ${{ vars.AZURE_CONTAINER_ENV }}
+        run: |
+          az extension add --name containerapp --upgrade --yes
+          az containerapp up --name "${AZURE_CONTAINER_APP}" \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --environment "${AZURE_CONTAINER_ENV}" --source .
+
+      - name: DigitalOcean App Platform deployment (existing application)
+        if: env.CLOUD_PROVIDER == 'digitalocean_app_platform'
+        env:
+          DO_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          DO_APP_ID: ${{ vars.DIGITALOCEAN_APP_ID }}
+        run: |
+          curl -fsSL https://github.com/digitalocean/doctl/releases/download/v1.125.0/doctl-1.125.0-linux-amd64.tar.gz | tar xz
+          ./doctl auth init -t "${DO_TOKEN}"
+          ./doctl apps create-deployment "${DO_APP_ID}" --update-sources
+
+      - name: Cloudflare Pages build and deploy
+        if: env.CLOUD_PROVIDER == 'cloudflare_pages'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CF_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          npm ci
+          npm run build
+          npx --yes wrangler@3 pages deploy dist --project-name "${CF_PAGES_PROJECT}"
+
+      - name: Railway deployment
+        if: env.CLOUD_PROVIDER == 'railway'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
+        run: |
+          npm install --global @railway/cli
+          railway up --service "${RAILWAY_SERVICE}" --ci
+
+      - name: Render deployment (preconfigured Git-linked service)
+        if: env.CLOUD_PROVIDER == 'render'
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          curl --fail --max-time 30 -X POST "${RENDER_DEPLOY_HOOK}"
+
+      - name: Report CI outcome to TeknTandao
+        if: always()
+        continue-on-error: true
+        env:
+          INGEST_TOKEN: ${{ secrets.TEKNTANDAO_INGEST_TOKEN }}
+          REPORT_URL: ${{ vars.TEKNTANDAO_INGEST_URL }}
+          ORG_ID: ${{ vars.TEKNTANDAO_ORG_ID }}
+          PROJECT_ID: ${{ vars.TEKNTANDAO_PROJECT_ID }}
+          CLOUD_PROVIDER: ${{ vars.CLOUD_PROVIDER }}
+          RUN_ID: ${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          node <<'NODE' > /tmp/tekntandao-report.json
+          const e=process.env;
+          const s=e.JOB_STATUS==='success'?'success':e.JOB_STATUS==='cancelled'?'cancelled':'failure';
+          process.stdout.write(JSON.stringify({orgId:e.ORG_ID,projectId:e.PROJECT_ID,
+            run:{runId:e.RUN_ID,sha:e.SHA,branch:e.BRANCH,status:s}}));
+          NODE
+          curl --fail-with-body --retry 2 --max-time 20 \
+            -H "Authorization: Bearer ${INGEST_TOKEN}" -H "Content-Type: application/json" \
+            --data-binary @/tmp/tekntandao-report.json "${REPORT_URL}"
+          rm -f /tmp/tekntandao-report.json

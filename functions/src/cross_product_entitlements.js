@@ -2,7 +2,7 @@
 // Deliberately pure: intended for reuse by existing verified-billing and ISP
 // admin Functions, without touching routers or changing payment state.
 const PRODUCTS = new Set(['TV','ISP','WORKSPACE','ISP_TV_BUNDLE']);
-function normalizedSubscription(record, id) {
+export function normalizedSubscription(record, id) {
   if (!record || !PRODUCTS.has(record.product)) throw new Error('invalid_product');
   if (typeof record.customerId !== 'string' || !record.customerId) throw new Error('invalid_customer');
   return {
@@ -11,7 +11,7 @@ function normalizedSubscription(record, id) {
     startsAt:record.startsAt ?? null, endsAt:record.endsAt ?? null
   };
 }
-function eventEnvelope({eventId, subscriptionId, customerId, product, status, occurredAt}) {
+export function eventEnvelope({eventId, subscriptionId, customerId, product, status, occurredAt}) {
   if (![eventId,subscriptionId,customerId].every(x=>typeof x==='string' && x.length>0)) throw new Error('missing_id');
   if (!PRODUCTS.has(product)) throw new Error('invalid_product');
   if (!['pending','active','trialing','paused','expired','cancelled'].includes(status)) throw new Error('invalid_state');
@@ -19,8 +19,8 @@ function eventEnvelope({eventId, subscriptionId, customerId, product, status, oc
   if (!Number.isFinite(when.getTime())) throw new Error('invalid_time');
   return {type:'subscription.status.changed.v1',eventId,subscriptionId,customerId,product,newStatus:status,occurredAt:when.toISOString()};
 }
-function serviceProducts(product) {
+export function serviceProducts(product) {
   if (!PRODUCTS.has(product)) throw new Error('invalid_product');
   return product === 'ISP_TV_BUNDLE' ? ['ISP','TV'] : [product];
 }
-module.exports={normalizedSubscription,eventEnvelope,serviceProducts};
+

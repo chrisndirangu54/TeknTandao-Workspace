@@ -11,7 +11,10 @@ param memorySize string = '1Gi'
 resource workspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: '${appName}-logs'
   location: location
-  properties: { sku: {name: 'PerGB2018'} retentionInDays: 30 }
+  properties: {
+    sku: { name: 'PerGB2018' }
+    retentionInDays: 30
+  }
 }
 resource env 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: '${appName}-env'
@@ -32,12 +35,28 @@ resource app 'Microsoft.App/containerApps@2023-05-01' = {
  properties: {
   managedEnvironmentId: env.id
   configuration: {
-   ingress: { external: true, targetPort: 8080, transport: 'auto' }
+   ingress: {
+     external: true
+     targetPort: 8080
+     transport: 'auto'
+   }
    activeRevisionsMode: 'Single'
   }
   template: {
-   containers: [{name: 'app',image: image,resources: {cpu: json(cpuCores),memory: memorySize}}]
-   scale: {minReplicas: 0,maxReplicas: 2}
+   containers: [
+     {
+       name: 'app'
+       image: image
+       resources: {
+         cpu: json(cpuCores)
+         memory: memorySize
+       }
+     }
+   ]
+   scale: {
+     minReplicas: 0
+     maxReplicas: 2
+   }
   }
  }
 }
